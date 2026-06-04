@@ -19,7 +19,7 @@ skills:
   # -- AppSec ---------------------------------------------------------------
   - id: threat-modeling
     name: "Threat Modeling (STRIDE)"
-    tags: [appsec, design, architecture, threat-model]
+    tags: [appsec, design, architecture, threat-model, messaging, queue]
     role: [security-engineer, architect, appsec-engineer, vciso]
     phase: [design, review]
     activity: [assess, design]
