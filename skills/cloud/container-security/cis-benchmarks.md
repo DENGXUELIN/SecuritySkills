@@ -254,6 +254,138 @@ spec:
   automountServiceAccountToken: false
 ```
 
+Review both the ServiceAccount object and each workload's Pod template. The Pod-level setting overrides the ServiceAccount-level setting, and a missing value can still result in a token being mounted by default.
+
+#### ServiceAccount Token Projection and Workload Identity Evidence
+
+Kubernetes clusters commonly use bound, projected ServiceAccount tokens for Kubernetes API access and cloud workload identity. These tokens are safer than legacy static Secret-backed tokens, but they still need explicit review.
+
+Record the following evidence for each workload:
+
+| Evidence | Review Question |
+|----------|-----------------|
+| `serviceAccountName` | Is the workload using a purpose-specific ServiceAccount instead of `default`? |
+| `automountServiceAccountToken` | Is auto-mounting disabled when no Kubernetes API token is needed? |
+| `projected.serviceAccountToken.audience` | Is the audience narrow and tied to the exact API or external identity provider? |
+| `projected.serviceAccountToken.expirationSeconds` | Is the token short-lived and justified for the workload? |
+| `volumeMounts` | Is the token mounted only into containers that need it, including init and sidecar containers? |
+| RBAC bindings | Are verbs/resources namespace-scoped and least-privileged? |
+| Workload identity annotations | Do cloud IAM bindings constrain namespace, ServiceAccount, subject, and audience? |
+
+```yaml
+# BAD: Default Kubernetes API token is available to every container in the pod.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reporting
+spec:
+  template:
+    spec:
+      serviceAccountName: default
+      containers:
+        - name: app
+          image: example/reporting:1.0
+        - name: log-sidecar
+          image: example/log-forwarder:1.0
+
+---
+# BAD: Projected token has a broad external audience, long lifetime, and is
+# mounted into a sidecar that does not need cloud identity.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: export-worker
+spec:
+  template:
+    spec:
+      serviceAccountName: export-worker
+      automountServiceAccountToken: false
+      volumes:
+        - name: cloud-identity
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: https://iam.example.com/
+                  expirationSeconds: 86400
+      containers:
+        - name: worker
+          image: example/export-worker:1.0
+          volumeMounts:
+            - name: cloud-identity
+              mountPath: /var/run/secrets/tokens
+              readOnly: true
+        - name: metrics-sidecar
+          image: example/metrics:1.0
+          volumeMounts:
+            - name: cloud-identity
+              mountPath: /var/run/secrets/tokens
+              readOnly: true
+```
+
+```yaml
+# GOOD: Auto-mounted API tokens are disabled, and the projected token is
+# short-lived, audience-scoped, read-only, and mounted only into the container
+# that exchanges it with the intended identity provider.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: export-worker
+  namespace: production
+automountServiceAccountToken: false
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: export-worker
+  namespace: production
+spec:
+  template:
+    spec:
+      serviceAccountName: export-worker
+      automountServiceAccountToken: false
+      volumes:
+        - name: cloud-identity
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: api://export-worker-prod
+                  expirationSeconds: 600
+      containers:
+        - name: worker
+          image: example/export-worker:1.0
+          volumeMounts:
+            - name: cloud-identity
+              mountPath: /var/run/secrets/tokens
+              readOnly: true
+        - name: metrics-sidecar
+          image: example/metrics:1.0
+```
+
+Severity guidance:
+
+- **Critical:** Projected or auto-mounted ServiceAccount token can reach cluster-admin, wildcard cluster-wide permissions, or broad secret access from an application workload.
+- **High:** Token has broad audience, excessive lifetime, or is mounted into unnecessary containers while the ServiceAccount has meaningful namespace permissions.
+- **Medium:** Token scope is partly constrained but lacks documented audience/expiration justification, read-only mount, or container-level mount minimization.
+- **Low:** Minor documentation or naming issue where effective RBAC and token mount scope are already least-privileged.
+
+Suggested grep patterns:
+
+```
+serviceAccountName:
+automountServiceAccountToken:
+projected:
+serviceAccountToken:
+audience:
+expirationSeconds:
+volumeMounts:
+eks.amazonaws.com/role-arn
+iam.gke.io/gcp-service-account
+azure.workload.identity/client-id
+```
+
 ### CIS 5.2 -- Pod Security Standards
 
 Evaluate workload configurations against Kubernetes Pod Security Standards. The three levels are:

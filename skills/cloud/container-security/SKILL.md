@@ -13,7 +13,7 @@ phase: [build, deploy, operate]
 frameworks: [CIS-Docker-v1.6.0, CIS-Kubernetes-v1.9.0, NIST-SP-800-190]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -59,6 +59,7 @@ NIST SP 800-190 identifies five risk categories: image risks, registry risks, or
 - Access to Dockerfiles and container build configurations
 - Kubernetes manifests (YAML), Helm charts, or Kustomize overlays
 - RBAC configuration files (Roles, ClusterRoles, RoleBindings)
+- ServiceAccount definitions, token projection volumes, and workload identity annotations
 - NetworkPolicy definitions
 - Pod Security Standard configurations or OPA/Gatekeeper policies
 - Container registry configurations (if available)
@@ -99,6 +100,12 @@ Use Glob to locate all relevant configuration files.
 **/*-ingress.yaml
 **/*-networkpolicy.yaml
 **/*-rbac.yaml
+**/*-role.yaml
+**/*-rolebinding.yaml
+**/*-clusterrole.yaml
+**/*-clusterrolebinding.yaml
+**/*-serviceaccount.yaml
+**/*-serviceaccount.yml
 **/*-psp.yaml
 **/*-podsecuritypolicy.yaml
 ```
@@ -109,7 +116,26 @@ Classify findings by type: Dockerfiles, Kubernetes manifests, Helm charts, Kusto
 
 ### Step 2 through Step 6: CIS Benchmark and NIST SP 800-190 Evaluation
 
-Evaluate all container and Kubernetes configurations against CIS Docker Benchmark v1.6.0, CIS Kubernetes Benchmark v1.9.0, and NIST SP 800-190 countermeasures. This covers Dockerfile security, Pod Security Standards, RBAC, Network Policies, Secrets Management, Control Plane configuration, and Container Runtime Hardening.
+Evaluate all container and Kubernetes configurations against CIS Docker Benchmark v1.6.0, CIS Kubernetes Benchmark v1.9.0, and NIST SP 800-190 countermeasures. This covers Dockerfile security, Pod Security Standards, RBAC, ServiceAccount token exposure, Network Policies, Secrets Management, Control Plane configuration, and Container Runtime Hardening.
+
+For Kubernetes workloads, build an evidence chain from the workload to the ServiceAccount, ServiceAccount token source, token mount scope, and effective RBAC:
+
+| Evidence | What to Record |
+|----------|----------------|
+| Workload identity | Namespace, workload kind/name, `serviceAccountName`, and whether the default ServiceAccount is used implicitly |
+| Auto-mount state | `automountServiceAccountToken` at the ServiceAccount and Pod template levels, including inherited/default behavior |
+| Token projection | `projected.serviceAccountToken` path, `audience`, `expirationSeconds`, and target volume name |
+| Mount scope | Each container, init container, and sidecar that mounts the token volume; whether the mount is read-only |
+| Effective RBAC | Role/ClusterRole permissions reachable through RoleBinding/ClusterRoleBinding for that ServiceAccount |
+| External trust | Workload identity annotations or federation bindings that trust the projected token audience/subject |
+
+Flag any of the following as findings:
+
+- Default ServiceAccount used by application workloads, especially when token auto-mounting is not explicitly disabled.
+- ServiceAccount tokens mounted into containers that do not call the Kubernetes API or an external identity provider.
+- Projected tokens with missing/default audience, overly broad audience, or long `expirationSeconds` without justification.
+- Workload identity annotations or federation bindings that are not tied to a narrow namespace, ServiceAccount subject, and intended audience.
+- ServiceAccount tokens combined with wildcard, cluster-wide, or secret-reading RBAC.
 
 For detailed CIS benchmark checklist items, NIST SP 800-190 countermeasure tables, and comprehensive security context evaluation criteria, see [cis-benchmarks.md](cis-benchmarks.md) in this skill directory.
 
@@ -126,8 +152,8 @@ Produce the final report using the structure defined in the Output Format sectio
 
 | Severity | Definition | Examples |
 |----------|-----------|----------|
-| **Critical** | Container escape, cluster compromise, or credential exposure | Privileged containers, Docker socket mounts, cluster-admin bound to application SA, secrets in plaintext manifests, `hostPID`/`hostNetwork` on app pods |
-| **High** | Significant security gap enabling lateral movement or privilege escalation | Running as root, missing network policies, wildcard RBAC, `allowPrivilegeEscalation: true`, host path mounts to sensitive directories |
+| **Critical** | Container escape, cluster compromise, or credential exposure | Privileged containers, Docker socket mounts, cluster-admin bound to application SA, secrets in plaintext manifests, service account token with cluster-admin RBAC mounted into app containers, `hostPID`/`hostNetwork` on app pods |
+| **High** | Significant security gap enabling lateral movement or privilege escalation | Running as root, missing network policies, wildcard RBAC, broad service account token audience with long expiration, `allowPrivilegeEscalation: true`, host path mounts to sensitive directories |
 | **Medium** | Missing hardening that weakens defense-in-depth | No resource limits, mutable image tags, missing seccomp profile, read-write root filesystem, secrets as env vars |
 | **Low** | Best-practice deviation with limited immediate risk | No HEALTHCHECK in Dockerfile, ADD instead of COPY, missing liveness/readiness probes, using default namespace |
 | **Informational** | Observation with no direct security impact | Image size optimization, multi-stage build suggestions, label recommendations |
@@ -173,6 +199,7 @@ Produce the final report using the structure defined in the Output Format sectio
 - **File:** <path>
 - **Line(s):** <line numbers>
 - **Resource:** <Deployment/StatefulSet name>
+- **ServiceAccount / Token Evidence:** <namespace/name, auto-mount state, projected token audience/expiry, mounted containers, effective RBAC>
 - **Container:** <container name>
 - **Description:** <what was found>
 - **Evidence:** <specific configuration>
@@ -184,6 +211,13 @@ Produce the final report using the structure defined in the Output Format sectio
 |----------|-----------|-----------|------------|
 | deploy/app | production | Baseline (not Restricted) | runAsRoot, no seccomp |
 | deploy/worker | production | Privileged | privileged: true |
+
+### ServiceAccount Token Evidence Matrix
+
+| Workload | Namespace | ServiceAccount | Token Source | Audience | Expiration | Mounted Containers | Effective RBAC | Status |
+|----------|-----------|----------------|--------------|----------|------------|--------------------|----------------|--------|
+| deploy/app | production | app-sa | projected volume | api://vault | 600s | app only | get/list secrets in namespace | Review |
+| deploy/worker | production | default (implicit) | auto-mounted default | Kubernetes API | default | worker, sidecar | wildcard ClusterRole | Fail |
 
 ### Prioritized Remediation Plan
 
@@ -220,7 +254,7 @@ Produce the final report using the structure defined in the Output Format sectio
 | 2 | etcd | TLS configuration, peer authentication, unique CA |
 | 3 | Control Plane Configuration | Authentication, authorization, admission controllers, audit logging |
 | 4 | Worker Nodes | Kubelet configuration, file permissions, TLS bootstrapping |
-| 5 | Policies | RBAC, Pod Security Standards, network policies, secrets management |
+| 5 | Policies | RBAC, ServiceAccount token mounting, Pod Security Standards, network policies, secrets management |
 
 ### NIST SP 800-190 -- Risk Categories and Countermeasures
 
@@ -228,7 +262,7 @@ Produce the final report using the structure defined in the Output Format sectio
 |--------------|-----------|---------------------|
 | Image Risks | Vulnerabilities, malware, embedded secrets, unpatched software | Minimal base images, scanning, signing, immutable references |
 | Registry Risks | Unauthorized access, stale images, insufficient authentication | Registry authentication, image lifecycle policies |
-| Orchestrator Risks | Unrestricted access, mixed sensitivity workloads, insufficient logging | RBAC, namespaces, network policies, audit logging |
+| Orchestrator Risks | Unrestricted access, mixed sensitivity workloads, insufficient logging, over-broad workload identity tokens | RBAC, namespaces, network policies, service account token scoping, audit logging |
 | Container Risks | Runtime privilege escalation, unbounded resources, writable filesystems | Non-root, capabilities, resource limits, read-only FS |
 | Host OS Risks | Shared kernel, large attack surface, unpatched hosts | Minimal host OS, regular patching, immutable infrastructure |
 
@@ -257,6 +291,7 @@ Produce the final report using the structure defined in the Output Format sectio
 5. **`readOnlyRootFilesystem` breaks many applications.** When recommending this control, also recommend adding writable `emptyDir` volume mounts for directories the application needs to write to (e.g., `/tmp`, `/var/cache`).
 6. **Network policies are additive, not subtractive.** A default-deny policy must be explicitly created. Without it, all pod-to-pod traffic is allowed regardless of other NetworkPolicy resources.
 7. **Distroless images have no shell.** While this is excellent for security, note that debugging requires ephemeral containers (`kubectl debug`). Flag this as a consideration, not a problem.
+8. **`automountServiceAccountToken: false` is not the whole token story.** Workloads can still mount explicit projected ServiceAccount tokens for Kubernetes API calls or cloud workload identity. Review the projected token audience, expiration, mounted containers, and effective RBAC before marking the workload safe.
 
 ---
 
@@ -285,6 +320,8 @@ Produce the final report using the structure defined in the Output Format sectio
 - Kubernetes Pod Security Admission: https://kubernetes.io/docs/concepts/security/pod-security-admission/
 - Kubernetes Network Policies: https://kubernetes.io/docs/concepts/services-networking/network-policies/
 - Kubernetes RBAC: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- Kubernetes ServiceAccounts: https://kubernetes.io/docs/concepts/security/service-accounts/
+- Kubernetes ServiceAccount token projection: https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/
 - Docker Security Best Practices: https://docs.docker.com/develop/security-best-practices/
 - Dockerfile Best Practices: https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
 - NSA/CISA Kubernetes Hardening Guide: https://media.defense.gov/2022/Aug/29/2003066362/-1/-1/0/CTR_KUBERNETES_HARDENING_GUIDANCE_1.2_20220829.PDF
@@ -293,4 +330,5 @@ Produce the final report using the structure defined in the Output Format sectio
 
 ## Changelog
 
+- **1.0.1** -- Added ServiceAccount token evidence coverage for projected token audience, expiration, mount scope, workload identity bindings, and effective RBAC.
 - **1.0.0** -- Initial release. Full coverage of CIS Docker Benchmark v1.6.0 Section 4-5, CIS Kubernetes Benchmark v1.9.0 Sections 1-5, and NIST SP 800-190 countermeasures across all five risk categories.
