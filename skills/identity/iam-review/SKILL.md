@@ -13,7 +13,7 @@ phase: [design, operate]
 frameworks: [NIST-SP-800-63B, NIST-SP-800-207, CIS-Controls-v8]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.1.0"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -174,6 +174,10 @@ IAM-PRIV-05: Custom roles with excessive scope beyond job function
 IAM-PRIV-06: Direct policy attachment instead of role/group-based assignment (CIS 6.8)
 IAM-PRIV-07: Cross-account access without external ID or condition keys
 IAM-PRIV-08: Resource-based policies granting public or overly broad access
+IAM-PRIV-09: Cloud privilege escalation path not tested or documented
+IAM-PRIV-10: Role passing or service account impersonation can attach elevated runtime identities
+IAM-PRIV-11: IAM policy administration can self-grant, roll back, or attach privileged permissions
+IAM-PRIV-12: Identity provider or application registration administration can mint credentials or assign app roles
 ```
 
 **Platform-specific checks:**
@@ -188,12 +192,53 @@ IAM-PRIV-08: Resource-based policies granting public or overly broad access
 | **GCP** | IAM Recommender, Policy Analyzer | Excess permissions, recommended removals |
 | **GCP** | Organization-level IAM bindings | Primitive roles (Owner, Editor) at org/folder level |
 
+#### Cloud Privilege Escalation Evidence Gate
+
+Do not classify a cloud IAM review as complete until privilege escalation routes have been tested or explicitly marked Not Evaluable. Broad permission review is not enough; many real escalation paths use a small set of administrative verbs to create, attach, or impersonate a more privileged identity.
+
+For each cloud provider in scope, produce a matrix with:
+
+| Field | Evidence Required |
+|---|---|
+| **Principal** | User, group, role, service principal, managed identity, service account, or workload identity being evaluated |
+| **Current Grants** | Direct grants, group grants, inherited grants, permission sets, custom roles, and resource-scoped bindings |
+| **Escalation Primitive** | The exact permission that could change effective privileges, impersonate another identity, pass a role, create credentials, or modify trust |
+| **Target Identity / Resource** | The role, service account, app registration, managed identity, workload, policy, or resource that would receive or expose elevated access |
+| **Required Conditions** | Boundaries, SCPs, deny assignments, conditional access, IAM Conditions, approval workflows, trust-policy conditions, and resource restrictions |
+| **Observed Result** | Escalates, blocked, requires approval, constrained to non-production, no target found, or Not Evaluable |
+| **False-Positive Guardrail** | Evidence showing why a broad-looking grant is not exploitable, such as explicit deny, boundary enforcement, resource condition, or missing target control |
+
+Provider-specific paths to validate:
+
+| Platform | Escalation Path | Evidence to Collect |
+|---|---|---|
+| **AWS** | `iam:PassRole` to Lambda, EC2, ECS, CodeBuild, CloudFormation, Glue, or Step Functions | Allowed role ARNs, service constraints, trust policy principals, `iam:PassedToService` conditions, and whether the caller can start or update the target workload |
+| **AWS** | Policy self-management, including `CreatePolicyVersion`, `SetDefaultPolicyVersion`, `AttachUserPolicy`, `AttachRolePolicy`, `PutUserPolicy`, `PutRolePolicy`, or `UpdateAssumeRolePolicy` | Existing policy documents, allowed resources, permissions boundaries, SCPs, and whether a new default or inline policy could grant admin actions |
+| **AWS** | STS role assumption or external cross-account trust | Trust policy principals, `sts:AssumeRole` permissions, external ID, source identity, MFA, session tags, and condition-key enforcement |
+| **Azure / Entra ID** | Azure RBAC role assignment or custom role administration | `Microsoft.Authorization/roleAssignments/write`, `roleDefinitions/write`, scope level, eligible vs. active PIM state, deny assignments, and approval requirements |
+| **Azure / Entra ID** | App registration, enterprise application, or service principal credential control | Ability to add secrets/certificates, assign app roles, grant admin consent, update federated credentials, or modify owners |
+| **Azure / Entra ID** | Managed identity attachment or workload control | Managed identity contributor permissions, VM/function/automation ownership, Key Vault data-plane access, and whether the identity can be used to retrieve secrets or tokens |
+| **GCP** | Service account impersonation | `iam.serviceAccounts.actAs`, `iam.serviceAccounts.getAccessToken`, `iam.serviceAccounts.signJwt`, `Service Account Token Creator`, workload identity bindings, and target service account roles |
+| **GCP** | IAM policy mutation | `resourcemanager.*.setIamPolicy`, `iam.roles.update`, project/folder/org scope, conditional bindings, deny policies, and primitive Owner/Editor inheritance |
+| **GCP** | Workload launch with privileged service account | Cloud Build, Cloud Run, Cloud Functions, Compute Engine, GKE, or Deployment Manager permissions plus attached service account privileges |
+
+Severity guidance for this gate:
+
+| Condition | Suggested Severity |
+|---|---|
+| Principal can grant itself or launch a workload with full administrative access in production | **Critical** |
+| Principal can impersonate or pass a high-privilege identity with low friction | **High** |
+| Principal can escalate only after approval, in non-production, or under strong conditional controls | **Medium** |
+| Escalation path is blocked by explicit deny, boundary, or missing target control, but evidence is incomplete | **Low / Not Evaluable** |
+
 **Severity Classification:**
 
 | Finding | Severity | Rationale |
 |---|---|---|
 | Wildcard admin (`*:*`) on production | **Critical** | Full environment compromise potential |
 | Standing admin without JIT | **High** | Persistent lateral movement target |
+| Role passing or service-account impersonation into privileged workloads | **High** | Converts limited IAM rights into runtime access with broader permissions |
+| IAM policy or app-registration administration without guardrails | **High** | Can mint credentials, attach privileges, or alter trust relationships |
 | Unused permissions > 90 days | **Medium** | Attack surface reduction opportunity |
 | Direct policy attachment | **Low** | Governance improvement, not direct risk |
 
@@ -380,6 +425,8 @@ For each finding, produce a row with:
 | **Framework Ref** | NIST SP 800-63B section, NIST SP 800-207 tenet, or CIS Control ID |
 | **Affected Scope** | Accounts, roles, policies, or platforms impacted |
 | **Evidence** | Specific configuration, policy, or data supporting the finding |
+| **Privilege Escalation Path** | Escalation primitive, target identity/resource, required conditions, and observed result |
+| **Guardrail Status** | Boundary, deny, approval, condition, or segmentation control that blocks or limits escalation |
 | **Remediation** | Prioritized fix with implementation guidance |
 | **Effort** | Low (< 1 day) / Medium (1-5 days) / High (> 5 days) |
 
@@ -413,6 +460,11 @@ For each finding, produce a row with:
 
 ### Detailed Findings
 [Findings table — see above]
+
+### Cloud Privilege Escalation Matrix
+| Platform | Principal | Current Grants | Escalation Primitive | Target Identity / Resource | Required Conditions | Observed Result | Severity | Guardrail Status |
+|---|---|---|---|---|---|---|---|---|
+| [AWS/Azure/GCP] | [identity] | [direct/inherited grants] | [pass role / impersonation / policy mutation / credential minting] | [target] | [boundary/approval/condition] | [escalates/blocked/not evaluable] | [severity] | [evidence] |
 
 ### Remediation Roadmap
 [Prioritized actions: immediate (0-7 days), short-term (30 days), medium-term (90 days)]
@@ -508,4 +560,5 @@ This skill processes user-supplied content including IAM policies, access config
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.1.0 | 2026-06-05 | Added cloud privilege escalation evidence gates for AWS, Azure/Entra ID, and GCP, including role passing, service account impersonation, policy mutation, app credential control, guardrail evidence, and report output fields. |
 | 1.0.0 | 2025-03-06 | Initial release |

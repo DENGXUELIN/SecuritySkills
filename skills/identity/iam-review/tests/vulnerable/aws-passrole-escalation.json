@@ -1,0 +1,30 @@
+{
+  "principal": "arn:aws:iam::111122223333:user/developer",
+  "attachedPolicies": [
+    {
+      "policyName": "DeveloperPassAnyRole",
+      "document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Action": [
+              "iam:PassRole",
+              "lambda:CreateFunction",
+              "lambda:UpdateFunctionConfiguration"
+            ],
+            "Resource": "*"
+          }
+        ]
+      }
+    }
+  ],
+  "targetRoles": [
+    {
+      "arn": "arn:aws:iam::111122223333:role/AdminRuntimeRole",
+      "trusts": ["lambda.amazonaws.com"],
+      "permissions": ["AdministratorAccess"]
+    }
+  ],
+  "expectedFinding": "IAM-PRIV-10: developer can pass an administrative runtime role to Lambda without iam:PassedToService, role ARN, permissions boundary, or SCP guardrails."
+}
