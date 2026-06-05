@@ -1,0 +1,57 @@
+name: reusable deploy boundary benign
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        type: choice
+        required: true
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  call-deploy:
+    permissions:
+      contents: read
+      id-token: write
+    uses: org/platform/.github/workflows/deploy.yml@8f3a4c2d1e6b5a7980c4e2f11a9b8c7d6e5f4a3b
+    secrets:
+      deploy_token: ${{ secrets.DEPLOY_TOKEN }}
+    with:
+      deploy-target: ${{ inputs.target }}
+
+---
+
+name: called reusable deploy
+
+on:
+  workflow_call:
+    inputs:
+      deploy-target:
+        type: string
+        required: true
+    secrets:
+      deploy_token:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.deploy-target }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - shell: bash
+        env:
+          DEPLOY_TARGET: ${{ inputs.deploy-target }}
+        run: |
+          case "$DEPLOY_TARGET" in
+            staging|production) ./deploy.sh "$DEPLOY_TARGET" ;;
+            *) echo "unsupported target" >&2; exit 1 ;;
+          esac

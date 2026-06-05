@@ -99,6 +99,10 @@ azure-pipelines.yml
 .circleci/config.yml
 bitbucket-pipelines.yml
 .tekton/*.yaml
+
+# GitHub reusable workflow surfaces
+.github/workflows/*.yml   # look for on: workflow_call
+.github/workflows/*.yaml  # and jobs.<id>.uses: owner/repo/.github/workflows/*.yml@ref
 ```
 
 Also locate supporting security configuration:
@@ -252,6 +256,7 @@ on: pull_request_target
 
 - **Indirect PPE:** Workflows that execute scripts, Makefiles, or config files that exist in the repository and can be modified by a pull request.
 - **Public fork access:** Whether the repository allows workflows to run on pull requests from forks with access to secrets.
+- **Reusable workflow PPE:** Called workflows triggered by `workflow_call` that execute caller-controlled `inputs.*`, `github.event.*`, branch names, artifact names, package names, or deployment targets in shell commands, checkout refs, scripts, package-manager commands, or deployment tooling without allowlist validation. Treat the caller workflow as a trust boundary: a safe called workflow can become privileged PPE if a lower-trust caller can choose inputs that affect commands, refs, artifacts, or deployment behavior.
 - Injection of untrusted input into shell commands:
 
 ```yaml
@@ -264,7 +269,39 @@ on: pull_request_target
     PR_TITLE: ${{ github.event.pull_request.title }}
 ```
 
-**Finding format:** Report any `pull_request_target` usage, direct expression injection in `run:` steps, fork workflow policies, and whether PR code can influence privileged pipelines.
+**Reusable workflow patterns to check:**
+
+```yaml
+# RISKY: caller input flows into a privileged shell command without validation
+on:
+  workflow_call:
+    inputs:
+      deploy-target:
+        type: string
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./deploy.sh ${{ inputs.deploy-target }}
+
+# SAFER: validate caller input before command or deployment use
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - shell: bash
+        env:
+          DEPLOY_TARGET: ${{ inputs.deploy-target }}
+        run: |
+          case "$DEPLOY_TARGET" in
+            staging|production) ./deploy.sh "$DEPLOY_TARGET" ;;
+            *) echo "unsupported target" >&2; exit 1 ;;
+          esac
+```
+
+**Finding format:** Report any `pull_request_target` usage, direct expression injection in `run:` steps, fork workflow policies, `workflow_call` inputs that influence commands or refs, and whether PR code or lower-trust caller workflows can influence privileged pipelines.
 
 ---
 
@@ -277,6 +314,9 @@ on: pull_request_target
 - Secrets available to all workflows rather than scoped to specific environments.
 - No conditional checks on branch or environment before accessing sensitive resources.
 - Self-hosted runners shared across repositories with different trust levels.
+- Reusable workflow caller jobs that use `secrets: inherit` instead of explicitly passing only the named secrets required by the called workflow.
+- Caller jobs that omit least-privilege `permissions:` when invoking a reusable workflow, allowing the called workflow to run with the caller repository's default `GITHUB_TOKEN` capabilities.
+- Reusable workflows callable from repositories, branches, or workflows that do not meet the same trust level as the secrets, environments, runners, or deployment actions used by the called workflow.
 
 **Grep patterns:**
 
@@ -290,9 +330,25 @@ if: github.ref == 'refs/heads/main'
 
 # Check for runner isolation
 runs-on: self-hosted  # Shared runners are a risk
+
+# Check reusable workflow secret and token boundaries
+uses: org/repo/.github/workflows/deploy.yml@v1
+secrets: inherit
+permissions:
 ```
 
-**Finding format:** Report whether secrets and deployment capabilities are scoped to appropriate environments and branches, and whether runner infrastructure is properly segmented.
+**Reusable workflow boundary evidence:**
+
+| Evidence | Pass Condition | Risk If Missing |
+|---|---|---|
+| Caller inventory | Every `jobs.<id>.uses` reusable workflow call is listed with caller repo, branch/event, and called ref | Review misses which lower-trust callers can reach privileged workflows |
+| Secret passing | Caller passes explicit named secrets, not broad `secrets: inherit`, unless caller and callee share the same trust boundary | Called workflow receives unrelated organization, repository, or environment secrets |
+| Token permissions | Caller job sets least-privilege `permissions:` and callee does not assume broader default token access | Called workflow can write contents, packages, deployments, or security events unexpectedly |
+| Input validation | Called workflow validates `inputs.*` before shell, checkout ref, package, artifact, cloud, or deployment use | Caller-controlled input becomes command injection or deployment-target injection |
+| Environment gates | Production/staging environments are protected in the caller/callee path that actually touches secrets or deploys | Reusable deployment bypasses environment reviewers or branch rules |
+| Ref pinning | Cross-repository reusable workflows are pinned to a trusted tag or SHA and owned by an approved repository | Caller executes mutable or unapproved workflow logic |
+
+**Finding format:** Report whether secrets and deployment capabilities are scoped to appropriate environments, branches, and reusable workflow callers; whether `secrets: inherit` is justified; whether caller job `permissions:` are least-privilege; and whether runner infrastructure is properly segmented.
 
 ---
 
@@ -550,6 +606,8 @@ This skill processes user-supplied content including CI/CD configuration files, 
 - SLSA Build Track: https://slsa.dev/spec/v1.0/levels#build-track
 - OWASP Top 10 CI/CD Security Risks: https://owasp.org/www-project-top-10-ci-cd-security-risks/
 - GitHub Actions Security Hardening: https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions
+- GitHub Actions Reuse workflows: https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows
+- GitHub Actions Secure use reference: https://docs.github.com/en/actions/reference/security/secure-use
 - Sigstore / Cosign: https://docs.sigstore.dev/
 - SLSA GitHub Generator: https://github.com/slsa-framework/slsa-github-generator
 
@@ -557,4 +615,5 @@ This skill processes user-supplied content including CI/CD configuration files, 
 
 ## Changelog
 
+- **1.0.1** -- Add reusable workflow trust-boundary checks for `workflow_call`, caller inputs, `secrets: inherit`, caller token permissions, environment gates, and reusable workflow fixture examples.
 - **1.0.0** -- Initial release. Full coverage of SLSA v1.0 build track and OWASP Top 10 CI/CD Security Risks (CICD-SEC-1 through CICD-SEC-10).

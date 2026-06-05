@@ -1,0 +1,35 @@
+name: reusable deploy boundary vulnerable
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        type: string
+        required: true
+
+jobs:
+  call-deploy:
+    uses: org/platform/.github/workflows/deploy.yml@main
+    secrets: inherit
+    with:
+      deploy-target: ${{ inputs.target }}
+
+---
+
+name: called reusable deploy
+
+on:
+  workflow_call:
+    inputs:
+      deploy-target:
+        type: string
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.deploy-target }}
+      - run: ./deploy.sh ${{ inputs.deploy-target }}
