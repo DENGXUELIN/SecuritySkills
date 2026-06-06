@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [SSVC-2.1, EPSS-v3, CISA-KEV]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -51,7 +51,7 @@ Before starting, collect or confirm:
 - [ ] **Change management constraints:** Maintenance windows, freeze periods, change advisory board (CAB) schedules
 - [ ] **Compensating controls inventory:** WAF rules, network segmentation, EDR policies, disabled features currently in place
 - [ ] **Compliance mandates:** Applicable regulatory requirements (CISA BOD 22-01, PCI DSS 4.0 Requirement 6.3.3, HIPAA, FedRAMP)
-- [ ] **Historical EPSS data:** EPSS score trends over 7/30/90 days if available (API: https://api.first.org/data/v1/epss)
+- [ ] **Historical EPSS data:** EPSS score and percentile trends over 7/30/90 days, source date, and history status (complete, missing, stale, first-seen, or zero baseline) if available (API: https://api.first.org/data/v1/epss)
 
 If asset context is missing, assume internet-facing and business-critical, and flag assumptions in the output.
 
@@ -119,13 +119,23 @@ Analyze EPSS score trajectory to identify vulnerabilities with increasing exploi
 1. Retrieve current EPSS score and percentile for each CVE
 2. Compare against 7-day, 30-day, and 90-day historical scores (EPSS API: `https://api.first.org/data/v1/epss?cve=[CVE-ID]`)
 3. Calculate the trend direction and magnitude
+4. Record EPSS source date, historical data freshness, current percentile, percentile movement when available, and whether the 30-day baseline is missing, zero, stale, or newly available
+5. Apply organization-defined trend policy floors before a relative EPSS increase can change an SLA tier; relative growth from a near-zero baseline is a monitoring signal, not automatic urgency
 
 #### EPSS Trend Classification
 
+Treat the following values as default policy floors. Adjust them to the organization's vulnerability volume, exposure model, and patch capacity before using them as hard automation thresholds.
+
+- **Surging relative floor:** relative change >= 200% only counts as Surging when current EPSS is >= 0.05 and 30-day absolute delta is >= 0.02.
+- **Rising relative floor:** relative change >= 50% only counts as Rising when current EPSS is >= 0.01 and 30-day absolute delta is >= 0.005.
+- **Insufficient history:** missing, zero, stale, or first-seen historical EPSS values must not produce a relative trend label or SLA escalation from trend alone.
+
 | Trend | Definition | Action |
 |---|---|---|
-| **Surging** | EPSS increased by >= 0.2 (absolute) or >= 200% (relative) in 30 days | Escalate one SLA tier immediately; flag for out-of-cycle patching |
-| **Rising** | EPSS increased by >= 0.05 (absolute) or >= 50% (relative) in 30 days | Monitor closely; prepare patch for next available window |
+| **Surging** | EPSS increased by >= 0.2 absolute in 30 days, or relative change is >= 200% while meeting the Surging relative floor | Recommend one-tier escalation only when SSVC, exposure, exploit intelligence, KEV status, asset criticality, or local policy also supports out-of-cycle patching |
+| **Rising** | EPSS increased by >= 0.05 absolute in 30 days, or relative change is >= 50% while meeting the Rising relative floor | Monitor closely; prepare patch for next available window; do not change SLA tier on relative movement alone |
+| **Low-baseline Monitor** | Relative increase is large, but current EPSS, absolute delta, or percentile movement remains below policy floors | Keep the SSVC-driven SLA; note the relative movement and monitor for continued growth |
+| **Insufficient History** | 30-day historical EPSS is missing, zero, stale, or first-seen, making relative change undefined or misleading | Do not assign Surging/Rising from trend; rely on current EPSS, SSVC, KEV, exposure, and exploit intelligence until history is usable |
 | **Stable** | EPSS change < 0.05 in 30 days | Maintain current SLA tier |
 | **Declining** | EPSS decreased by >= 0.05 in 30 days | May support risk acceptance for Scheduled/Defer tier findings |
 
@@ -136,8 +146,13 @@ EPSS Trend Analysis:
 - 7-day prior EPSS:    [score]
 - 30-day prior EPSS:   [score]
 - 90-day prior EPSS:   [score]
-- Trend:               [Surging | Rising | Stable | Declining]
+- Absolute Delta:      [current - 30-day prior]
+- Relative Delta:      [percentage or Not Calculable]
+- Percentile Movement: [changed percentile or Not Available]
+- History Status:      [Complete | Missing | Zero Baseline | Stale | First Seen]
+- Trend:               [Surging | Rising | Low-baseline Monitor | Insufficient History | Stable | Declining]
 - Trend Impact:        [Escalate tier | Monitor | Maintain | Supports deferral]
+- Rationale:           [Why the trend did or did not meet policy floors]
 ```
 
 ### Step 4: Compensating Controls Assessment
@@ -301,11 +316,11 @@ findings requiring immediate action.]
 **Patch Posture:** [Critical Backlog | Elevated Risk | On Track | Healthy]
 
 ### EPSS Trend Alerts
-[List any CVEs with Surging or Rising EPSS trends and recommended tier adjustments]
+[List any CVEs with Surging, Rising, Low-baseline Monitor, or Insufficient History trend outcomes and the evidence behind any recommended tier adjustment]
 
-| CVE ID | Current EPSS | 30-day Prior | Trend | Recommended Action |
-|---|---|---|---|---|
-| [CVE-ID] | [score] | [score] | [Surging/Rising] | [Action] |
+| CVE ID | Current EPSS | 30-day Prior | Absolute Delta | Relative Delta | History Status | Trend | Recommended Action |
+|---|---|---|---|---|---|---|---|
+| [CVE-ID] | [score] | [score] | [delta] | [percent] | [status] | [Surging/Rising/Low-baseline Monitor/Insufficient History] | [Action] |
 
 ### Prioritized Patch Schedule
 
@@ -370,9 +385,11 @@ Known Exploited Vulnerabilities catalog maintained by CISA. Contains CVEs with c
 
 3. **Allowing risk exceptions to auto-renew without review.** Risk acceptances that roll over indefinitely create a shadow backlog of unpatched vulnerabilities. Every exception must have a hard expiration date and mandatory re-evaluation. Track exception aging as a KPI and report to leadership quarterly.
 
-4. **Ignoring EPSS trend direction.** A CVE with a low absolute EPSS score but a rapidly rising trend (e.g., from 0.02 to 0.15 in two weeks) signals that exploit development is progressing. Treating EPSS as a static snapshot rather than a time series misses emerging threats. Always evaluate 7/30/90-day trends.
+4. **Ignoring EPSS trend direction.** A CVE with a meaningful absolute EPSS increase and rising percentile (e.g., from 0.02 to 0.15 in two weeks) signals that exploit development may be progressing. Treating EPSS as a static snapshot rather than a time series misses emerging threats. Always evaluate 7/30/90-day trends.
 
-5. **Scheduling patches without rollback plans.** Patch deployment failures without rollback procedures cause unplanned outages that erode trust in the patching program. Every patch window must include a validated rollback procedure, tested in a non-production environment where possible.
+5. **Overreacting to near-zero EPSS baselines.** A CVE can increase by hundreds of percent when the prior probability was close to zero while still remaining operationally low probability. Do not classify undefined, zero-baseline, or low-absolute-delta relative movement as Surging. Record source freshness, current probability, absolute delta, relative delta, percentile movement, and history status before changing an SLA.
+
+6. **Scheduling patches without rollback plans.** Patch deployment failures without rollback procedures cause unplanned outages that erode trust in the patching program. Every patch window must include a validated rollback procedure, tested in a non-production environment where possible.
 
 ---
 
@@ -391,6 +408,8 @@ Known Exploited Vulnerabilities catalog maintained by CISA. Contains CVEs with c
 - SSVC 2.1 (CERT/CC): https://certcc.github.io/SSVC/
 - SSVC GitHub Repository: https://github.com/CERTCC/SSVC
 - EPSS v3 (FIRST.org): https://www.first.org/epss/
+- EPSS User Guide: https://www.first.org/epss/user-guide.html
+- EPSS Model: https://www.first.org/epss/model
 - EPSS API Documentation: https://api.first.org/data/v1/epss
 - EPSS Data Portal: https://epss.cyentia.com/
 - CISA KEV Catalog: https://www.cisa.gov/known-exploited-vulnerabilities-catalog
