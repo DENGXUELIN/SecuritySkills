@@ -82,6 +82,8 @@ Before beginning the assessment, gather the following. If any item is unavailabl
 | Model signing or attestation | CI/CD configs, SLSA provenance files, Sigstore artifacts | Confirms cryptographic supply chain verification |
 | Access controls on model storage | Cloud storage IAM, artifact registry permissions | Determines who can replace or modify model weights |
 | Adapter/plugin sources | LoRA configs, adapter download code | Third-party adapters inherit the same supply chain risks |
+| Final served artifact manifest | Promotion pipeline, model registry metadata, deployment bundle manifest | Confirms the exact weights, adapter, tokenizer, chat template, quantization, and runtime config that production serves |
+| Remote-code load settings | Model loading code and inference startup scripts | Identifies model repos that can execute repository-provided Python during load |
 
 ---
 
@@ -95,6 +97,9 @@ Determine where every model artifact originates and whether its authenticity and
 
 - Model download code that pulls weights from Hugging Face, S3, GCS, or other sources. Check whether SHA256 checksums or cryptographic signatures are verified after download.
 - Use of `from_pretrained()` calls (Hugging Face transformers, diffusers, sentence-transformers) without pinning to a specific commit hash or revision. Model repos on Hugging Face can be updated at any time; unpinned references pull the latest, potentially compromised weights.
+- Use of `trust_remote_code=True`, custom `AutoConfig` / `AutoModel` / `AutoTokenizer` classes, or repository-provided modeling/tokenizer files. These settings can execute code from the model repository during load and should be treated as a code supply chain boundary, not only as model metadata.
+- Final deployment bundles assembled from multiple artifacts: base weights, LoRA/QLoRA/PEFT adapters, tokenizer files, chat templates, GGUF/GGML quantizations, Ollama Modelfiles, runtime config, and prompt templates. Verify the manifest covers the served bundle, not only the original upstream base model.
+- Internal mirrors or promotion registries that re-publish third-party models. Do not classify every mirror as equally risky if there is strong evidence of an immutable upstream revision, signed import/promotion attestation, restricted writer access, and digest verification for each promoted artifact.
 - Models loaded from shared network drives, team Slack channels, or email attachments with no integrity verification.
 - Absence of SLSA provenance attestations or Sigstore signatures for model artifacts.
 - Models identified only by name ("llama-2-7b") without specifying the exact source organization, revision, or checksum.
@@ -103,19 +108,26 @@ Determine where every model artifact originates and whether its authenticity and
 
 ```
 # Find model download and loading code
-Grep: "from_pretrained|load_model|torch.load|pickle.load|onnx.load|tf.saved_model" in **/*.{py,ts,js}
+Grep: "from_pretrained|snapshot_download|hf_hub_download|load_model|torch.load|pickle.load|onnx.load|tf.saved_model" in **/*.{py,ts,js}
 Grep: "huggingface|hf_hub|transformers|diffusers|sentence.transformers" in **/*.{py,toml,cfg,txt,yaml,yml}
+Grep: "trust_remote_code\\s*=\\s*True|AutoConfig.from_pretrained|AutoModel.*from_pretrained|AutoTokenizer.from_pretrained" in **/*.py
+Grep: "PeftModel.from_pretrained|LoraConfig|adapter_model|merge_and_unload|qlora|lora" in **/*.{py,yaml,yml,json}
 
 # Check for integrity verification
-Grep: "sha256|checksum|hash|verify|digest|signature|sigstore|cosign" in **/*.{py,sh,yaml,yml}
+Grep: "sha256|checksum|hash|verify|digest|signature|sigstore|cosign|slsa|in-toto|attestation" in **/*.{py,sh,yaml,yml,json}
 
 # Check for pinned model versions
 Grep: "revision=|commit_hash|model_version" in **/*.{py,yaml,yml,json}
+
+# Check for final served artifact composition
+Grep: "Modelfile|ollama pull|FROM hf.co|gguf|ggml|chat_template|tokenizer_config|special_tokens_map" in **/*.{Dockerfile,dockerfile,txt,md,yaml,yml,json,jinja}
+Grep: "artifact_manifest|model_manifest|bundle_manifest|promotion_manifest|subject_digest" in **/*.{py,sh,yaml,yml,json,md}
 
 # Find model artifact storage
 Glob: **/*.{pt,bin,safetensors,pkl,onnx,pb,h5,gguf,ggml}
 Glob: **/model_config.json
 Glob: **/config.json
+Glob: **/Modelfile
 ```
 
 **Real-world case -- PoisonGPT (Mithril Security, 2023):** Researchers at Mithril Security demonstrated that a model on Hugging Face Hub could be surgically modified to spread targeted misinformation while maintaining normal performance on standard benchmarks. They took GPT-J-6B, used the ROME (Rank-One Model Editing) technique to alter specific factual associations, and uploaded the modified model under a name resembling a legitimate organization. Users downloading the model by name would receive the poisoned version with no indication of tampering. The attack succeeded because Hugging Face Hub at the time did not enforce model signing, and most download code did not verify checksums against a trusted source. This demonstrated that model provenance verification is not optional -- it is the first line of defense against supply chain compromise.
@@ -125,11 +137,15 @@ Glob: **/config.json
 | Condition | Severity |
 |---|---|
 | Models loaded via `pickle.load` or `torch.load` without `weights_only=True` | Critical |
+| `trust_remote_code=True` or custom remote model/tokenizer code without pinned revision and code-review provenance | Critical |
 | No checksum or signature verification on model download | High |
 | Model source unpinned (no commit hash, revision, or version lock) | High |
 | Model pulled from unverified third-party source (not the original publisher) | High |
+| Final served bundle lacks a manifest covering weights, adapters, tokenizer, chat template, quantization, and runtime config | High |
+| Adapter, quantization, Modelfile, tokenizer, or chat template sourced from an unverified registry even when the base model is verified | High |
 | No model card or provenance documentation available | Medium |
 | Checksums verified but against values stored in the same repository as the model (self-referential) | Medium |
+| Internal mirror lacks signed promotion evidence linking the mirrored artifact to an immutable upstream revision | Medium |
 
 ---
 
@@ -378,14 +394,20 @@ Assess whether architectural and procedural controls exist to detect model backd
 
 ## Model Inventory
 
-| Model | Source | Format | Checksum Verified | Pinned Version | Model Card |
+| Model | Source | Format | Checksum Verified | Pinned Version | Remote Code Enabled | Final Bundle Manifest | Model Card |
+|---|---|---|---|---|---|---|---|
+| [name] | [source] | [format] | [Yes/No] | [Yes/No] | [Yes/No] | [Complete/Partial/Missing] | [Complete/Partial/Missing] |
+
+## Artifact Boundary Review
+
+| Served Artifact | Source | Digest / Attestation | Includes | Missing Evidence | Risk |
 |---|---|---|---|---|---|
-| [name] | [source] | [format] | [Yes/No] | [Yes/No] | [Complete/Partial/Missing] |
+| [bundle or registry entry] | [publisher/mirror/promotion pipeline] | [hash/signature/SLSA/in-toto evidence] | [weights/adapters/tokenizer/template/config] | [gap] | [severity] |
 
 ## Findings
 
 ### Finding [N]: [Title]
-- **Category:** [Provenance | Training Data | Fine-Tuning Pipeline | Inference Dependency | Model Card | Backdoor Detection]
+- **Category:** [Provenance | Remote Code Loading | Final Artifact Composition | Training Data | Fine-Tuning Pipeline | Inference Dependency | Model Card | Backdoor Detection]
 - **Severity:** [Critical | High | Medium | Low | Informational]
 - **OWASP LLM Category:** LLM03:2025 -- Supply Chain Vulnerabilities
 - **MITRE ATLAS Technique:** [technique ID and name]
@@ -401,6 +423,7 @@ Assess whether architectural and procedural controls exist to detect model backd
 | Domain | Current State | Target State | Gap Severity |
 |---|---|---|---|
 | Model provenance | [description] | [recommendation] | [severity] |
+| Final artifact composition | [description] | [recommendation] | [severity] |
 | Training data lineage | [description] | [recommendation] | [severity] |
 | Fine-tuning pipeline | [description] | [recommendation] | [severity] |
 | Inference dependencies | [description] | [recommendation] | [severity] |
@@ -435,11 +458,15 @@ Assess whether architectural and procedural controls exist to detect model backd
 
 2. **Treating `safetensors` as a complete solution.** The `safetensors` format eliminates arbitrary code execution during deserialization, which is a critical improvement over pickle-based formats. However, it does not protect against model weight manipulation (backdoors), training data poisoning, or any other supply chain attack that operates on the model's learned parameters rather than its serialization format. `safetensors` addresses one attack vector; the other five steps in this assessment remain necessary.
 
-3. **Auditing application dependencies but ignoring ML framework dependencies.** Standard SCA tooling often covers `requests`, `flask`, or `django` but misses ML-specific libraries (transformers, vLLM, Ray, LangChain) that have had critical CVEs. Ensure vulnerability scanning covers the full dependency tree including ML frameworks.
+3. **Verifying the base model but not the served bundle.** A deployment rarely serves only upstream base weights. It may merge adapters, quantize weights, override tokenizer files, add a chat template, or package an Ollama Modelfile. Treat the final served bundle as the artifact under review; a verified base model does not make an unverified adapter, quantization, tokenizer, or template safe.
 
-4. **Assuming Hugging Face models are vetted.** Hugging Face Hub is a hosting platform, not a curation service. Any user can upload any model. While Hugging Face has introduced malware scanning and model signing capabilities, the majority of hosted models have no cryptographic provenance. Treat Hugging Face models as untrusted artifacts requiring verification, the same way you treat npm packages.
+4. **Treating all internal mirrors as equally suspicious.** Internal mirrors reduce risk when they are part of a controlled promotion workflow with immutable upstream revisions, signed import attestations, manifest digest checks, restricted writers, and deployment-time verification. Without those controls, a mirror is only another mutable registry and should not reduce severity.
 
-5. **Evaluating models only on benchmarks.** Standard benchmarks measure general capability, not supply chain integrity. A backdoored model will perform normally on benchmarks by design. Behavioral differential testing with curated, domain-specific test sets that probe for targeted manipulation is required to surface backdoors.
+5. **Auditing application dependencies but ignoring ML framework dependencies.** Standard SCA tooling often covers `requests`, `flask`, or `django` but misses ML-specific libraries (transformers, vLLM, Ray, LangChain) that have had critical CVEs. Ensure vulnerability scanning covers the full dependency tree including ML frameworks.
+
+6. **Assuming Hugging Face models are vetted.** Hugging Face Hub is a hosting platform, not a curation service. Any user can upload any model. While Hugging Face has introduced malware scanning and model signing capabilities, the majority of hosted models have no cryptographic provenance. Treat Hugging Face models as untrusted artifacts requiring verification, the same way you treat npm packages.
+
+7. **Evaluating models only on benchmarks.** Standard benchmarks measure general capability, not supply chain integrity. A backdoored model will perform normally on benchmarks by design. Behavioral differential testing with curated, domain-specific test sets that probe for targeted manipulation is required to surface backdoors.
 
 ---
 
