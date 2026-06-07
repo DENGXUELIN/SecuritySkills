@@ -1,0 +1,30 @@
+name: benign isolated self-hosted deploy runner
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, prod-deploy-ephemeral]
+    environment: production
+    steps:
+      - name: Check out trusted branch without persisting credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Record runner isolation evidence
+        run: |
+          echo "runner_group=prod-deploy"
+          echo "lifecycle=ephemeral-one-job"
+          echo "cleanup=workspace-and-docker-state-wiped"
+
+      - name: Deploy with short-lived OIDC credentials
+        run: ./scripts/deploy.sh

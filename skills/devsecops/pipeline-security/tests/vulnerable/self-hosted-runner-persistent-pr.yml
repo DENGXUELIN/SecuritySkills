@@ -1,0 +1,42 @@
+name: vulnerable self-hosted runner PR path
+
+on:
+  pull_request_target:
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  privileged-pr-test:
+    runs-on: [self-hosted, linux, deploy]
+    steps:
+      - name: Check out untrusted PR head on privileged runner
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Restore shared build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/build
+            .venv
+          key: shared-build-${{ runner.os }}
+          restore-keys: |
+            shared-build-
+
+      - name: Run contributor-controlled script with deployment material present
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          echo "$DEPLOY_KEY" > key
+          ./scripts/test.sh
+
+  deploy:
+    needs: privileged-pr-test
+    runs-on: [self-hosted, linux, deploy]
+    environment: production
+    steps:
+      - name: Deploy from the same runner pool
+        run: ./scripts/deploy.sh
