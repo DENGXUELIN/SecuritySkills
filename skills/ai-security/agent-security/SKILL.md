@@ -14,7 +14,7 @@ phase: [design, build, review]
 frameworks: [OWASP-Agentic-AI, NIST-AI-RMF-1.0]
 difficulty: advanced
 time_estimate: "60-120min"
-version: "1.0.2"
+version: "1.0.3"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -80,6 +80,7 @@ Before beginning the assessment, gather the following. If any item is unavailabl
 | Tool/function definitions | Code files defining tool schemas, OpenAPI specs, MCP server configs | Determines what each agent can do and with what parameters |
 | Permission/IAM configuration | Cloud IAM, role definitions, service account configs, .env files | Reveals whether least-privilege is enforced |
 | Human approval gate implementation | Workflow code, UI code, approval service configs | Determines if HITL is architecturally sound or bypassable |
+| Approval artifacts and execution records | Approval service payloads, signed tool-call envelopes, policy decision logs | Verifies the approved action matches the exact tool invocation that executed |
 | Agent identity and credential management | Auth middleware, secret managers, token configs | Exposes credential scope and rotation practices |
 | Multi-agent communication protocol | Message bus configs, inter-agent APIs, shared state stores | Identifies trust boundary violations |
 | Audit logging implementation | Logger configs, log pipeline code, SIEM integration | Determines forensic capability |
@@ -217,11 +218,13 @@ Evaluate the design, placement, and robustness of human approval gates in the ag
 - **Gate placement:** Where in the agent workflow do human approval gates exist? Are they placed before every state-changing action, only before high-risk actions, or not at all?
 - **Gate bypass paths:** Can the agent take an alternative path that avoids the approval gate? Are there fallback modes that skip approval when the approval service is unavailable?
 - **Gate context sufficiency:** When a human is asked to approve an action, do they receive enough context to make a meaningful decision? Or do they see only a summary that hides critical details?
+- **Approval artifact binding:** Is the approval decision bound to the exact executable tool name, normalized arguments, resource identifiers, risk tier, policy decision, expiry, and nonce? Or can the agent rewrite parameters after the human approves a summary?
+- **Replay and mutation protection:** Does the tool execution layer reject stale, replayed, partially approved, or post-approval-mutated tool calls? Is the approved artifact signed, hashed, or otherwise immutable?
 - **Cumulative action tracking:** If the agent can take many small actions, does the system track cumulative impact? Can an agent split a dangerous action into multiple individually benign sub-actions that bypass threshold-based gates?
 - **Approval fatigue management:** How many approval requests per session does a human reviewer face? Systems generating hundreds of low-context requests have effectively no human oversight.
 - **Fail-closed design:** If the approval service is unreachable, does the agent halt (fail-closed) or proceed without approval (fail-open)?
 
-**Detection methods:** Search for approval gates (`approve`, `human_in_the_loop`, `hitl`, `require_approval`), bypass paths (`skip_approval`, `auto_approve`, `fail_open`), cumulative tracking (`cumulative`, `session_risk`, `action_count`), and action classification (`risk_level`, `destructive`, `irreversible`, `high_risk`).
+**Detection methods:** Search for approval gates (`approve`, `human_in_the_loop`, `hitl`, `require_approval`), bypass paths (`skip_approval`, `auto_approve`, `fail_open`), approval binding fields (`canonical`, `tool_call_id`, `approval_id`, `nonce`, `expires_at`, `policy_hash`, `resource_id`, `argument_hash`, `signature`), cumulative tracking (`cumulative`, `session_risk`, `action_count`), and action classification (`risk_level`, `destructive`, `irreversible`, `high_risk`).
 
 **HITL gate design principles:**
 
@@ -229,6 +232,8 @@ Evaluate the design, placement, and robustness of human approval gates in the ag
 |---|---|---|
 | Fail-closed | Agent halts if approval service is unavailable | Agent proceeds without approval on timeout |
 | Full context | Approver sees the complete action with all parameters | Approver sees "Agent wants to run a tool" with no details |
+| Artifact binding | Approval covers a canonical executable artifact, not only a generated summary | Human approves a harmless summary, then the agent changes tool arguments before execution |
+| Replay protection | Approval includes expiry, nonce, and one-time-use enforcement | Old approval token can be reused for a new tool call |
 | Cumulative tracking | System tracks aggregate session risk, not just per-action risk | Each action evaluated independently, ignoring compound effect |
 | Action classification | Actions categorized by risk level with different approval requirements | Binary approve/deny with no risk differentiation |
 | Approval diversity | Critical actions require multiple approvers or multi-channel confirmation | Single click from one reviewer for all actions |
@@ -242,7 +247,9 @@ Evaluate the design, placement, and robustness of human approval gates in the ag
 | No human approval gate before destructive or irreversible actions | Critical |
 | Approval gate fails open (agent proceeds on approval service timeout) | Critical |
 | Agent can modify approval thresholds or bypass conditions | Critical |
+| Approved action can execute with a different tool, arguments, resource IDs, or risk tier than the artifact the human approved | Critical |
 | Approval context insufficient for meaningful human decision | High |
+| Approval token lacks expiry, nonce, or one-time-use enforcement for side-effecting actions | High |
 | No cumulative risk tracking -- agent can split dangerous actions into small steps | High |
 | Single approval mechanism for all risk levels (no tiered review) | Medium |
 | No approval fatigue management (high volume of undifferentiated requests) | Medium |
@@ -298,14 +305,15 @@ Evaluate whether the audit logging for agent actions is sufficient for incident 
 **What to look for in code and configuration:**
 
 - **Action logging:** Is every tool invocation logged with: agent identity, timestamp, tool name, full input parameters, output result, session/correlation ID, and the user or trigger that initiated the workflow?
-- **Decision logging:** Is the agent's reasoning captured? For compliance-sensitive decisions, logging only the action without the reasoning makes it impossible to audit why the agent acted as it did.
-- **Prompt/context logging:** Is the prompt (or a hash/summary of it) logged for correlation? Can investigators reconstruct what the agent "saw" when it made a decision?
+- **Decision logging:** Is the decision rationale or policy trace captured for consequential actions? For compliance-sensitive decisions, logging only the action without the policy inputs and outcome makes it difficult to audit why the agent acted as it did. This does not require storing raw chain-of-thought.
+- **Prompt/context logging:** Is the prompt, context, or a privacy-preserving surrogate (hash, redacted summary, retrieval document IDs, policy trace ID) logged for correlation? Can investigators reconstruct the security-relevant context without retaining sensitive prompts verbatim?
+- **Privacy-preserving audit alternatives:** If raw prompts, chain-of-thought, or full tool parameters are intentionally not stored, does the system retain immutable hashes, redacted parameters, policy decisions, retrieval IDs, approval artifacts, and replayable event IDs?
 - **Log integrity:** Are logs tamper-evident? Can the agent or an attacker who compromises the agent modify or delete its own audit trail?
 - **Log completeness:** Are there code paths where tool invocations occur but logging is skipped (e.g., in error handlers, retry logic, or fallback paths)?
 - **Log retention and access:** Are agent audit logs retained for the required compliance period? Are they accessible to security and compliance teams?
 - **Cross-agent correlation:** In multi-agent systems, can logs be correlated across agents to reconstruct the full action chain for a given workflow?
 
-**Detection methods:** Search for logging implementations (`logger`, `audit`, `emit`), per-invocation fields (`tool_name`, `tool_input`, `correlation_id`, `trace_id`), log integrity (`immutable`, `append_only`, `tamper`), decision logging (`reasoning`, `chain_of_thought`, `rationale`), and SIEM integration (`splunk`, `datadog`, `cloudwatch`, `elasticsearch`).
+**Detection methods:** Search for logging implementations (`logger`, `audit`, `emit`), per-invocation fields (`tool_name`, `tool_input`, `correlation_id`, `trace_id`), privacy-preserving context fields (`prompt_hash`, `context_hash`, `redacted`, `policy_trace`, `retrieval_ids`, `approval_artifact_id`), log integrity (`immutable`, `append_only`, `tamper`), decision logging (`rationale`, `policy_decision`, `risk_tier`, `decision_trace`), and SIEM integration (`splunk`, `datadog`, `cloudwatch`, `elasticsearch`).
 
 **Audit trail completeness checklist:**
 
@@ -318,6 +326,9 @@ Evaluate whether the audit logging for agent actions is sufficient for incident 
 | Session/correlation ID | Workflow reconstruction | No correlation across multi-step agent workflows |
 | User/trigger identity | Authorization audit | Agent actions not linked to initiating user |
 | Prompt hash or summary | Context reconstruction | No record of what the agent was told to do |
+| Policy decision trace | Explains why a consequential action was allowed or denied | Only the final tool call is logged, not the risk inputs |
+| Approval artifact ID | Links HITL approval to the exact executed action | Approval event cannot be matched to tool execution |
+| Redaction evidence | Privacy-safe auditability | Raw logs are disabled but no hashes, redacted fields, or trace IDs remain |
 | Error details | Failure analysis | Errors caught and swallowed silently |
 | Approval decisions (if HITL) | Oversight verification | Approvals not logged or logged without the approver's identity |
 
@@ -332,7 +343,9 @@ Evaluate whether the audit logging for agent actions is sufficient for incident 
 | No correlation ID to link multi-step agent workflows | High |
 | Agent actions not attributable to specific agent identity (shared identity) | High |
 | No log pipeline to SIEM or centralized log management | High |
+| HITL approvals are not linked to the exact executed tool-call artifact | High |
 | Decision reasoning not logged for compliance-sensitive actions | Medium |
+| Raw prompt or chain-of-thought is not retained, but no privacy-preserving context hash, policy trace, redacted parameter set, or replayable event ID exists | Medium |
 | Audit logs not retained for required compliance period | Medium |
 | Error paths skip audit logging | Medium |
 | No monitoring or alerting on anomalous agent action patterns | Medium |
@@ -507,6 +520,7 @@ Glob: **/security_architecture*
 - **Evidence:** [Code pattern, configuration, or design observation]
 - **Blast Radius:** [What could go wrong if this gap is exploited]
 - **Recommendation:** [Specific architectural remediation]
+- **Approval Artifact:** [canonical tool/action artifact, approval ID, or N/A]
 - **Priority:** [P0 / P1 / P2 / P3]
 
 ## Architecture Security Posture Summary
@@ -565,7 +579,7 @@ Glob: **/security_architecture*
 
 3. **Trusting agents because they are "internal."** In multi-agent architectures, teams often skip inter-agent authentication because "both agents are ours." This ignores the primary threat: one agent being compromised via prompt injection and then pivoting to other agents. Inter-agent trust must be authenticated and authorized even within a single organization's infrastructure. A compromised research agent should not be able to instruct an execution agent to deploy code.
 
-4. **Building audit trails that log actions but not context.** An audit log that records "Agent-A called write_file at 14:32:01" is useful for timeline reconstruction but insufficient for root cause analysis. Without logging what the agent was told (the prompt or task), what it reasoned (the chain of thought), and what it received from other agents or tools (the inputs), investigators cannot determine whether the action was legitimate, hallucinated, or injected. Log the full decision context for every consequential action.
+4. **Building audit trails that log actions but not context.** An audit log that records "Agent-A called write_file at 14:32:01" is useful for timeline reconstruction but insufficient for root cause analysis. Investigators need the security-relevant decision context: prompt or context hash, retrieved document IDs, redacted tool parameters, approval artifact ID, policy trace, and outcome. Raw prompt and chain-of-thought retention may be inappropriate for privacy or safety reasons, but the system still needs enough immutable evidence to reconstruct why a consequential action was allowed.
 
 5. **Assuming rollback is someone else's problem.** Agent developers frequently rely on downstream systems (databases, deployment platforms, email providers) to handle rollback without verifying that rollback mechanisms actually exist and work. A database transaction can be rolled back, but only if the agent's actions are wrapped in a transaction. An email cannot be recalled. A deployed binary cannot be un-deployed if the deployment pipeline has no rollback. For every tool an agent can invoke, the architecture must document the rollback mechanism and test it.
 
