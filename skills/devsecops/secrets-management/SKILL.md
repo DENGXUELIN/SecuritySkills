@@ -194,6 +194,24 @@ Verify that at least one secret detection tool is configured and integrated:
 
 **Finding classification:** No secret detection tooling deployed is **Critical**. Detection in CI only (no pre-commit) is **Medium**. Excessive allowlist entries without justification is **Medium**.
 
+#### 2.4 Push Protection Bypass Governance
+
+Hosted secret scanning and push protection are prevention controls only when bypass decisions are reviewed and remediated. A bypassed push is not automatically a false positive or an accepted residual risk.
+
+**Evidence to collect:**
+
+| Evidence Field | What to Verify | Fails When |
+|----------------|----------------|------------|
+| **Push protection status** | Repository, organization, and protected branches have push protection enabled for supported token types | Push protection is disabled or only enabled for a subset of protected repositories |
+| **Bypass event inventory** | Audit logs record actor, repository, commit, token type, bypass reason, timestamp, and linked alert | Bypass events are missing, unreviewed, or retained outside the review period |
+| **Delegated bypass policy** | Only approved roles can bypass and bypass requires a reason category | Any developer can bypass without justification |
+| **Reviewer independence** | A security owner or repository maintainer reviews the bypass separately from the bypass actor | The bypass actor self-approves or review ownership is unclear |
+| **Fix-later tracking** | If the secret is not removed immediately, a ticket records owner, due date, rotation status, and compensating controls | Fix-later bypasses have no due date or remain open past SLA |
+| **Rotation and revocation proof** | Real exposed secrets have provider-side revocation or rotation evidence before closure | Findings are closed after code removal only |
+| **Allowlist and baseline delta** | Allowlist entries are scoped to test fixtures, placeholders, or known non-secrets and are reviewed on change | Broad regex/path allowlists suppress real token formats or whole directories |
+
+**Classification guidance:** Treat an unreviewed push-protection bypass for a likely real credential as **High**. Escalate to **Critical** when the secret is confirmed live, privileged, or externally reachable and no rotation or revocation proof exists. Treat a bypass as benign only when the value is a placeholder/test fixture or the secret was rotated/revoked, the bypass was independently reviewed, and any fix-later exception has an owner, due date, and narrow scope.
+
 ---
 
 ### Step 3: .env File and Git History Exposure (OWASP Secrets Management Cheat Sheet)
@@ -381,6 +399,12 @@ spec:
 | Gitleaks | Yes/No | Yes/No | Yes/No | Yes/No | Yes/No |
 | detect-secrets | Yes/No | Yes/No | Yes/No | N/A | Yes/No |
 
+### Push Protection Bypass Governance
+
+| Repository | Push Protection | Bypass Events Reviewed | Delegated Bypass | Fix-Later Tickets | Rotation / Revocation Proof | Residual Risk |
+|------------|-----------------|------------------------|------------------|------------------|-----------------------------|---------------|
+| <repo> | Enabled / Partial / Disabled | Yes / No / N/A | Restricted / Broad / None | <count and SLA status> | Complete / Partial / Missing | Low / Medium / High / Critical |
+
 ### Secrets Inventory (by type, NOT values)
 
 | Secret Type | Storage Method | Rotation Period | Automated | Last Rotated |
@@ -442,6 +466,8 @@ spec:
 
 4. **Ignoring secret sprawl across multiple secrets managers.** Large organizations often have Vault, AWS Secrets Manager, Azure Key Vault, and application-specific secret stores running simultaneously. Without a unified inventory, secrets expire unmonitored and rotation gaps emerge. Maintain a single source of truth for secret metadata (type, owner, rotation schedule, storage location).
 
+5. **Treating push protection bypass as proof of safety.** A bypass reason such as "used in tests" or "will fix later" is evidence to review, not evidence to close. Verify the token type, placeholder status, audit log, reviewer, rotation/revocation proof, and fix-later SLA before suppressing the finding.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -471,5 +497,6 @@ This skill processes configuration files and code that may contain secret values
 
 ## Changelog
 
+- **1.0.2** -- Added push protection bypass governance checks, reporting fields, and closure criteria.
 - **1.0.1** -- Add false positive filtering guidance: distinguish real secrets from placeholders/examples, verify entropy, scope findings to actual secrets (not architectural gaps).
 - **1.0.0** -- Initial release. Full coverage of OWASP Secrets Management Cheat Sheet and NIST SP 800-57 Part 1 Rev 5 for secrets management review.
