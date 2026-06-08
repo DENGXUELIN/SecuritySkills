@@ -146,6 +146,17 @@ aws_accessanalyzer_analyzer
 type = "ACCOUNT"
 ```
 
+**Finding-review evidence commands:**
+
+```bash
+aws accessanalyzer list-analyzers
+aws accessanalyzer list-findings --analyzer-arn <analyzer-arn> --filter '{"status":{"eq":["ACTIVE"]}}'
+aws accessanalyzer list-findings --analyzer-arn <analyzer-arn> --filter '{"status":{"eq":["ARCHIVED"]}}'
+aws accessanalyzer list-archive-rules --analyzer-name <analyzer-name>
+```
+
+Also capture analyzer scope (`ACCOUNT` versus `ORGANIZATION`), analyzer type, region coverage, unused-access analyzer coverage, active finding age, archive-rule owner/justification/expiry, and evidence that resolved findings map to policy or resource changes. Mark CIS 1.20 as partial evidence when an analyzer exists but finding review and archive-rule governance are missing.
+
 ### CIS 1.21 -- Ensure IAM users are managed centrally via identity federation or AWS Organizations for multi-account environments
 
 Check for SSO/Identity Center configuration:

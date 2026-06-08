@@ -99,6 +99,37 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, gre
 
 ---
 
+### Step 6b: IAM Access Analyzer Finding Review
+
+CIS 1.20 verifies that IAM Access Analyzer is enabled, but analyzer existence alone does not prove that exposed or unused access is reviewed. Treat analyzer findings, archive rules, and unused-access coverage as operational evidence.
+
+**Required evidence:**
+
+| Gate | Evidence to Capture | Fail / Not Evaluable Condition |
+|------|---------------------|--------------------------------|
+| Analyzer scope and regions | Analyzer name, ARN, region, type, `ACCOUNT` or `ORGANIZATION` scope, and intended trust boundary | Analyzer scope does not match the account/organization boundary or required regions are missing |
+| Active finding inventory | Active external/internal/unused findings by analyzer, resource, principal, finding type, severity, first observed date, and age | Active findings are not exported, aged findings lack owner, or only dashboard totals are provided |
+| Unused access analyzer coverage | Whether unused role, access key, password, and unused permission findings are enabled where the review relies on Access Analyzer | Unused access review is claimed but no unused-access analyzer evidence exists |
+| Archive-rule governance | Archive rule filters, owner, approver, business justification, expiry/review date, and affected finding examples | Broad archive rules hide public or unapproved cross-account access without narrow filters and approval |
+| Resolved finding proof | Policy/resource diff, access removal evidence, finding status transition, and validation timestamp | Findings are marked resolved without a linked policy/resource change that removed access |
+| Reporting separation | Raw active/archived/resolved counts shown separately from CIS 1.20 enablement pass/fail | CIS 1.20 is marked fully effective based only on `aws_accessanalyzer_analyzer` resources |
+
+Use these finding IDs when reporting gaps:
+
+```text
+AWS-AA-01: Access Analyzer exists, but active external, internal, or unused-access findings are not reviewed
+AWS-AA-02: Analyzer scope or region coverage does not match the intended account or organization trust boundary
+AWS-AA-03: Unused access analyzer coverage is missing where unused role, key, password, or permission review is expected
+AWS-AA-04: Archive rules are broad enough to suppress public or unapproved cross-account findings
+AWS-AA-05: Archived findings lack owner, approval, business justification, expiry, or review evidence
+AWS-AA-06: Resolved findings are not tied to policy/resource changes that actually removed access
+AWS-AA-07: Raw Access Analyzer finding counts are not reported separately from CIS 1.20 enablement status
+```
+
+**Finding classification:** Active public or unapproved cross-account findings hidden by archive rules are **High** or **Critical** depending on resource sensitivity. Missing active finding review, unused-access coverage, or resolved-finding proof is **Medium**. Missing reporting separation is **Low** unless it materially changes compliance status.
+
+---
+
 ### Step 7: Compile Assessment Report
 
 Produce the final report using the structure defined in the Output Format section.
@@ -163,6 +194,12 @@ Produce the final report using the structure defined in the Output Format sectio
 1. **[Critical]** CIS X.Y -- <action item>
 2. **[High]** CIS X.Y -- <action item>
 3. ...
+
+### IAM Access Analyzer Finding Review
+
+| Analyzer | Scope / Region | Finding Class | Active | Archived | Resolved | Oldest Active | Archive Rule Governance | Resolved Proof | Status |
+|----------|----------------|---------------|--------|----------|----------|---------------|-------------------------|----------------|--------|
+| <name> | <ACCOUNT/ORGANIZATION + region> | <external/internal/unused> | <N> | <N> | <N> | <age> | <owner, approval, expiry, narrow filters> | <policy/resource change> | <Pass/Fail/Not Evaluable> |
 
 ### Summary
 - Critical findings: <N>
