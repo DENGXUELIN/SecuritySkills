@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [CIS-Controls-v8, NIST-SP-800-41-Rev1]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -254,6 +254,42 @@ Egress filtering prevents compromised internal hosts from establishing unrestric
 
 ---
 
+#### 2.8 Remote Access VPN / ZTNA Evidence Gate (NIST SP 800-46; NIST SP 800-41)
+
+Remote-access VPN, ZTNA, and clientless gateway policies are firewall policy enforcement points. Treat them as part of the rule-base review when they can create paths into internal, management, database, or production networks.
+
+For every remote-access group, profile, tunnel, or ZTNA application policy, collect:
+
+| Evidence Area | Required Evidence | Finding Trigger |
+|---|---|---|
+| **MFA enforcement** | Policy export showing phishing-resistant or approved MFA requirement, exception list, and break-glass handling | High if privileged or broad internal access is allowed without MFA |
+| **User and group mapping** | Named groups, IdP source, owner, approval record, and last review date | Medium if access is granted through unmanaged, nested, or unowned groups |
+| **Internal route scope** | Split-tunnel include/exclude routes, full-tunnel setting, per-app ZTNA resources, and sensitive network coverage | High if users receive broad `any` internal access or uninspected paths to admin/database/production networks |
+| **Client posture checks** | Managed-device, EDR, disk-encryption, certificate, patch, jailbreak/root, or compliance-policy evidence | Medium if unmanaged devices can reach sensitive internal zones; High for privileged/admin paths |
+| **DNS policy and leakage controls** | VPN DNS resolver assignment, DNS suffix policy, DoH/DoT handling, blocked external resolvers, and leak-test evidence | Medium if VPN clients can bypass approved resolvers for internal or security-sensitive lookups |
+| **Management-plane restrictions** | Firewall, cloud, hypervisor, IAM, IdP, PAM, and backup-console admin access paths over VPN/ZTNA | High if management planes are reachable without stricter admin group, MFA, posture, logging, and allowlist controls |
+| **Session logging and retention** | Login, logout, source IP, assigned IP, device ID, posture result, accessed app/route, bytes, policy decision, and retention destination | Medium if remote-access decisions cannot be tied to users, devices, routes, or time windows |
+
+Use `Not Evaluable` when remote-access policy exists but exports, route tables, posture policies, or session logs are unavailable. Do not mark remote-access exposure as passing based only on a network diagram or vendor dashboard summary.
+
+```
+Remote Access Evidence Record:
+- Gateway / Policy:        [VPN profile, ZTNA app policy, clientless portal]
+- User / Group Scope:      [group, owner, last review]
+- MFA Enforcement:         [required/exception evidence]
+- Client Posture Checks:   [managed device/EDR/cert/patch evidence]
+- Split Tunnel / Routes:   [full tunnel, included routes, excluded routes]
+- Sensitive Networks:      [admin/db/prod/management access allowed or denied]
+- DNS Policy:              [resolver, suffix, leak-control evidence]
+- Management Access:       [allowed/denied, stricter controls]
+- Session Logging:         [fields, destination, retention]
+- Decision:                [Pass | Fail | Not Evaluable]
+```
+
+**Finding classification:** Broad remote-access internal routing without MFA is **High**. Split-tunnel bypass to sensitive networks is **High**. Missing posture or DNS leakage controls are **Medium** unless they expose privileged or production paths. Missing session logging is **Medium**.
+
+---
+
 ### Step 3: Compile Assessment Report
 
 Produce the final report using the following structure.
@@ -317,6 +353,11 @@ Produce the final report using the following structure.
 | SMTP (25)     | Yes/No    | <mail server IPs>      |
 | HTTPS (443)   | Yes/No    | <proxy or direct>      |
 
+### Remote Access VPN / ZTNA Evidence
+| Gateway / Policy | User / Group Scope | MFA Enforcement | Client Posture Checks | Split Tunnel / Routes | Sensitive Networks | DNS Policy | Management Access | Session Logging | Decision |
+|------------------|--------------------|-----------------|-----------------------|-----------------------|-------------------|------------|-------------------|-----------------|----------|
+| <vpn-profile> | <group/owner/review> | Pass/Fail | Pass/Fail/Not Evaluable | <full/split/routes> | <admin/db/prod access> | Pass/Fail | Pass/Fail | Pass/Fail | Pass/Fail/Not Evaluable |
+
 ### Prioritized Remediation Plan
 1. **[Critical]** <action item with control reference>
 2. **[High]** <action item with control reference>
@@ -361,6 +402,8 @@ Produce the final report using the following structure.
 
 5. **Conflating network ACLs with security groups in cloud environments.** In AWS, NACLs are stateless and operate at the subnet level; security groups are stateful and operate at the instance level. Both must be audited. A permissive NACL can undermine restrictive security group rules for responses.
 
+6. **Leaving remote access out of the firewall review.** VPN and ZTNA gateways can create implicit paths around perimeter and east-west firewall rules. Review MFA, group scope, split-tunnel routes, posture checks, DNS policy, management-plane access, and session logging before concluding that internal firewall policy is effective.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -380,10 +423,13 @@ This skill processes firewall configurations that may contain user-supplied comm
 - CIS Control 4 -- Secure Configuration of Enterprise Assets and Software: https://www.cisecurity.org/controls/secure-configuration-of-enterprise-assets-and-software
 - NIST SP 800-41 Rev 1, Guidelines on Firewalls and Firewall Policy: https://csrc.nist.gov/publications/detail/sp/800-41/rev-1/final
 - NIST SP 800-41 Rev 1 (PDF): https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-41r1.pdf
+- NIST SP 800-46 Rev 2, Guide to Enterprise Telework, Remote Access, and BYOD Security: https://csrc.nist.gov/publications/detail/sp/800-46/rev-2/final
+- CISA #StopRansomware Guide: https://www.cisa.gov/stopransomware/ransomware-guide
 - CIS Benchmarks (platform-specific firewall hardening): https://www.cisecurity.org/cis-benchmarks
 
 ---
 
 ## Changelog
 
+- **1.0.1** -- Added remote-access VPN/ZTNA evidence gate for MFA, group scope, split-tunnel routing, posture, DNS policy, management access, and session logging.
 - **1.0.0** -- Initial release. Full coverage of CIS Controls v8 (4.4, 4.5) and NIST SP 800-41 Rev 1 firewall audit methodology.
