@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [CIS-GCP-v2.0.0]
 difficulty: intermediate
 time_estimate: "60-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -88,6 +88,25 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, gre
 
 ---
 
+### Step 8A: Supplemental Custom Image and Snapshot Sharing Evidence
+
+Private VMs, Shielded VM, and CMEK disks do not prove that the underlying custom image or disk snapshot is private. Review Compute Engine custom images, snapshots, project-level discoverability, artifact sensitivity, and IAM sharing separately from VM posture.
+
+| Code | Gate | Evidence Required |
+|------|------|-------------------|
+| GCP-IMAGE-SHARE-01 | Image and snapshot inventory | In-scope custom image and snapshot denominator with project, artifact ID, source workload, sensitivity, owner, and review date. |
+| GCP-IMAGE-SHARE-02 | Image IAM policy | `roles/compute.imageUser` bindings, including `allAuthenticatedUsers`, external principals, inherited IAM, and conditional expiry. |
+| GCP-IMAGE-SHARE-03 | Snapshot IAM policy | Snapshot IAM bindings and approved principal inventory reviewed independently from disk encryption and VM network controls. |
+| GCP-IMAGE-SHARE-04 | Project Viewer discoverability | Project-level `roles/viewer` or equivalent bindings that let principals discover shared images in the image project. |
+| GCP-IMAGE-SHARE-05 | Public and cross-org sharing | `allAuthenticatedUsers`, partner groups, external domains, and cross-organization access mapped to business approval and expiry. |
+| GCP-IMAGE-SHARE-06 | Data sanitization | Evidence that shared images or snapshots were generalized, scrubbed, rebuilt from golden source, or classified safe to share. |
+| GCP-IMAGE-SHARE-07 | Audit and monitoring | Cloud Asset Inventory, IAM policy export, and audit-log evidence for image/snapshot policy changes. |
+| GCP-IMAGE-SHARE-08 | Not Evaluable and exception handling | Missing inventory, missing artifact IAM, missing sensitivity, or approved exception with owner, expiry, and residual risk. |
+
+Mark this supplemental section **Not Evaluable** when the review lacks artifact-level image/snapshot inventory or IAM policy evidence. Do not infer a pass from a private instance, encrypted disk, or absence of `allUsers`.
+
+---
+
 ### Step 9: Compile Assessment Report
 
 
@@ -100,7 +119,7 @@ Produce the final report using the structure defined in the Output Format sectio
 | Severity | Definition | Examples |
 |----------|-----------|----------|
 | **Critical** | Immediate risk of data breach or unauthorized access | Public GCS buckets, firewall rules allowing 0.0.0.0/0 on SSH/RDP, Cloud SQL with public IP and no SSL, user-managed SA keys with admin roles |
-| **High** | Significant security gap that materially weakens posture | Default service accounts with broad scopes, missing Cloud Audit Logs, no VPC flow logs, instances with public IPs |
+| **High** | Significant security gap that materially weakens posture | Default service accounts with broad scopes, missing Cloud Audit Logs, no VPC flow logs, instances with public IPs, sensitive custom image or snapshot shared with `allAuthenticatedUsers` or unapproved external principals |
 | **Medium** | Control gap that should be addressed in normal cycle | Missing log metric filters, DNSSEC not enabled, Shielded VM not enabled, uniform bucket access not set |
 | **Low** | Hardening recommendation or defense-in-depth measure | OS Login not enabled, serial port access not explicitly disabled, BigQuery tables without CMEK |
 | **Informational** | Best practice observation, no direct security impact | Default network still exists (non-production), naming conventions, documentation gaps |
@@ -137,6 +156,12 @@ Produce the final report using the structure defined in the Output Format sectio
 | 5 | Storage | X | Y | Z | nn% |
 | 6 | Cloud SQL | X | Y | Z | nn% |
 | 7 | BigQuery | X | Y | Z | nn% |
+
+### Supplemental Custom Image and Snapshot Sharing Evidence
+
+| Artifact Type | Project | Artifact ID | IAM Scope | Shared Principals | Project Viewer Discoverability | Sensitivity / Sanitization | Audit Evidence | Status |
+|---------------|---------|-------------|-----------|-------------------|--------------------------------|----------------------------|----------------|--------|
+| image/snapshot | <project> | <name> | <artifact/project/inherited> | <principal list> | <yes/no> | <classification/evidence> | <asset/log ref> | Pass/Fail/Not Evaluable |
 
 ### Detailed Findings
 
@@ -194,6 +219,7 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **Cloud SQL authorized_networks vs. private IP.** CIS 6.5 flags `0.0.0.0/0` in authorized networks, but CIS 6.6 goes further and recommends disabling public IP entirely in favor of private networking.
 5. **BigQuery dataset-level vs. table-level CMEK.** CIS 7.2 checks table-level encryption, while CIS 7.3 checks the dataset default. Both should be evaluated independently.
 6. **Default compute service account identification.** The default SA follows the pattern `PROJECT_NUMBER-compute@developer.gserviceaccount.com`. Grep for this pattern, not just the string "default."
+7. **Treating private VM posture as image or snapshot privacy.** Custom images and snapshots have separate IAM policies. `allUsers` may be absent while `allAuthenticatedUsers` or project-level discoverability still exposes sensitive artifacts.
 
 ---
 
@@ -219,10 +245,13 @@ Produce the final report using the structure defined in the Output Format sectio
 - Google Cloud Audit Logs: https://cloud.google.com/logging/docs/audit
 - Google Cloud VPC Documentation: https://cloud.google.com/vpc/docs
 - Google Cloud SQL Security: https://cloud.google.com/sql/docs/mysql/configure-ssl-instance
+- Manage access to custom images: https://cloud.google.com/compute/docs/images/managing-access-custom-images
+- Compute Engine snapshots: https://cloud.google.com/compute/docs/disks/snapshots
 - Terraform Google Provider Documentation: https://registry.terraform.io/providers/hashicorp/google/latest/docs
 
 ---
 
 ## Changelog
 
+- **1.0.1** -- Added supplemental custom image and snapshot sharing evidence gates covering image/snapshot IAM policy, `allAuthenticatedUsers`, project Viewer discoverability, sanitization, audit evidence, and exception governance.
 - **1.0.0** -- Initial release. Full coverage of CIS Google Cloud Platform Foundation Benchmark v2.0.0 sections 1 through 7.

@@ -532,6 +532,63 @@ resource "google_compute_instance" {
 }
 ```
 
+### Supplemental -- Custom Image and Snapshot Sharing Evidence
+
+This supplemental checklist is reported separately from CIS scoring. It verifies whether Compute Engine custom images and snapshots can expose disk-derived data even when the VM is private, Shielded, and CMEK-encrypted.
+
+**gcloud / Cloud Asset evidence to request:**
+
+```bash
+gcloud compute images get-iam-policy <image> --project <image-project>
+gcloud compute snapshots get-iam-policy <snapshot> --project <snapshot-project>
+
+gcloud projects get-iam-policy <image-project> \
+  --flatten="bindings[].members" \
+  --filter="bindings.role:roles/viewer OR bindings.role:roles/compute.imageUser"
+
+gcloud asset search-all-iam-policies \
+  --scope=organizations/<org-id> \
+  --query='policy:roles/compute.imageUser OR policy:allAuthenticatedUsers'
+```
+
+**Terraform patterns to review:**
+
+```hcl
+resource "google_compute_image_iam_member" "image_user" {
+  project = google_compute_image.hardened.project
+  image   = google_compute_image.hardened.name
+  role    = "roles/compute.imageUser"
+  member  = var.approved_image_user_group
+}
+
+resource "google_compute_snapshot_iam_member" "snapshot_user" {
+  project  = var.project_id
+  snapshot = google_compute_snapshot.sanitized.name
+  role     = "roles/compute.storageAdmin"
+  member   = var.approved_snapshot_admin_group
+}
+```
+
+**Review checks:**
+
+| Code | Check | Evidence |
+|------|-------|----------|
+| GCP-IMAGE-SHARE-01 | Custom image and snapshot inventory is complete | Artifact list from IaC, Cloud Asset Inventory, or gcloud with project, owner, source workload, and sensitivity. |
+| GCP-IMAGE-SHARE-02 | Custom image IAM is restricted | `roles/compute.imageUser` bindings exclude `allAuthenticatedUsers` and unapproved external principals. |
+| GCP-IMAGE-SHARE-03 | Snapshot IAM is restricted | Snapshot IAM policy is reviewed independently from the source disk and VM. |
+| GCP-IMAGE-SHARE-04 | Project Viewer discoverability is understood | Project-level Viewer bindings for image projects are approved and bounded. |
+| GCP-IMAGE-SHARE-05 | Cross-org sharing is approved | External groups/domains have owner, ticket, expiry, and business justification. |
+| GCP-IMAGE-SHARE-06 | Shared artifact data is sanitized | Evidence shows generalized image, scrubbed secrets, clean golden image, or approved data classification. |
+| GCP-IMAGE-SHARE-07 | Sharing changes are monitored | Audit logs or Cloud Asset Inventory exports cover image/snapshot IAM changes. |
+| GCP-IMAGE-SHARE-08 | Exceptions are governed | Missing evidence, approved exceptions, and residual risk are explicit in the report. |
+
+**Severity guidance:**
+
+- **High:** production-derived or sensitive image/snapshot is shared with `allAuthenticatedUsers` or unapproved external principals.
+- **Medium:** image/snapshot is shared with named external groups but owner, expiry, sanitization, or review evidence is incomplete.
+- **Low:** artifact inventory, project Viewer discoverability, or audit evidence is incomplete.
+- **Informational:** image/snapshot IAM is restricted to approved principals with review cadence and sanitization evidence.
+
 ---
 
 ## Section 5 -- Storage
