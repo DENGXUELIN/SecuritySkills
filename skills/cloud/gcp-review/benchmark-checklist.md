@@ -293,6 +293,38 @@ resource "google_project_service" {
 }
 ```
 
+### Security Command Center Findings and Mute Rules
+
+These checks supplement CIS Section 2. Record the result separately from CIS
+pass/fail scoring because muted SCC findings can be hidden from default views
+while the underlying finding remains active.
+
+```bash
+# Export raw active findings before applying saved views, dashboard totals, or mute filters.
+gcloud scc findings list ORG_ID \
+  --location=global \
+  --filter='state="ACTIVE"' \
+  --field-mask='finding.category,finding.severity,finding.state,finding.mute,finding.event_time,finding.resource_name,finding.finding_class' \
+  --format=json
+
+# Inventory mute configurations and their filters.
+gcloud scc muteconfigs list \
+  --organization=ORG_ID \
+  --location=global \
+  --format=json
+
+# Review mute and bulk-mute activity in Cloud Audit Logs.
+gcloud logging read \
+  'protoPayload.serviceName="securitycenter.googleapis.com" AND (protoPayload.methodName:"Mute" OR protoPayload.methodName:"mute")' \
+  --freshness=90d \
+  --format=json
+```
+
+Flag raw active findings that disappear only because of mute rules, broad static
+mute filters across production projects or severity levels, dynamic mutes with
+no expiry or recertification, and bulk mute events without approval, rollback,
+or remediation tracking.
+
 ---
 
 ## Section 3 -- Networking

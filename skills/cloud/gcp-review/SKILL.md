@@ -88,7 +88,34 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, gre
 
 ---
 
-### Step 9: Compile Assessment Report
+### Step 9: Security Command Center Finding and Mute Governance
+
+When Security Command Center (SCC) exports are available, review raw active findings before relying on dashboard totals, saved views, or post-mute reports. Muting changes visibility and notification behavior; it does not prove that the underlying misconfiguration, vulnerability, or threat finding was remediated.
+
+**Evidence to collect:**
+
+- Active SCC finding export for the organization, folder, or project scope, including category, severity, state, mute state, resource name, event time, and finding class.
+- Static mute rule inventory with filter expression, owner, approver, justification, compensating control, linked ticket, and next review date.
+- Dynamic mute rule inventory with creation time, update time, automation owner, expiry or recertification cadence, and stale-rule cleanup evidence.
+- Bulk mute/audit-log history with requester, approver, affected categories/resources, change record, rollback plan, and follow-up tracking.
+- Raw active-finding counts reported separately from muted/default-dashboard counts and CIS pass/fail scoring.
+
+**What to flag:**
+
+```
+GCP-SCC-MUTE-01: SCC evidence starts from dashboard or post-mute totals instead of raw active findings
+GCP-SCC-MUTE-02: Static mute rule has a broad filter, missing owner, missing justification, or no review date
+GCP-SCC-MUTE-03: Dynamic mute rule has no expiry, recertification cadence, automation owner, or stale-rule cleanup evidence
+GCP-SCC-MUTE-04: High or Critical active muted finding lacks ticket, owner, remediation target, or accepted-risk approval
+GCP-SCC-MUTE-05: Bulk mute operation lacks change approval, affected-scope inventory, rollback plan, or follow-up tracking
+GCP-SCC-MUTE-06: Report counts muted SCC findings as remediated or CIS-passing without separate risk acceptance
+```
+
+Rate unmanaged SCC mute governance as **Medium** by default. Escalate to **High** when a mute suppresses High/Critical findings, internet exposure, public data access, privileged access, malware/threat findings, or production assets without time-bound approval and compensating evidence.
+
+---
+
+### Step 10: Compile Assessment Report
 
 
 Produce the final report using the structure defined in the Output Format section.
@@ -150,6 +177,12 @@ Produce the final report using the structure defined in the Output Format sectio
 - **Evidence:** <specific configuration or code snippet>
 - **Remediation:** <specific fix with code example>
 
+### Security Command Center Finding and Mute Governance
+
+| Scope | Finding Category | Severity | Raw State | Mute State | Mute Rule | Owner/Approver | Review/Expiry | Decision | Required Action |
+|-------|------------------|----------|-----------|------------|-----------|----------------|---------------|----------|-----------------|
+| <org/folder/project/resource> | <category> | <severity> | <ACTIVE/INACTIVE> | <MUTED/UNMUTED> | <rule/name> | <owner/approver> | <date/none> | <remediate/risk/false-positive> | <action> |
+
 ### Prioritized Remediation Plan
 
 1. **[Critical]** CIS X.Y -- <action item>
@@ -194,6 +227,7 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **Cloud SQL authorized_networks vs. private IP.** CIS 6.5 flags `0.0.0.0/0` in authorized networks, but CIS 6.6 goes further and recommends disabling public IP entirely in favor of private networking.
 5. **BigQuery dataset-level vs. table-level CMEK.** CIS 7.2 checks table-level encryption, while CIS 7.3 checks the dataset default. Both should be evaluated independently.
 6. **Default compute service account identification.** The default SA follows the pattern `PROJECT_NUMBER-compute@developer.gserviceaccount.com`. Grep for this pattern, not just the string "default."
+7. **Treating muted SCC findings as fixed.** Muted SCC findings can disappear from default views while still remaining active. Always compare raw active findings, mute-rule evidence, and remediation or risk-acceptance tracking.
 
 ---
 
@@ -219,6 +253,9 @@ Produce the final report using the structure defined in the Output Format sectio
 - Google Cloud Audit Logs: https://cloud.google.com/logging/docs/audit
 - Google Cloud VPC Documentation: https://cloud.google.com/vpc/docs
 - Google Cloud SQL Security: https://cloud.google.com/sql/docs/mysql/configure-ssl-instance
+- Security Command Center Findings: https://cloud.google.com/security-command-center/docs/how-to-api-list-findings
+- Security Command Center Mute Findings: https://cloud.google.com/security-command-center/docs/how-to-mute-findings
+- gcloud SCC Mute Configs: https://cloud.google.com/sdk/gcloud/reference/scc/muteconfigs/list
 - Terraform Google Provider Documentation: https://registry.terraform.io/providers/hashicorp/google/latest/docs
 
 ---
