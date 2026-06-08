@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [NIST-SP-800-81-Rev2, CIS-Controls-v8]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -37,12 +37,13 @@ If a target is provided via arguments, focus the review on: $ARGUMENTS
 - Compliance audits requiring NIST SP 800-81 alignment.
 - Protective DNS service evaluation or deployment planning.
 - Incident response when DNS tunneling is suspected.
+- Domain inventory review after SaaS, CDN, static hosting, cloud DNS, or registrar migrations.
 
 ---
 
 ## Context
 
-DNS is a foundational protocol that is often under-secured. NIST SP 800-81 Rev 2 Section 2 identifies three primary DNS threat categories: DNS cache poisoning, DNS-based denial of service, and unauthorized zone data modification. DNSSEC addresses data integrity but not confidentiality. CIS Controls v8 Control 9.2 requires the use of DNS filtering services to block access to known malicious domains. Beyond these baseline controls, DNS is increasingly exploited as a covert data exfiltration channel because port 53 is almost universally permitted through firewalls. Detecting DNS tunneling and exfiltration requires analysis of query patterns, payload sizes, and entropy -- not just domain reputation.
+DNS is a foundational protocol that is often under-secured. NIST SP 800-81 Rev 2 Section 2 identifies three primary DNS threat categories: DNS cache poisoning, DNS-based denial of service, and unauthorized zone data modification. DNSSEC addresses data integrity but not confidentiality. CIS Controls v8 Control 9.2 requires the use of DNS filtering services to block access to known malicious domains. Beyond these baseline controls, DNS records can delegate trust to SaaS, CDN, static hosting, registrar, and cloud DNS tenants whose ownership changes independently of the DNS zone. Detecting dangling records and takeover risk requires ownership, reservation, and claimability evidence. DNS is also increasingly exploited as a covert data exfiltration channel because port 53 is almost universally permitted through firewalls. Detecting DNS tunneling and exfiltration requires analysis of query patterns, payload sizes, and entropy -- not just domain reputation.
 
 ---
 
@@ -237,7 +238,64 @@ If a cloud-based protective DNS service is used (Cisco Umbrella, Cloudflare Gate
 
 ---
 
-### Step 5: DNS Exfiltration and Tunneling Detection Patterns
+### Step 5: Dangling Record and Takeover Evidence Review
+
+DNSSEC, RPZ, and protective DNS do not prove that a CNAME, ALIAS, ANAME, NS, MX, or TXT target is still controlled by the intended tenant. Review public and internal zones for stale third-party targets and delegated zones that can be claimed by another account.
+
+#### 5.1 Dangling Record Inventory
+
+For each record that points outside the organization's authoritative zone or delegates a subzone, capture:
+
+| Field | Required evidence |
+|-------|-------------------|
+| Record name | FQDN and zone where the record is published. |
+| Record type | CNAME, ALIAS, ANAME, NS, MX, TXT verification record, or provider-specific record. |
+| Target | Hostname, distribution, app, bucket, Pages site, static web app, cloud DNS zone, registrar account, or SaaS tenant. |
+| Provider | Vendor or cloud service that owns the target namespace. |
+| Owner | Internal team, service owner, or vendor owner responsible for the target. |
+| Reservation status | Active reservation, verified custom domain, deleted app, missing zone, expired account, unknown. |
+| Claimability evidence | Vendor-specific check showing whether another tenant can claim the name or target. |
+| Last verification date | Date when ownership and claimability were last verified. |
+| Remediation decision | Keep, remove, reclaim, transfer, park, or monitor. |
+
+**Patterns to check:**
+
+```
+# CNAME / static hosting / SaaS
+CNAME
+ALIAS
+ANAME
+github.io
+herokuapp.com
+azurestaticapps.net
+cloudfront.net
+pages.dev
+netlify.app
+vercel.app
+
+# Delegation takeover
+NS
+awsdns-
+googledomains.com
+azure-dns
+cloudflare.com
+```
+
+#### 5.2 Vendor Claimability and Reservation Checks
+
+Do not mark a record vulnerable solely because the target returns 404 or NXDOMAIN. Verify provider-specific ownership behavior and vendor-specific reservation evidence:
+
+- Custom domain still attached to an active tenant, distribution, app, bucket, Pages site, or static web app.
+- Deleted targets cannot be recreated by an unrelated account with the same hostname.
+- TXT verification tokens are still bound to the expected tenant and are not reusable by attackers.
+- NS delegations point to an active hosted zone controlled by the organization, not to deleted cloud DNS zones or expired registrar accounts.
+- Parked migration records have an owner, expiration, monitoring, and last verification date.
+
+**Finding classification:** Dangling public CNAME/ALIAS/ANAME records with confirmed third-party claimability are **High**. Stale public NS delegations where another party can control the delegated zone are **Critical**. Unknown ownership or stale verification for public records is **Medium** until claimability is confirmed. Internal split-horizon records with active reservation evidence are **Low** or informational.
+
+---
+
+### Step 6: DNS Exfiltration and Tunneling Detection Patterns
 
 DNS tunneling encodes data in DNS query names or TXT record responses to create a covert communication channel. Detection requires pattern analysis, not just domain reputation.
 
@@ -286,7 +344,7 @@ abcdef0123456789.dnscat.example.com TXT
 
 ---
 
-### Step 6: Domain Categorization and Newly Registered Domain (NRD) Blocking
+### Step 7: Domain Categorization and Newly Registered Domain (NRD) Blocking
 
 - **NRD blocking:** Domains registered within the past 30 days are disproportionately associated with phishing and malware. CIS Control 9.2 supports blocking or flagging NRDs.
 - **DGA detection:** Domain Generation Algorithms produce random-appearing domain names. Detection relies on entropy analysis and machine learning classifiers integrated into protective DNS services.
@@ -299,8 +357,8 @@ abcdef0123456789.dnscat.example.com TXT
 | Severity | Definition |
 |----------|-----------|
 | **Critical** | Broken DNSSEC chain of trust (missing DS record in parent); authoritative zones serving invalid signatures. |
-| **High** | DNSSEC validation disabled on resolvers; no DNS filtering/RPZ; unsigned public authoritative zones; DNS bypass paths around protective DNS; no DNS query logging; weak signing algorithms. |
-| **Medium** | Plaintext DNS forwarding over untrusted networks; stale RPZ feeds; undocumented NTAs; no NRD blocking; no exfiltration detection; DoH bypass not controlled. |
+| **High** | DNSSEC validation disabled on resolvers; no DNS filtering/RPZ; unsigned public authoritative zones; DNS bypass paths around protective DNS; no DNS query logging; weak signing algorithms; dangling public CNAME/ALIAS/ANAME records with confirmed third-party claimability. |
+| **Medium** | Plaintext DNS forwarding over untrusted networks; stale RPZ feeds; undocumented NTAs; no NRD blocking; no exfiltration detection; DoH bypass not controlled; public third-party DNS targets with unknown owner or stale claimability verification. |
 | **Low** | Missing documentation of DNS architecture; resolver software not at latest version; cosmetic configuration issues. |
 
 ---
@@ -328,6 +386,12 @@ abcdef0123456789.dnscat.example.com TXT
 |----------|-------------------|--------------------|--------------|--------------|
 | ns1      | Enabled/Disabled  | DoT/DoH/Plaintext  | Yes/No       | Yes/No       |
 
+### Dangling Record and Takeover Evidence
+
+| Record | Type | Target | Provider | Owner | Reservation Status | Claimability Evidence | Last Verified | Decision |
+|--------|------|--------|----------|-------|--------------------|-----------------------|---------------|----------|
+| docs.example.com | CNAME | old-vendor.example-host.com | Vendor | Docs team | Active/Deleted/Unknown | <vendor proof, failed claim test, ticket, API evidence> | YYYY-MM-DD | Keep/Remove/Reclaim |
+
 ### Findings
 
 #### [F-001] <Finding Title>
@@ -336,6 +400,7 @@ abcdef0123456789.dnscat.example.com TXT
 - **File:** <path to config file>
 - **Description:** <what was found>
 - **Evidence:** <specific configuration snippet>
+- **Takeover Evidence:** <owner, reservation status, vendor-specific claimability, last verification date>
 - **Remediation:** <concrete fix>
 
 ### DNS Exfiltration Detection Readiness
@@ -384,6 +449,8 @@ abcdef0123456789.dnscat.example.com TXT
 
 4. **Ignoring DNS over TCP.** DNS is not UDP-only. DNS over TCP (port 53) supports large responses and is required for zone transfers. Some tunneling tools prefer TCP for reliability. Firewall rules and monitoring must cover both UDP and TCP port 53.
 
+5. **Flagging every stale-looking CNAME as a takeover.** A third-party target that returns 404 is not automatically claimable. Require provider-specific reservation and ownership evidence before assigning high severity. Conversely, do not dismiss NS delegation takeover just because the parent zone is DNSSEC-signed.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -413,4 +480,5 @@ This skill processes DNS configuration files that may contain user-supplied zone
 
 ## Changelog
 
+- **1.0.1** -- Added dangling DNS record, stale delegation, vendor claimability, reservation, owner, and last-verification evidence gates.
 - **1.0.0** -- Initial release. Full coverage of NIST SP 800-81 Rev 2 and CIS Controls v8 Control 9.2 for DNS security review.
