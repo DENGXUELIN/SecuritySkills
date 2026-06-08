@@ -13,7 +13,7 @@ phase: [build, deploy, operate]
 frameworks: [CIS-Docker-v1.6.0, CIS-Kubernetes-v1.9.0, NIST-SP-800-190]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.1.0"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -115,6 +115,35 @@ For detailed CIS benchmark checklist items, NIST SP 800-190 countermeasure table
 
 ---
 
+### Step 6b: Policy Exception Evidence Gate
+
+Pod Security Admission, OPA/Gatekeeper, Kyverno, admission webhooks, and Helm security defaults only prove control coverage when exceptions are narrow, owned, expiring, and monitored. Broad namespace exemptions, policy exclude blocks, non-expiring Helm overrides, or webhook bypass annotations can nullify the control while making the cluster look governed.
+
+For every exception, record:
+
+- **Exception mechanism:** namespace label, policy exclude block, webhook bypass, constraint exemption, Helm value override, annotation, admission controller flag, or CI/CD waiver.
+- **Exact scope:** namespace, workload, service account, image, chart, capability, host namespace, hostPath, hostPort, seccomp/AppArmor profile, RBAC verb, or registry path covered by the exception.
+- **Owner and approval:** named business/system owner, security approver, ticket, change request, or risk acceptance record.
+- **Expiration or review date:** expiry date, next review date, and automated reminder or enforcement behavior. Treat no-expiry exceptions as persistent risk.
+- **Compensating controls:** NetworkPolicy, runtime detection, read-only root filesystem, restricted RBAC, image signing, admission audit mode, monitoring, or other controls that reduce the exception risk.
+- **Enforcement evidence:** proof that non-exempt resources are still blocked or audited, and that exception matches are logged.
+
+**What to look for:**
+
+```
+CTR-EXCEPTION-01: Broad namespace or cluster-wide exception disables Pod Security, Gatekeeper, Kyverno, or admission webhook enforcement
+CTR-EXCEPTION-02: Exception lacks named owner, security approval, ticket, or risk acceptance record
+CTR-EXCEPTION-03: Exception has no expiration, review date, automated reminder, or removal plan
+CTR-EXCEPTION-04: Exception scope covers privileged, hostNetwork, hostPID, hostPath, hostPort, added capabilities, root user, or wildcard image patterns beyond the stated workload need
+CTR-EXCEPTION-05: Compensating controls are missing or do not address the exempted risk
+CTR-EXCEPTION-06: Policy engine does not prove non-exempt resources are still blocked or audited
+CTR-EXCEPTION-07: Exception hits are not logged, monitored, or reviewed for drift
+```
+
+Do not mark a policy domain as passing solely because a policy engine exists. Report broad, ownerless, unapproved, non-expiring, or unmonitored exceptions as findings.
+
+---
+
 ### Step 7: Compile Assessment Report
 
 
@@ -184,6 +213,12 @@ Produce the final report using the structure defined in the Output Format sectio
 |----------|-----------|-----------|------------|
 | deploy/app | production | Baseline (not Restricted) | runAsRoot, no seccomp |
 | deploy/worker | production | Privileged | privileged: true |
+
+### Policy Exception Evidence
+
+| Policy Engine / Control | Exception Mechanism | Scope | Owner / Approval | Expiration | Compensating Controls | Enforcement Evidence | Risk |
+|---|---|---|---|---|---|---|---|
+| [PSA/Gatekeeper/Kyverno/webhook] | [label/exclude/annotation/override] | [namespace/workload/image/SA] | [owner/ticket] | [date/none] | [controls] | [audit/block evidence] | [Low/Medium/High] |
 
 ### Prioritized Remediation Plan
 
@@ -257,6 +292,7 @@ Produce the final report using the structure defined in the Output Format sectio
 5. **`readOnlyRootFilesystem` breaks many applications.** When recommending this control, also recommend adding writable `emptyDir` volume mounts for directories the application needs to write to (e.g., `/tmp`, `/var/cache`).
 6. **Network policies are additive, not subtractive.** A default-deny policy must be explicitly created. Without it, all pod-to-pod traffic is allowed regardless of other NetworkPolicy resources.
 7. **Distroless images have no shell.** While this is excellent for security, note that debugging requires ephemeral containers (`kubectl debug`). Flag this as a consideration, not a problem.
+8. **Policy engines can be neutralized by exceptions.** Pod Security Admission, Gatekeeper, Kyverno, and custom webhooks only help when exceptions are narrow, owned, expiring, and monitored. Treat broad namespace exemptions or permanent exclude rules as findings, not as evidence of control coverage.
 
 ---
 
@@ -293,4 +329,5 @@ Produce the final report using the structure defined in the Output Format sectio
 
 ## Changelog
 
+- **1.1.0** -- Added policy exception evidence gates for Pod Security Admission, Gatekeeper, Kyverno, admission webhooks, Helm overrides, exception ownership, expiry, compensating controls, and enforcement evidence.
 - **1.0.0** -- Initial release. Full coverage of CIS Docker Benchmark v1.6.0 Section 4-5, CIS Kubernetes Benchmark v1.9.0 Sections 1-5, and NIST SP 800-190 countermeasures across all five risk categories.
