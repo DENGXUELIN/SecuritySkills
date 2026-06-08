@@ -99,6 +99,44 @@ CUSTODY LOG:
 - Compute and record cryptographic hashes (SHA-256 minimum) at collection time and verify at each transfer
 - Maintain a continuous, unbroken record from collection through final disposition
 
+### Step 1b: Record Time Source and Clock Skew
+
+Forensic timelines can be wrong even when hashes and chain of custody are sound. Endpoint clocks, SIEM ingestion timestamps, cloud provider event times, SaaS export times, and collector workstation clocks often disagree. Record a per-evidence time basis before correlation so original timestamps remain intact and any normalized timeline is clearly marked as a derived artifact.
+
+**Time source record:**
+
+```
+TIME SOURCE RECORD
+==================
+Evidence ID:             [EVD-NNNN]
+Source System/Service:   [hostname, cloud service, IdP, SIEM, SaaS tenant]
+Source Time Zone:        [UTC / local TZ / unknown]
+Source Clock Value:      [YYYY-MM-DD HH:MM:SS plus timezone]
+Collector Clock Value:   [YYYY-MM-DD HH:MM:SS UTC]
+Observed Clock Offset:   [+/- seconds or "unknown"]
+Time Sync Source:        [NTP, domain controller, cloud provider, manual, unknown]
+Timestamp Fields:        [event_time, ingestion_time, processing_time, export_time]
+Normalization Applied:   [none / offset noted only / derived UTC timeline copy]
+Confidence:              [high / medium / low, with reason]
+```
+
+**Evidence gates:**
+
+```
+FOR-TIME-01: Evidence source timezone or UTC offset is missing or inferred without support
+FOR-TIME-02: Collector clock was not recorded and synchronized before acquisition
+FOR-TIME-03: Event time is mixed with ingestion, processing, or export time in the timeline
+FOR-TIME-04: Original timestamps were modified instead of preserving a derived normalized copy
+FOR-TIME-05: Clock skew is ignored when correlating attacker or responder actions across systems
+FOR-TIME-06: Large or unknown clock skew is not reflected in confidence or sequence-of-events conclusions
+```
+
+**False-positive boundaries:**
+
+- Do not flag a source simply because it uses local time when the timezone, UTC offset, collector clock, and normalization method are documented.
+- Do not require direct host clock access for SaaS/cloud logs when provider documentation, export metadata, and API event-time semantics are recorded.
+- Do not treat SIEM ingestion time as wrong by default; mark it as ingestion time and keep it separate from the original event time.
+
 ### Step 2: Collect Evidence in Order of Volatility (RFC 3227)
 
 RFC 3227 Section 2.1 defines the order of volatility -- evidence sources ranked from most volatile (shortest lifespan) to least volatile. Collect in this order to minimize evidence loss.
@@ -394,6 +432,11 @@ the order of collection, and any evidence that could not be obtained.]
 |---|---|---|---|
 | EVD-0001 | [hash] | [hash] | [YES/NO] |
 
+### Timestamp Normalization
+| Evidence ID | Source Time Zone | Source Clock Value | Collector Clock Value | Clock Offset | Time Sync Source | Timestamp Fields Used | Normalization Applied | Confidence |
+|---|---|---|---|---|---|---|---|---|
+| EVD-0001 | [UTC/local/unknown] | [timestamp] | [timestamp] | [+/- seconds/unknown] | [NTP/cloud/DC/manual/unknown] | [event/ingestion/export] | [none/derived timeline] | [high/medium/low] |
+
 ### Evidence Gaps
 [List any evidence that could not be collected and the reason]
 
@@ -460,6 +503,10 @@ Applying traditional forensic methods to cloud environments without adaptation l
 ### Pitfall 5: Overwriting Evidence with Collection Activity
 
 Every action on a live system modifies it -- writing memory dump files to the evidence drive changes timestamps and consumes disk space, running commands updates shell history and modifies access times. Minimize evidence contamination by writing collection output to external media (USB, network share, S3 bucket), documenting every command executed on the system, and noting the expected impact of each collection action on the evidence state.
+
+### Pitfall 6: Normalizing Timestamps by Editing Original Evidence
+
+Do not rewrite source log files, disk metadata, SaaS exports, or cloud logs to "fix" time zones or clock skew. Preserve original timestamps exactly as collected and create a separate derived UTC timeline with the offset, method, and confidence documented. If skew is unknown, say so and avoid overconfident sequence-of-events conclusions.
 
 ---
 
