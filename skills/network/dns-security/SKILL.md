@@ -111,6 +111,45 @@ For each authoritative zone, verify:
 - **DS record in parent:** A DS record matching the KSK is published in the parent zone.
 - **NSEC vs. NSEC3:** NSEC3 is preferred to prevent zone enumeration (NIST SP 800-81 Rev 2 Section 4.4).
 
+**DNSSEC chain-of-trust evidence gate:**
+
+Do not mark a public zone's DNSSEC chain as valid based only on registrar UI, a hosted-zone checkbox, or the presence of DNSKEY records. Evidence must prove the active parent DS RRset matches the child KSK DNSKEY digest and that validators can build the chain at the time of review.
+
+```
+DNSSEC-CHAIN-01: Registrar, parent-zone, or registry evidence for active DS records is missing
+DNSSEC-CHAIN-02: Parent DS key tag, algorithm, digest type, digest, or TTL is not recorded
+DNSSEC-CHAIN-03: Child KSK DNSKEY key tag, algorithm, public key, or DNSKEY RRset evidence is not recorded
+DNSSEC-CHAIN-04: Parent DS digest does not match the digest computed from the child KSK DNSKEY
+DNSSEC-CHAIN-05: Multiple DS/DNSKEY records exist but rollover state, active key, or expected overlap window is not documented
+DNSSEC-CHAIN-06: Validation output is missing, stale, uses only a non-validating resolver, or does not show AD/bogus/servfail status
+DNSSEC-CHAIN-07: DNSSEC deployment is enabled in UI but parent DS is absent, disabled, or still pending publication
+DNSSEC-CHAIN-08: Broken-chain findings omit remediation owner, registrar/parent action, and recheck timestamp
+```
+
+**DNSSEC chain evidence record:**
+
+```
+DNSSEC CHAIN-OF-TRUST EVIDENCE
+==============================
+Zone:                    [example.com]
+Review Timestamp:        [UTC timestamp]
+Parent Evidence Source:  [dig DS @parent | registrar export | registry API]
+Parent DS:               [key tag, algorithm, digest type, digest, TTL]
+Child DNSKEY / KSK:      [key tag, algorithm, public key hash/evidence]
+Digest Match:            [Pass/Fail/Not Tested]
+Rollover State:          [steady | pre-publish | double-sign | retiring | unknown]
+Validation Command:      [dig +dnssec | delv | drill | DNSViz]
+Validation Result:       [AD | secure | bogus | servfail | insecure]
+Remediation Owner / ETA: [N/A or owner/date]
+Recheck Timestamp:       [UTC timestamp]
+```
+
+**False-positive boundaries:**
+
+- Do not require a single DS record when an active rollover intentionally publishes multiple DS records and the overlap window is documented.
+- Do not flag a private/internal zone for absent parent DS when it has no public delegation and the trust anchor model is documented separately.
+- Do not reject a registrar export when it is paired with independent DNS query validation from parent nameservers or DNSViz-style validation output.
+
 **Patterns to check in zone files:**
 
 ```
@@ -322,6 +361,12 @@ abcdef0123456789.dnscat.example.com TXT
 |------|--------|-----------|-----------|--------------|-------------|--------|
 | example.com | Yes/No | 13/8/15 | KSK:2048/ZSK:1024 | Yes/No | NSEC3 | Pass/Fail |
 
+### DNSSEC Chain-of-Trust Evidence
+
+| Zone | Parent DS | Child KSK DNSKEY | Digest Match | Rollover State | Validation Command | Validation Result | Evidence Timestamp | Remediation Owner / ETA |
+|---|---|---|---|---|---|---|---|---|
+| example.com | [keytag/alg/digest-type/digest] | [keytag/alg/evidence] | [Pass/Fail] | [state] | [command] | [AD/secure/bogus/servfail/insecure] | [UTC] | [N/A or owner/date] |
+
 ### Resolver Security
 
 | Resolver | DNSSEC Validation | Encrypted Transport | RPZ/Filtering | Query Logging |
@@ -383,6 +428,8 @@ abcdef0123456789.dnscat.example.com TXT
 3. **Relying solely on domain reputation lists for exfiltration detection.** Attackers use attacker-controlled domains that are not yet categorized. Behavioral detection (entropy, volume, query type anomalies) catches novel exfiltration domains that reputation feeds miss.
 
 4. **Ignoring DNS over TCP.** DNS is not UDP-only. DNS over TCP (port 53) supports large responses and is required for zone transfers. Some tunneling tools prefer TCP for reliability. Firewall rules and monitoring must cover both UDP and TCP port 53.
+
+5. **Trusting DNSSEC UI without chain verification.** Registrar or DNS-hosting UI can show DNSSEC enabled while the parent DS is missing, stale, or mismatched. Always record the parent DS RRset, child KSK DNSKEY, digest comparison, rollover state, and validator output before marking the chain of trust valid.
 
 ---
 
