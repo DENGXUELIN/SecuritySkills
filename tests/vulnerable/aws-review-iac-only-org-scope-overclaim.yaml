@@ -1,0 +1,75 @@
+id: aws-review-iac-only-org-scope-overclaim
+skill: aws-review
+expected: vulnerable
+description: >
+  IaC-only review overclaims organization-wide AWS compliance from one security
+  account Terraform module and one regional analyzer.
+scenario:
+  review_scope:
+    claimed_scope: "all AWS accounts and all enabled regions"
+    supplied_evidence:
+      - path: terraform/security-account/cloudtrail.tf
+        source_type: iac-only
+        captured: "2026-06-01"
+      - path: terraform/security-account/access-analyzer.tf
+        source_type: iac-only
+        captured: "2026-06-01"
+    missing_evidence:
+      - aws_organizations_account_denominator
+      - delegated_administrator_export
+      - member_account_inclusion_export
+      - enabled_and_opt_in_region_inventory
+      - cloudtrail_get_trail_status_export
+      - cloudtrail_s3_bucket_policy_export
+      - cloudtrail_kms_key_policy_export
+      - cloudwatch_logs_integration_export
+      - access_analyzer_policy_validation_findings
+  terraform:
+    provider_region: us-east-1
+    resources:
+      - type: aws_cloudtrail
+        name: org
+        attributes:
+          is_organization_trail: true
+          is_multi_region_trail: true
+          enable_logging: true
+          kms_key_id: "arn:aws:kms:us-east-1:111122223333:key/cloudtrail"
+          cloud_watch_logs_group_arn: null
+      - type: aws_accessanalyzer_analyzer
+        name: account
+        attributes:
+          analyzer_name: account-analyzer
+          type: ACCOUNT
+  reported_findings:
+    - cis_id: "3.1"
+      title: "Ensure CloudTrail is enabled in all regions"
+      status: Pass
+      severity: Low
+      evidence_source: iac-only
+      scope_coverage: "organization-wide"
+      problem: "Treats one Terraform organization trail as proof of all member accounts and regions."
+    - cis_id: "1.20"
+      title: "Ensure IAM Access Analyzer is enabled for all regions"
+      status: Pass
+      severity: Low
+      evidence_source: iac-only
+      scope_coverage: "all-regions"
+      problem: "One ACCOUNT analyzer in us-east-1 is treated as all-region analyzer and policy-validation evidence."
+    - cis_id: "1.1"
+      title: "Maintain current contact details"
+      status: Pass
+      evidence_source: unknown
+      problem: "A live-only control is passed without account contact export evidence."
+should_trigger:
+  - AWS-EVID-SCOPE-01
+  - AWS-EVID-SCOPE-02
+  - AWS-EVID-SCOPE-03
+  - AWS-EVID-SCOPE-04
+  - AWS-EVID-SCOPE-05
+  - AWS-EVID-SCOPE-06
+expected_result: >
+  The skill should flag the assessment as overconfident. CloudTrail can only be
+  a scoped or Not Evaluable finding until organization, member-account, region,
+  bucket-policy, KMS-policy, and status evidence is supplied. Access Analyzer
+  deployment must be separated from IAM policy-validation evidence, and live-only
+  controls should use Not Evaluable reason codes.
