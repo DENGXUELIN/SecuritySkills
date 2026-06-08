@@ -442,6 +442,23 @@ Note: Not all requirements support the Customized Approach. Requirements with "T
 |---------|--------|---------|----------|-------------|
 | [N.x.x] | [In Place/Not in Place] | [finding detail] | [evidence reviewed] | [action needed] |
 
+### Evidence Freshness and Sample Matrix
+
+Before marking any sub-requirement `In Place`, capture assessor-verifiable evidence metadata:
+
+- `PCI-EVID-01` **Testing procedure mapping**: identify the PCI DSS testing method used for the sub-requirement: examine, observe, interview, test, or customized approach validation.
+- `PCI-EVID-02` **Evidence artifact**: record the exact artifact, system export, sample set, ticket, log source, interview record, observation record, or test output reviewed.
+- `PCI-EVID-03` **Evidence owner and collector**: record who owns the evidence and who collected or validated it.
+- `PCI-EVID-04` **Evidence date and period covered**: capture the collection date plus the operating period covered by the evidence.
+- `PCI-EVID-05` **CDE and connected-to scope coverage**: identify systems, accounts, applications, network segments, vendors, security-impacting systems, or TPSP responsibilities sampled.
+- `PCI-EVID-06` **Frequency requirement met**: for recurring controls, confirm the evidence covers the required cadence across the assessment period.
+- `PCI-EVID-07` **Freshness status**: mark evidence `Current`, `Stale`, or `Unknown` based on the assessment window, control population, CDE scope, and control change history.
+- `PCI-EVID-08` **Unknown/finding behavior**: mark the result `Unknown` or `Not in Place` when testing procedure, sample scope, owner, date, period, CDE coverage, or freshness cannot be verified.
+
+| Sub-Req | Testing Procedure | Artifact | Owner/Collector | Evidence Date/Period | Sample Scope | CDE Coverage | Frequency Met | Freshness | Result |
+|---------|-------------------|----------|-----------------|----------------------|--------------|--------------|---------------|-----------|--------|
+| [N.x.x] | [Examine/Observe/Interview/Test] | [artifact] | [owner/collector] | [date/period] | [systems/accounts/vendors/logs] | [complete/partial/unknown] | [Yes/No/N/A/Unknown] | [Current/Stale/Unknown] | [Pass/Fail/Unknown] |
+
 ## New v4.0 Requirements Status
 [Assessment of all 64 new requirements, particularly those mandatory since March 31, 2025]
 
@@ -519,6 +536,8 @@ Maintain an Information Security Policy:                Requirement 12
 4. **Treating compensating controls as permanent solutions.** Compensating controls must be reassessed annually and are expected to be temporary measures while the organization works toward meeting the original requirement. Assessors scrutinize long-standing compensating controls and may reject those that have become routine without progress toward full compliance.
 
 5. **Failing to manage third-party service provider (TPSP) compliance.** Requirement 12.8 and 12.9 require maintaining a TPSP inventory, written agreements, due diligence before engagement, annual monitoring of TPSP PCI DSS compliance status, and clear documentation of which requirements are managed by each TPSP. The shared responsibility model must be explicitly documented.
+
+6. **Marking stale or unsampled evidence as compliant.** A current screenshot, policy, or single-system export does not prove operating effectiveness across the full CDE, connected-to systems, TPSP responsibilities, or required assessment period. Missing sample scope, owner, date, period covered, frequency proof, or freshness status should block `Requirement in Place`.
 
 ---
 
