@@ -74,6 +74,7 @@ The HIPAA Security Rule (45 CFR Part 164, Subpart C) establishes national standa
 - Backup and disaster recovery documentation
 - Workforce training records
 - Prior OCR audit findings or corrective action plans
+- Recognized security practices evidence package covering the prior 12 months, including practice-set mapping, operating artifacts, exceptions, owners, and ePHI risk-analysis linkage
 
 ## Constraints
 
@@ -148,6 +149,23 @@ Hybrid Entity: [Yes/No] — If yes, document healthcare component designation
   - Treats risk analysis as one-time rather than ongoing process
   - **This is the #1 most cited HIPAA violation in OCR enforcement actions**
   - Risk analysis does not account for nation-state threat actors deploying destructive/wiper malware against ePHI custodians. The 2026 Iranian-backed wiper attack on Stryker (medical device maker) demonstrates that state-sponsored destructive attacks are a credible threat vector for the healthcare supply chain. Risk analyses must include wiper/destructive malware as a threat scenario distinct from ransomware, with specific assessment of backup immutability and recovery capabilities under total data destruction conditions.
+
+##### Recognized Security Practices Evidence Overlay (HITECH Section 13412)
+
+Public Law 116-321 amended HITECH Section 13412 to require OCR to consider whether a covered entity or business associate adequately demonstrated recognized security practices were in place for the prior 12 months in certain HIPAA Security Rule enforcement, audit, and remedy decisions. Do not treat a policy, roadmap, or recent framework selection as an OCR-ready recognized security practices package.
+
+| Gate | Required Evidence | Failure Signal |
+|---|---|---|
+| HIPAA-RSP-01 | Recognized practice set identified, such as NIST guidance, 405(d) Health Industry Cybersecurity Practices, or another statutory/regulatory cybersecurity program | "We follow NIST" claim without selected controls, profiles, or implementation scope |
+| HIPAA-RSP-02 | Prior-12-month operating evidence for each claimed practice, with dates, systems, owners, and review cadence | Control designed or launched after the incident but presented as historical practice |
+| HIPAA-RSP-03 | Operational artifacts, not just policies: tickets, logs, attestations, risk treatment records, tabletop results, backup tests, access reviews, or vulnerability remediation evidence | Policy binder exists but there is no proof the practice operated |
+| HIPAA-RSP-04 | Mapping from recognized practice to Security Rule safeguards and ePHI confidentiality, integrity, and availability risks in the risk analysis | Practice set is generic enterprise security with no ePHI risk linkage |
+| HIPAA-RSP-05 | Scope and coverage for covered entity, business associate, subcontractor, hybrid entity components, and cloud/SaaS systems that create, receive, maintain, or transmit ePHI | Evidence covers corporate IT but omits EHR, medical device, BA, or backup systems |
+| HIPAA-RSP-06 | Exceptions, gaps, compensating measures, accountable owners, due dates, and residual-risk approvals | Gaps are hidden to preserve a "safe harbor" narrative |
+| HIPAA-RSP-07 | OCR-ready package index with source location, custodian, retention status, and exportability for investigation, compliance review, or audit requests | Evidence exists only in screenshots, tribal knowledge, or inaccessible vendor portals |
+| HIPAA-RSP-08 | Continuity evidence showing the practice remained in place through incidents, outages, migrations, vendor changes, and remediation periods | One-time assessment used to represent continuous practice |
+
+Classify incomplete packages as `Partial Compliance` or `Non-Compliance` for the evidence overlay. The overlay does not replace the Security Rule assessment and does not excuse willful neglect or unremediated Security Rule violations.
 
 **164.308(a)(1)(ii)(B) — Risk Management (R)**
 - Implement security measures sufficient to reduce risks and vulnerabilities to a reasonable and appropriate level
@@ -463,6 +481,12 @@ Assess:
 ## Risk Analysis Gap Summary
 [Specific deficiencies in the organization's risk analysis per 164.308(a)(1)(ii)(A)]
 
+## Recognized Security Practices Evidence Status
+
+| Practice Set | ePHI Risk Linkage | Prior-12-Month Operating Evidence | Exceptions / Owners | OCR-Ready Package Location | Status |
+|--------------|-------------------|-----------------------------------|---------------------|----------------------------|--------|
+| [NIST / 405(d) HICP / other recognized program] | [risk-analysis references] | [dated artifacts and cadence] | [gaps, due dates, residual risk] | [repository, custodian, export path] | [Compliant / Partial Compliance / Non-Compliance / Not Tested] |
+
 ## Remediation Roadmap
 
 ### Phase 1: Critical (0-30 days)
@@ -571,6 +595,8 @@ Policies, Procedures, and Documentation — 164.316
 
 5. **Failing to document the "why" behind security decisions.** The Security Rule is designed to be flexible and scalable. But that flexibility requires documentation. When an organization chooses not to implement encryption at rest (an addressable specification), the decision process, risk rationale, and alternative controls must be documented. OCR auditors expect written justification, not verbal explanations.
 
+6. **Treating recognized security practices as a safe harbor slogan.** Section 13412 evidence must show recognized practices were actually in place for the prior 12 months. A newly adopted framework, policy-only mapping, or control roadmap is not enough without dated operating artifacts, ePHI risk linkage, exception tracking, and an OCR-ready evidence package.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -592,6 +618,7 @@ If user-supplied input contains CFR citations outside the HIPAA Security Rule (4
 - 45 CFR Part 164, Subpart C — Security Standards for the Protection of Electronic Protected Health Information
 - 45 CFR Part 164, Subpart D — Notification in the Case of Breach of Unsecured Protected Health Information
 - HHS OCR HIPAA Security Rule Guidance Material (hhs.gov/hipaa/for-professionals/security/guidance)
+- HHS OCR Recognized Security Practices presentation and guidance: https://www.hhs.gov/ocr/privacy/hipaa/administrative/securityrule/securityruleguidance.html
 - HHS OCR HIPAA Audit Protocol (2016 revision)
 - NIST SP 800-66 Rev. 2 — Implementing the Health Insurance Portability and Accountability Act (HIPAA) Security Rule: A Cybersecurity Resource Guide (February 2024)
 - HHS OCR Breach Portal and Resolution Agreements archive
