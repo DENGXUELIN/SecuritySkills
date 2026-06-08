@@ -12,7 +12,7 @@ phase: [operate]
 frameworks: [MITRE-ATT&CK-v16]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -56,6 +56,7 @@ Before beginning, gather or confirm:
 - [ ] **Environment baseline:** Normal volume and patterns for the data source (e.g., average daily failed logon count, typical admin logon hours).
 - [ ] **Alert priority and response:** Desired severity level and expected analyst response procedure.
 - [ ] **Performance constraints:** Query time window, maximum execution time, and scheduled frequency.
+- [ ] **Time semantics and latency evidence:** Event-time field, ingestion/index-time field, measured latency distribution, clock-skew tolerance, timezone normalization, lookback buffer, and deduplication strategy for overlapping scheduled windows.
 - [ ] **Existing rules:** Any current rules covering similar detections that may overlap or conflict.
 
 ---
@@ -456,6 +457,56 @@ Suppression:         Enabled, 1 hour
 Entity mapping:      Account -> UserPrincipalName, IP -> IPAddress, Host -> Computer
 ```
 
+### Step 4A: Time Semantics and Late-Arrival Evidence
+
+For scheduled rules, prove which timestamp controls detection logic and how late-arriving data is handled. Rules that only query a narrow event-time window can miss delayed events; rules that only use ingestion or index time can distort attack sequence logic, baselines, and analyst timelines.
+
+| ID | Evidence Gate | What to Verify | Finding Behavior |
+|---|---|---|---|
+| SIEM-TIME-01 | Event-time field | Identify the authoritative event timestamp used for attack sequence logic, such as `TimeGenerated`, `_time`, `EventTime`, or source log timestamp. | Not Evaluable when the rule has no documented event-time source. |
+| SIEM-TIME-02 | Ingestion/index-time field | Identify the SIEM arrival timestamp, such as `ingestion_time()` in KQL or `_indextime` in SPL. | Fail when scheduled detection ignores measured late-arrival risk. |
+| SIEM-TIME-03 | Latency distribution | Measure or document p50/p95/p99 source-to-SIEM delay by log source and environment. | Not Evaluable when latency is assumed but not measured for the reviewed source. |
+| SIEM-TIME-04 | Lookback buffer | Query period exceeds query frequency by enough to cover p95/p99 latency plus clock skew for the detection objective. | Fail when the event-time window equals frequency despite known delay. |
+| SIEM-TIME-05 | Overlap deduplication | Overlapping lookbacks use alert keys, incident grouping, `arg_max`, `dedup`, or suppression to avoid duplicate alerts. | Fail when extended lookback creates repeated identical alerts. |
+| SIEM-TIME-06 | Clock skew and timezone normalization | Normalize source timestamps to UTC and define tolerated skew between hosts, identity providers, and collectors. | Not Evaluable when multi-source correlation lacks timestamp normalization evidence. |
+| SIEM-TIME-07 | Sequence preservation | For correlation rules, use event time for ordering and ingestion/index time only for arrival coverage or freshness filtering. | Fail when index time changes the attack sequence in the finding narrative. |
+| SIEM-TIME-08 | Backfill and outage handling | Define replay/backfill behavior for collector outages, delayed connectors, and restored data. | Keep rule in Testing/Needs Tuning until delayed-event behavior is verified. |
+
+**Example KQL latency-aware window pattern:**
+
+```kql
+let rule_frequency = 5m;
+let latency_buffer = 15m;
+let detection_window = 10m;
+SigninLogs
+| where ingestion_time() > ago(rule_frequency + latency_buffer)
+| where TimeGenerated > ago(detection_window + latency_buffer)
+| extend IngestionDelay = ingestion_time() - TimeGenerated
+| summarize
+    DistinctAccounts = dcount(UserPrincipalName),
+    FirstEventTime = min(TimeGenerated),
+    LastEventTime = max(TimeGenerated),
+    MaxIngestionDelay = max(IngestionDelay)
+    by IPAddress, bin(TimeGenerated, detection_window)
+| where DistinctAccounts >= 10
+```
+
+**Example SPL latency-aware window pattern:**
+
+```spl
+index=wineventlog sourcetype="WinEventLog:Security" EventCode=4625 earliest=-20m@m latest=now
+| eval ingestion_delay_sec = _indextime - _time
+| where _time >= relative_time(now(), "-15m")
+| bin _time span=10m
+| stats dc(TargetUserName) as distinct_accounts,
+    count as attempt_count,
+    max(ingestion_delay_sec) as max_ingestion_delay_sec
+    by IpAddress, _time
+| where distinct_accounts >= 10
+| eval alert_key = IpAddress . ":" . tostring(_time)
+| dedup alert_key
+```
+
 ### Step 5: Detection Rule Lifecycle Management
 
 **Lifecycle stages:**
@@ -509,7 +560,7 @@ Produce SIEM rule deliverables in this structure:
 ```markdown
 ## SIEM Detection Rule: [Rule Name]
 **Date:** [YYYY-MM-DD]
-**Skill:** siem-rules v1.0.0
+**Skill:** siem-rules v1.0.1
 **Framework:** MITRE ATT&CK v16
 **Platform:** [Microsoft Sentinel (KQL) | Splunk (SPL)]
 
@@ -533,6 +584,17 @@ Produce SIEM rule deliverables in this structure:
 | Time window | [Xm/h] | [Why this window] |
 | Frequency | [Xm/h] | [How often to run] |
 | Suppression | [Xh] | [Cooldown period] |
+
+### Time Semantics and Late-Arrival Handling
+| Field | Value | Evidence |
+|---|---|---|
+| Event-time field | [TimeGenerated / _time / source timestamp] | [Why this represents event occurrence] |
+| Ingestion/index-time field | [ingestion_time() / _indextime] | [How arrival time is measured] |
+| Latency distribution | [p50/p95/p99] | [Measurement source and date] |
+| Lookback buffer | [Duration] | [Why it covers latency and skew] |
+| Deduplication key | [Entity + event window + rule ID] | [How overlapping windows avoid duplicate alerts] |
+| Clock skew / timezone handling | [UTC normalization and tolerance] | [Evidence] |
+| Backfill behavior | [Replay / suppress / manual review] | [Procedure] |
 
 ### Entity Mapping
 | Entity Type | Source Field |
@@ -631,6 +693,10 @@ Deploying a rule without confirming it fires on known-malicious activity is depl
 ### Pitfall 5: Failing to Suppress Duplicate Alerts
 
 A detection rule that fires every 5 minutes on the same ongoing activity (e.g., a brute force attack lasting 2 hours) floods the alert queue with duplicates. Configure alert suppression or deduplication to prevent the same incident from generating hundreds of identical alerts. Use suppression windows and entity-based grouping to consolidate related alerts.
+
+### Pitfall 6: Treating Event Time and Ingestion Time as Interchangeable
+
+Event time describes when activity occurred; ingestion or index time describes when the SIEM received it. A rule that searches only the last 5 minutes of event time can miss events that arrive 8-12 minutes late. A rule rewritten entirely around ingestion time can preserve alert coverage but break sequence logic for detections such as failed logons followed by success. Use ingestion/index time to capture late arrivals, event time to reason about attacker behavior, and deduplication for overlapping lookbacks.
 
 ---
 
