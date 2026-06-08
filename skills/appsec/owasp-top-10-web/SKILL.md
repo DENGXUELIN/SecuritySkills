@@ -138,6 +138,15 @@ Access-Control-Allow-Origin.*\*|cors\(\{.*origin.*true
 - Insufficient randomness — use of `Math.random()`, `random.random()`, or similar non-CSPRNG functions for security-sensitive values.
 - Secrets committed to version control (`.env` files, config files with credentials).
 
+**Randomness context gate:** Treat non-CSPRNG APIs as findings only when the value protects confidentiality, integrity, authentication, authorization, payment, abuse prevention, or another security decision. Record the value name, sink, and decision before escalating.
+
+| Check ID | Evidence to collect | Failure condition |
+|---|---|---|
+| `OWASP-RAND-01` | Random value purpose and sink: session token, password reset token, CSRF token, OAuth `state`, invite code, nonce, MFA code, payment decision, rate-limit bypass, or non-security UI/test use | Finding is based on `Math.random()`, `random.random()`, or `rand()` without proving a security-sensitive sink |
+| `OWASP-RAND-02` | Entropy source and generation API, including whether browser, Node.js, Python, Java, Go, Ruby, or framework CSPRNG APIs are used | Security-sensitive values use predictable PRNGs or time/sequence-derived randomness |
+| `OWASP-RAND-03` | Benign-context rationale for UI animation, visual jitter, randomized test data, non-security sampling, placeholder art, or A/B layout display | Benign randomness is reported as A02 without a security impact |
+| `OWASP-RAND-04` | Token length, encoding, uniqueness, expiration, replay handling, and storage/logging behavior | CSPRNG exists but output is too short, reusable, logged, or not bound to the intended request/session |
+
 **CWE Mappings:**
 
 | CWE | Name |
@@ -562,6 +571,8 @@ log.*req\.body|log.*request\.getParameter|logger\.info\(.*\+.*req
 - PDF generators, image resizers, link previewers, or import-from-URL features.
 - Lack of allowlist validation on destination URLs (scheme, host, port, path).
 - No blocking of requests to private/reserved IP ranges (127.0.0.0/8, 10.0.0.0/8, 169.254.169.254, 172.16.0.0/12, 192.168.0.0/16, fd00::/8).
+- HTTP clients that follow redirects without revalidating every hop and the final resolved destination.
+- DNS rebinding or late-resolution gaps where validation occurs before the request but not at connect time or redirect time.
 
 **CWE Mappings:**
 
@@ -577,6 +588,8 @@ log.*req\.body|log.*request\.getParameter|logger\.info\(.*\+.*req
 requests\.get\(|requests\.post\(|urllib\.request|http\.get\(|fetch\(|axios\(|HttpClient|WebClient|curl_exec
 # URL parameters
 url=|dest=|redirect=|uri=|callback=|src=.*http
+# Redirect-following SSRF indicators
+allow_redirects\s*=\s*True|followRedirects\s*:\s*true|CheckRedirect|setInstanceFollowRedirects\s*\(\s*true
 # Cloud metadata (hardcoded blocking check)
 169\.254\.169\.254|metadata\.google|metadata\.azure
 ```
@@ -587,8 +600,20 @@ url=|dest=|redirect=|uri=|callback=|src=.*http
 - Block all requests to private and reserved IP ranges, link-local addresses, and cloud metadata endpoints at the network and application layers.
 - Do not send raw server-side responses to the client — parse expected data and return only the necessary fields.
 - Disable HTTP redirects in server-side HTTP clients, or re-validate the destination after each redirect.
+- Validate the full redirect chain: original URL, each `Location` target, post-DNS IP, scheme, host, port, and final destination must all remain in policy.
+- Set redirect-depth limits and fail closed on malformed redirects, scheme changes, DNS rebinding, metadata hosts, private IPs, and link-local ranges.
 - Deploy network-level segmentation so the application server cannot reach internal services it does not need.
 - For webhook features, validate callback URLs at registration time and again at invocation time (DNS rebinding defense).
+
+**Redirect-following SSRF evidence gate:**
+
+| Check ID | Evidence to collect | Failure condition |
+|---|---|---|
+| `OWASP-SSRF-01` | User-controlled URL source, HTTP client, redirect setting, and maximum redirect depth | Server-side fetch follows redirects from user input without documented controls |
+| `OWASP-SSRF-02` | Allowlist check for scheme, host, port, and path before the first request | Validation accepts arbitrary or wildcard destinations |
+| `OWASP-SSRF-03` | Per-hop revalidation of every redirect `Location`, including scheme changes and relative redirects | Only the first URL is validated; redirected targets are trusted automatically |
+| `OWASP-SSRF-04` | DNS resolution timing and IP-range enforcement at connect time and after redirects | DNS rebinding, metadata, loopback, private, link-local, or IPv6 ULA destinations can be reached |
+| `OWASP-SSRF-05` | Response handling and audit evidence: redirect chain, final URL/IP, blocked reason, and sanitized output | Raw internal responses are proxied to the caller or redirect-chain evidence is missing |
 
 ---
 
