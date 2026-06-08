@@ -296,6 +296,48 @@ NIST SP 800-57 Part 1 Rev 5 Table 1 defines recommended cryptoperiods by key typ
 - Rotation events are logged and monitored.
 - Failed rotations trigger alerts.
 
+#### 4.2.1 Rotation Validation Evidence Gate
+
+Treat the rotation job as the start of validation, not proof that rotation is complete. For every rotated long-lived credential, record evidence that consumers adopted the new secret, the old credential stopped authenticating after the approved rollover window, and post-rotation monitoring shows no fallback use or authentication failures.
+
+**Rotation validation findings:**
+
+```
+SEC-ROT-01: Rotation event ID, timestamp, automation job, or emergency-change ticket is missing
+SEC-ROT-02: Secret type, secret store, version identifier, or active version is missing from the rotation record
+SEC-ROT-03: Consumer inventory is incomplete, so adoption of the new secret cannot be verified
+SEC-ROT-04: Old credential revocation or disablement is missing after the rollover window
+SEC-ROT-05: Old credential test is missing, inconclusive, or still succeeds after rollover closure
+SEC-ROT-06: New credential functional test is missing for at least one required consumer
+SEC-ROT-07: Monitoring evidence is missing for fallback use, authentication errors, or failed consumer refreshes
+SEC-ROT-08: Emergency or manual rotation lacks post-incident review, owner, rollback window, or follow-up validation
+```
+
+**Rotation validation evidence record:**
+
+```
+SECRET ROTATION VALIDATION EVIDENCE
+===================================
+Secret Type / Store:       [API key, DB credential, cert, Vault/AWS SM/GCP SM/Azure KV]
+Secret Version / Alias:    [old version, new version, active alias; never include secret value]
+Rotation Event:            [job ID, ticket, incident, timestamp]
+Consumers:                 [services/jobs/agents expected to use the secret]
+Consumer Update Status:    [updated/redeployed/restarted/not applicable]
+Old Credential Revoked:    [Yes | No | Pending, with timestamp]
+Old Credential Test:       [Denied | Accepted | Not Tested, with evidence reference]
+New Credential Test:       [Accepted | Failed | Not Tested, with evidence reference]
+Monitoring Evidence:       [auth logs, error-rate dashboard, vault access logs, alerts]
+Rollback Window:           [duration, closure time, approver]
+Validation Confidence:     [High | Medium | Low, with reason]
+Owner / Follow-up:         [owner, post-incident review, retest date]
+```
+
+**False-positive boundaries:**
+
+- Do not require an old-credential authentication test when the platform provides immutable revocation evidence and a failed test would expose sensitive production systems.
+- Do not flag dynamic secrets as missing revocation evidence when the lease TTL, revocation logs, and consumer refresh behavior prove expiry.
+- Do not require every consumer to be redeployed when consumers fetch the active alias at runtime and access logs prove they use the new version.
+
 **Finding classification:** No rotation for secrets older than 180 days is **High**. Manual rotation process only is **Medium**. Rotation configured but not monitored is **Medium**.
 
 ---
@@ -389,6 +431,12 @@ spec:
 | API key (Stripe) | AWS SM | 90 days | Yes | 2024-01-15 |
 | TLS cert | cert-manager | 60 days | Yes | Auto |
 
+### Rotation Validation Evidence
+
+| Secret Type / Store | Secret Version / Alias | Rotation Event | Consumers | Consumer Update Status | Old Credential Revoked | Old Credential Test | New Credential Test | Monitoring Evidence | Rollback Window | Validation Confidence | Owner / Follow-up |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| [type/store] | [old/new/alias] | [job/ticket/timestamp] | [services] | [status] | [Yes/No/Pending] | [Denied/Accepted/Not Tested] | [Accepted/Failed/Not Tested] | [logs/metrics/alerts] | [duration/closed] | [High/Medium/Low] | [owner/date] |
+
 ### Findings
 
 #### [F-001] <Finding Title>
@@ -396,6 +444,7 @@ spec:
 - **Control Reference:** OWASP Secrets Mgmt / NIST SP 800-57 Section X
 - **File:** <path to config file>
 - **Description:** <what was found -- NEVER include actual secret values>
+- **Rotation Validation Evidence:** <event, consumers, old revocation, old/new tests, monitoring, confidence>
 - **Remediation:** <concrete fix>
 
 ### Prioritized Remediation Plan
@@ -441,6 +490,8 @@ spec:
 3. **Using environment variables as the secrets "manager."** Environment variables are better than hardcoded secrets in source, but they are still stored in plaintext in process memory, visible in `/proc/PID/environ` on Linux, and logged by many frameworks on crash. A proper secrets manager (Vault, cloud-native) with sidecar injection or API-based retrieval is the target state.
 
 4. **Ignoring secret sprawl across multiple secrets managers.** Large organizations often have Vault, AWS Secrets Manager, Azure Key Vault, and application-specific secret stores running simultaneously. Without a unified inventory, secrets expire unmonitored and rotation gaps emerge. Maintain a single source of truth for secret metadata (type, owner, rotation schedule, storage location).
+
+5. **Assuming a successful rotation job means old credentials are dead.** Rotation automation can create a new version while consumers keep using a cached old secret, a rollback credential remains enabled, or a hardcoded fallback path still authenticates. Verify consumer adoption, old credential revocation, old/new credential tests, and monitoring before marking rotation complete.
 
 ---
 
