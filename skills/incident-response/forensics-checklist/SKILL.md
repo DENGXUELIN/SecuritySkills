@@ -99,6 +99,51 @@ CUSTODY LOG:
 - Compute and record cryptographic hashes (SHA-256 minimum) at collection time and verify at each transfer
 - Maintain a continuous, unbroken record from collection through final disposition
 
+#### Custody Verification Evidence Gate
+
+Do not treat a custody log as complete when it only lists names, timestamps, and locations. Every custody transfer, storage move, evidence access, and analysis-copy creation needs verification evidence that proves the item remained intact and that access was authorized.
+
+**Custody verification findings:**
+
+```
+FOR-CUST-01: Custody transfer, storage move, access event, or analysis-copy event is missing from the verification record
+FOR-CUST-02: SHA-256 before or after the event is missing, weak, delayed, or not tied to the evidence item
+FOR-CUST-03: Hash match result is missing, mismatched, or lacks documented failure handling
+FOR-CUST-04: Purpose and authorization source are missing for evidence access or transfer
+FOR-CUST-05: Tamper-evident seal, object lock, WORM retention, version ID, or immutable-storage audit evidence is missing
+FOR-CUST-06: Original evidence, verified working copy, and derived analysis output are not distinguished
+FOR-CUST-07: Analysis is performed on original evidence when a verified working copy should be used
+FOR-CUST-08: Custody exception lacks owner, legal/IR disposition, re-verification, and court-readiness status
+```
+
+**Custody verification evidence record:**
+
+```
+FORENSIC CUSTODY VERIFICATION EVIDENCE
+======================================
+Evidence ID:              [EVD-NNNN]
+Evidence State:           [Original | Verified Working Copy | Derived Output]
+Event Type:               [Collection | Transfer | Storage Move | Access | Analysis Copy]
+Event Time (UTC):         [timestamp]
+Released By:              [person/system/source]
+Received / Accessed By:   [person/system/tool]
+Purpose:                  [collection, legal hold, analysis, transfer, preservation]
+Authorization Source:     [ticket, legal hold, warrant, manager approval]
+Storage / Location:       [locker, path, bucket, object version, case vault]
+SHA-256 Before:           [hash before event or N/A for initial collection]
+SHA-256 After:            [hash after event/copy]
+Match Result:             [Match | Mismatch | Not Applicable]
+Tamper Evidence:          [seal number, object lock, WORM policy, audit log, version ID]
+Failure Handling:         [N/A or quarantine/escalation/re-acquisition]
+Owner / Disposition:      [custodian, legal/IR disposition, court-readiness status]
+```
+
+**False-positive boundaries:**
+
+- Do not require a before-hash for initial collection when the acquisition hash is computed immediately and becomes the first hash in the chain.
+- Do not require a physical seal for cloud evidence when immutable storage controls, version IDs, retention policy, and audit logs provide equivalent tamper evidence.
+- Do not flag derived analysis outputs as original evidence when the report clearly distinguishes derivation source, tool, timestamp, and working-copy hash.
+
 ### Step 2: Collect Evidence in Order of Volatility (RFC 3227)
 
 RFC 3227 Section 2.1 defines the order of volatility -- evidence sources ranked from most volatile (shortest lifespan) to least volatile. Collect in this order to minimize evidence loss.
@@ -389,6 +434,11 @@ the order of collection, and any evidence that could not be obtained.]
 ### Chain of Custody
 [Include chain of custody form for each evidence item]
 
+### Custody Verification Evidence
+| Evidence ID | Evidence State | Event Type | Event Time (UTC) | Released By | Received / Accessed By | Purpose | Authorization Source | Storage / Location | SHA-256 Before | SHA-256 After | Match Result | Tamper Evidence | Failure Handling | Owner / Disposition |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| EVD-0001 | Original | Transfer | [timestamp] | [name/system] | [name/system] | [reason] | [ticket/legal hold/approval] | [location/path/version] | [hash] | [hash] | [Match/Mismatch/N/A] | [seal/object lock/WORM/audit ref] | [N/A or action] | [custodian/status] |
+
 ### Integrity Verification
 | Evidence ID | Acquisition Hash | Verification Hash | Match |
 |---|---|---|---|
@@ -448,6 +498,10 @@ Executing forensic tools (or any tools) that reside on the compromised system ri
 ### Pitfall 2: Breaking the Hash Chain
 
 Evidence integrity depends on an unbroken cryptographic hash chain from the moment of collection through analysis and into legal proceedings. Computing the initial hash hours after collection, using weak hash algorithms (MD5 alone), or failing to re-verify hashes after evidence transfers introduces doubt about evidence integrity. Compute SHA-256 hashes immediately upon acquisition, record them in the chain-of-custody form, and verify hashes at every transfer point.
+
+### Pitfall 2a: Logging Custody Without Verification Evidence
+
+A custody spreadsheet that records names and timestamps but omits before/after hashes, access authorization, seal or immutable-storage controls, copy type, and failure handling does not prove evidence integrity. Preserve per-event verification evidence for transfers, accesses, storage moves, and analysis copies.
 
 ### Pitfall 3: Imaging a Live System Without Capturing Memory First
 
