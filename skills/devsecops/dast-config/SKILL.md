@@ -473,6 +473,48 @@ DAST tools report findings per-URL, producing hundreds of duplicate alerts for t
 - Deduplication is applied before metrics reporting.
 - Triage workflow assigns findings to owning teams with SLAs.
 
+#### 7.2 Finding Validation Evidence Gate
+
+Do not file High or Critical remediation tickets from raw scanner output alone. Preserve enough redacted request/response context for an owner to reproduce the issue, then validate severity against exploitability, authentication context, session freshness, compensating controls, and false-positive rationale.
+
+**DAST validation findings:**
+
+```
+DAST-VAL-01: High/Critical finding lacks scanner alert ID, alert type, affected endpoint, or parameter
+DAST-VAL-02: Raw evidence is missing, over-redacted, or omits request/response context needed for reproduction
+DAST-VAL-03: Reproduction steps are missing, not authorized, or not run in an approved non-production target
+DAST-VAL-04: Validation result is missing or left as raw scanner severity without manual confirmation
+DAST-VAL-05: False-positive rationale is missing for dismissed or downgraded findings
+DAST-VAL-06: Authentication context, role, token scope, or session freshness is missing for authenticated findings
+DAST-VAL-07: Severity calibration omits exploitability, data exposure, WAF/compensating controls, duplicates, or endpoint criticality
+DAST-VAL-08: Confirmed finding lacks owner, remediation ticket, SLA, or retest plan
+```
+
+**Finding validation evidence record:**
+
+```
+DAST FINDING VALIDATION EVIDENCE
+================================
+Finding ID:             [scanner ID / dedup ID]
+Alert Type:             [SQLi, XSS, SSRF, auth bypass, etc.]
+Affected Endpoint:      [method URL/path; redact host if needed]
+Parameter / Vector:     [query/body/header/path/cookie field]
+Raw Evidence:           [redacted request/response, scanner payload class, alert excerpt]
+Auth Context:           [anonymous/user/admin/service, token scope, session age]
+Session Freshness:      [fresh login, re-auth evidence, CSRF/nonce handling]
+Reproduction Steps:     [approved target and safe steps]
+Validation Result:      [Confirmed | Partial | Duplicate | False Positive | Unknown]
+False-Positive Rationale:[technical reason when downgraded/dismissed]
+Severity Calibration:   [raw severity -> final severity, rationale]
+Owner / Ticket / Retest:[team, ticket, SLA, retest date]
+```
+
+**False-positive boundaries:**
+
+- Do not require live exploitation when the program only permits passive or replay-safe validation; use controlled replay, code review, or log correlation instead.
+- Do not flag WAF-blocked scanner payloads as confirmed application vulnerabilities unless the app remains exploitable without relying only on WAF behavior.
+- Do not require secrets, tokens, or personal data in evidence; redact sensitive values while preserving method, path, parameter name, status, and payload class.
+
 **Finding classification:** No results triage process is **Medium**. Injection rules set to IGNORE or WARN is **Critical**. No deduplication leading to alert fatigue is **Medium**.
 
 ---
@@ -527,7 +569,14 @@ DAST tools report findings per-URL, producing hundreds of duplicate alerts for t
 - **Control Reference:** OWASP Top 10 AXX / WSTG-XXXX-XX
 - **File:** <path to config file>
 - **Description:** <what was found>
+- **Validation Evidence:** <finding ID, endpoint, parameter, raw evidence, auth context, reproduction, validation result, severity calibration>
 - **Remediation:** <concrete fix with example>
+
+### DAST Finding Validation Evidence
+
+| Finding ID | Alert Type | Affected Endpoint | Parameter / Vector | Raw Evidence | Auth Context | Session Freshness | Reproduction Steps | Validation Result | FP Rationale | Severity Calibration | Owner / Ticket / Retest |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| <id> | <alert> | <endpoint> | <param/vector> | <redacted req/resp> | <role/scope> | <freshness evidence> | <safe steps> | <Confirmed/Partial/Duplicate/FP/Unknown> | <reason> | <raw -> final> | <team/ticket/date> |
 
 ### Prioritized Remediation Plan
 1. **[Critical]** <action item>
@@ -583,6 +632,8 @@ DAST tools report findings per-URL, producing hundreds of duplicate alerts for t
 4. **Treating DAST findings as ground truth without validation.** DAST tools have significant false positive rates, especially for injection findings. Every high-severity DAST finding must be manually validated before filing a remediation ticket. Build validation into the triage workflow.
 
 5. **Running only scheduled weekly scans instead of integrating into CI.** Weekly scans create a feedback loop measured in days. Passive baseline scans in CI (on every PR) give developers immediate feedback on security header regressions and configuration issues, while weekly full scans provide comprehensive active testing coverage.
+
+6. **Filing scanner output without reproduction evidence.** A raw DAST alert is not enough for an engineering ticket. Preserve redacted request/response evidence, auth context, session freshness, reproduction steps, validation result, false-positive rationale, severity calibration, owner, and retest plan.
 
 ---
 
