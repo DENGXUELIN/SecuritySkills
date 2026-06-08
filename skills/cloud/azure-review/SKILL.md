@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [CIS-Azure-v2.1.0]
 difficulty: intermediate
 time_estimate: "60-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -88,6 +88,23 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, Bic
 
 ---
 
+### Step 10A: Supplemental Managed Disk and Snapshot Export Evidence
+
+Managed disk encryption and VM network posture do not prove that disk or snapshot export is controlled. Review managed disks, snapshots, Disk Access resources, private endpoints, RBAC export permissions, and export SAS usage separately from normal VM access.
+
+| Code | Gate | Evidence Required |
+|------|------|-------------------|
+| AZ-DISK-EXPORT-01 | Disk and snapshot inventory | In-scope managed disk and snapshot denominator with subscription, resource group, data sensitivity, owner, and workload mapping. |
+| AZ-DISK-EXPORT-02 | Network export policy | `networkAccessPolicy`, `publicNetworkAccess`, and `diskAccessId` for each managed disk and snapshot. |
+| AZ-DISK-EXPORT-03 | Disk Access private endpoint | Disk Access resource, private endpoint connection state, DNS evidence, and coverage for every exportable disk or snapshot. |
+| AZ-DISK-EXPORT-04 | Export-capable RBAC | Principals with `Microsoft.Compute/disks/beginGetAccess/action`, `Microsoft.Compute/disks/endGetAccess/action`, `Microsoft.Compute/snapshots/beginGetAccess/action`, or `Microsoft.Compute/snapshots/endGetAccess/action`. |
+| AZ-DISK-EXPORT-05 | SAS duration and revocation | Approved `grant-access` duration, ticket or justification, `revoke-access` evidence, and stale export URL handling. |
+| AZ-DISK-EXPORT-06 | Snapshot parity | Snapshot export controls reviewed independently from source VM and managed disk controls. |
+| AZ-DISK-EXPORT-07 | Audit and monitoring | Activity Log or diagnostic evidence for disk/snapshot grant and revoke operations with alert owner. |
+| AZ-DISK-EXPORT-08 | Exception governance | Business justification, approved principal, expiry, compensating monitoring, and residual data-exfiltration risk for export exceptions. |
+
+Mark this section **Not Evaluable** when live inventory, Resource Graph export, or IaC evidence does not include managed disk and snapshot export settings. Do not infer a pass from a private VM, encrypted OS/data disk, or CMK setting alone.
+
 
 ---
 
@@ -102,7 +119,7 @@ Produce the final report using the structure defined in the Output Format sectio
 | Severity | Definition | Examples |
 |----------|-----------|----------|
 | **Critical** | Immediate risk of data breach or unauthorized access | NSGs open to 0.0.0.0/0 on RDP/SSH, SQL databases publicly accessible, Defender for Cloud disabled |
-| **High** | Significant security gap that materially weakens posture | Missing MFA enforcement, storage accounts with public access, Key Vault without purge protection |
+| **High** | Significant security gap that materially weakens posture | Missing MFA enforcement, storage accounts with public access, Key Vault without purge protection, production disk/snapshot export allowed publicly with broad export-capable RBAC |
 | **Medium** | Control gap that should be addressed in normal cycle | Missing activity log alerts, soft delete not enabled, TLS below 1.2 |
 | **Low** | Hardening recommendation or defense-in-depth measure | HTTP/2 not enabled, FTP not fully disabled, missing CMK on non-sensitive storage |
 | **Informational** | Best practice observation, no direct security impact | Naming conventions, tag policies, documentation gaps |
@@ -141,6 +158,12 @@ Produce the final report using the structure defined in the Output Format sectio
 | 7 | Virtual Machines | X | Y | Z | nn% |
 | 8 | Key Vault | X | Y | Z | nn% |
 | 9 | App Service | X | Y | Z | nn% |
+
+### Supplemental Managed Disk and Snapshot Export Evidence
+
+| Artifact Type | Resource | Sensitivity | NetworkAccessPolicy | PublicNetworkAccess | Disk Access / Private Endpoint | Export-Capable Principals | SAS Duration / Revocation | Audit Evidence | Status |
+|---------------|----------|-------------|---------------------|---------------------|-------------------------------|---------------------------|---------------------------|----------------|--------|
+| disk/snapshot | <name> | <level> | <policy> | <enabled/disabled> | <resource/state> | <principal list> | <duration/revoked> | <log query/ref> | Pass/Fail/Not Evaluable |
 
 ### Detailed Findings
 
@@ -200,6 +223,7 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **NSG rules using service tags.** A rule with `source_address_prefix = "Internet"` is equivalent to `0.0.0.0/0`. Both must be flagged for CIS 6.1 and 6.2.
 5. **Key Vault purge protection is irreversible.** CIS 8.5 requires `purge_protection_enabled = true`. Note this cannot be disabled once enabled -- flag this for awareness during remediation.
 6. **App Service TLS version on both Linux and Windows.** Check `azurerm_linux_web_app` and `azurerm_windows_web_app` resources separately.
+7. **Treating private VMs or encrypted disks as proof that disk export is private.** Managed disk and snapshot import/export use separate network controls, Disk Access resources, export SAS operations, and RBAC actions. Review these paths directly.
 
 ---
 
@@ -225,10 +249,13 @@ Produce the final report using the structure defined in the Output Format sectio
 - Azure Storage Security: https://learn.microsoft.com/en-us/azure/storage/common/storage-security-guide
 - Azure Key Vault Best Practices: https://learn.microsoft.com/en-us/azure/key-vault/general/best-practices
 - Azure App Service Security: https://learn.microsoft.com/en-us/azure/app-service/overview-security
+- Restrict managed disks from being imported or exported: https://learn.microsoft.com/en-us/azure/virtual-machines/disks-restrict-import-export-overview
+- Restrict import/export access for managed disks using Azure Private Link: https://learn.microsoft.com/en-us/azure/virtual-machines/disks-enable-private-links-for-import-export-portal
 - Terraform AzureRM Provider Documentation: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs
 
 ---
 
 ## Changelog
 
+- **1.0.1** -- Added supplemental managed disk and snapshot export evidence gates covering network export policy, Disk Access private endpoints, export-capable RBAC, SAS duration/revocation, audit evidence, and exception governance.
 - **1.0.0** -- Initial release. Full coverage of CIS Microsoft Azure Foundations Benchmark v2.1.0 sections 1 through 9.

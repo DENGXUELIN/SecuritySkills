@@ -568,6 +568,69 @@ Check for anti-malware extension deployment.
 
 Verify encryption for any legacy VHD-based disks.
 
+### Supplemental -- Managed Disk and Snapshot Export Evidence
+
+This supplemental checklist is reported separately from CIS scoring. It verifies whether managed disks and snapshots can be exported through public SAS URLs or unrestricted principals even when the VM itself is private and encrypted.
+
+**Azure CLI / Resource Graph evidence to request:**
+
+```bash
+az disk show --resource-group <rg> --name <disk> \
+  --query '{networkAccessPolicy:networkAccessPolicy, publicNetworkAccess:publicNetworkAccess, diskAccessId:diskAccessId}'
+
+az snapshot show --resource-group <rg> --name <snapshot> \
+  --query '{networkAccessPolicy:networkAccessPolicy, publicNetworkAccess:publicNetworkAccess, diskAccessId:diskAccessId}'
+
+az role assignment list --all --include-inherited \
+  --query "[?contains(roleDefinitionName, 'Disk') || contains(roleDefinitionName, 'Contributor')]"
+
+az disk grant-access --resource-group <rg> --name <disk> --access-level Read --duration-in-seconds <duration>
+az disk revoke-access --resource-group <rg> --name <disk>
+```
+
+**Terraform patterns to review:**
+
+```hcl
+resource "azurerm_managed_disk" "example" {
+  network_access_policy = "AllowPrivate"
+  public_network_access_enabled = false
+  disk_access_id = azurerm_disk_access.example.id
+}
+
+resource "azurerm_snapshot" "example" {
+  network_access_policy = "AllowPrivate"
+  public_network_access_enabled = false
+  disk_access_id = azurerm_disk_access.example.id
+}
+
+resource "azurerm_private_endpoint" "disk_access" {
+  private_service_connection {
+    private_connection_resource_id = azurerm_disk_access.example.id
+    subresource_names = ["disks"]
+  }
+}
+```
+
+**Review checks:**
+
+| Code | Check | Evidence |
+|------|-------|----------|
+| AZ-DISK-EXPORT-01 | Managed disk and snapshot inventory is complete | Disk/snapshot list from IaC, Resource Graph, or Azure CLI with owner and sensitivity. |
+| AZ-DISK-EXPORT-02 | Public export is disabled or private-only | `networkAccessPolicy`, `publicNetworkAccess`, and `diskAccessId` values for every artifact. |
+| AZ-DISK-EXPORT-03 | Disk Access private endpoint is connected | Disk Access ID, private endpoint state, and DNS/private-link evidence. |
+| AZ-DISK-EXPORT-04 | Export-capable RBAC is least privilege | Role definitions and assignments containing begin/end get access actions are limited and approved. |
+| AZ-DISK-EXPORT-05 | SAS generation is time-bound and revoked | Grant duration, approval ticket, revoke evidence, and stale URL handling. |
+| AZ-DISK-EXPORT-06 | Snapshots are reviewed independently | Snapshot export settings are not inferred from the source disk or VM. |
+| AZ-DISK-EXPORT-07 | Export operations are monitored | Activity Log or diagnostic evidence for grant/revoke access operations. |
+| AZ-DISK-EXPORT-08 | Exceptions are governed | Owner, justification, expiry, monitoring, and residual risk are documented. |
+
+**Severity guidance:**
+
+- **High:** production or regulated managed disk/snapshot allows public export and broad principals can generate SAS URLs.
+- **Medium:** export is allowed for named roles but duration, revocation, owner, audit, or sensitivity evidence is incomplete.
+- **Low:** private endpoint or Disk Access exists but inventory coverage, snapshot parity, or monitoring evidence is incomplete.
+- **Informational:** export is disabled or restricted through private endpoint and RBAC evidence across all in-scope disks/snapshots.
+
 ---
 
 ## Section 8 -- Key Vault
