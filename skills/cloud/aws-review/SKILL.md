@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [CIS-AWS-v3.0.0]
 difficulty: intermediate
 time_estimate: "60-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -55,6 +55,7 @@ The CIS Amazon Web Services Foundations Benchmark v3.0.0 is a consensus-driven s
 - S3 bucket policies and ACL configurations
 - VPC, security group, and NACL definitions
 - CloudTrail and CloudWatch configuration files
+- RDS snapshot, EBS snapshot, AMI launch-permission, and EBS block-public-access exports when backup/image artifacts are in scope
 
 ---
 
@@ -96,6 +97,32 @@ Record all discovered files. If no AWS configurations are found, report that fin
 Evaluate all AWS configurations against CIS AWS v3.0.0 Sections 1 through 5, covering Identity and Access Management, Storage, Logging, Monitoring, and Networking.
 
 For detailed CIS benchmark checklist items with specific Terraform patterns, grep patterns, and configuration examples for all five sections, see [benchmark-checklist.md](benchmark-checklist.md) in this skill directory.
+
+### Step 6A: Supplemental Public Snapshot and Image Sharing Evidence
+
+When the environment includes RDS, EBS, AMIs, backup automation, or account image pipelines, add a supplemental storage-artifact review. Do not report these as CIS recommendation IDs unless the reviewed benchmark explicitly includes them; report them as AWS snapshot/image artifact evidence because private live resources do not prove private backup artifacts.
+
+| ID | Evidence Gate | What to Verify | Finding Behavior |
+|---|---|---|---|
+| AWS-SNAP-01 | RDS manual snapshot restore attributes | Capture `describe-db-snapshots --snapshot-type manual --include-public` and `describe-db-snapshot-attributes` evidence. Public `restore` attributes such as `all` are exposure evidence even if the live DB is private. | Fail when production-derived or sensitive manual snapshots are public; Not Evaluable when only live RDS IaC is available. |
+| AWS-SNAP-02 | EBS snapshot createVolumePermission | Capture `describe-snapshot-attribute --attribute createVolumePermission` for in-scope Regions and identify `Group=all` or unapproved account sharing. | Fail for public snapshots unless an effective block neutralizes public access and residual raw sharing is documented. |
+| AWS-SNAP-03 | Regional EBS block public access mode | Capture `get-snapshot-block-public-access-state` per Region and distinguish `block-all-sharing`, `block-new-sharing`, and unblocked states. | Do not treat one Region or `block-new-sharing` alone as proof that existing public snapshots are private. |
+| AWS-SNAP-04 | AMI launch permissions | Capture `describe-image-attribute --attribute launchPermission` and map public AMIs to referenced snapshots where possible. | Fail when public AMIs expose launchable production images or snapshot-derived sensitive data. |
+| AWS-SNAP-05 | Artifact sensitivity and lineage | Identify whether snapshots/AMIs are production-derived, regulated, customer-data-bearing, or sanitized test artifacts. | Calibrate severity by data sensitivity and lineage rather than live resource posture alone. |
+| AWS-SNAP-06 | Explicit cross-account sharing governance | For non-public sharing, require approved account list, owner, purpose, ticket, expiry/review date, and revocation evidence. | Medium or Not Evaluable when sharing exists without governance, even if not public. |
+| AWS-SNAP-07 | Coverage denominator | Record account, Region, artifact type, and inventory source so absent findings are tied to the reviewed scope. | Not Evaluable when an assessment lacks live snapshot/AMI inventory for in-scope Regions. |
+| AWS-SNAP-08 | Remediation evidence | For public artifacts, require private attribute verification after remediation plus block-public-access mode or exception review evidence. | Keep findings open until both raw artifact attributes and account/Region guardrails are verified. |
+
+Add these fields to relevant detailed findings:
+
+- `Artifact Type`: RDS snapshot / EBS snapshot / AMI
+- `Artifact ID and Region`
+- `Public Attribute`: `restore`, `createVolumePermission`, or `launchPermission`
+- `Block Public Access State`
+- `Shared Accounts`
+- `Data Sensitivity / Lineage`
+- `Coverage Source`
+- `Remediation Verification`
 
 ---
 
@@ -200,6 +227,7 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **Assuming default security groups are empty.** AWS default security groups allow all inbound traffic from the same security group and all outbound traffic. CIS 5.4 requires explicitly managing them to have zero rules.
 5. **Overlooking IMDSv2 in launch templates.** CIS 5.6 applies to both `aws_instance` and `aws_launch_template` resources. Checking only direct instance definitions misses auto-scaled instances.
 6. **Counting not-evaluable controls as passing.** If a control cannot be verified from the available IaC (e.g., contact details in CIS 1.1), mark it "Not Evaluable" rather than "Pass."
+7. **Assuming private live resources imply private backup artifacts.** A private RDS instance, encrypted EBS volume, or non-public subnet does not prove manual snapshots, copied snapshots, or AMI launch permissions are private. Review snapshot and AMI attributes separately.
 
 ---
 
@@ -231,4 +259,5 @@ Produce the final report using the structure defined in the Output Format sectio
 
 ## Changelog
 
+- **1.0.1** -- Added supplemental public RDS snapshot, EBS snapshot, AMI launch-permission, block-public-access, sharing-governance, and remediation-evidence gates with artifact-specific output fields.
 - **1.0.0** -- Initial release. Full coverage of CIS Amazon Web Services Foundations Benchmark v3.0.0 sections 1 through 5 (62 recommendations).

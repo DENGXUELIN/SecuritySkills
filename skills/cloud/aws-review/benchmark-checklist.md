@@ -251,6 +251,67 @@ publicly_accessible = true
 publicly_accessible = false
 ```
 
+### Supplemental -- Public RDS/EBS Snapshot and AMI Sharing Evidence
+
+This supplemental gate is not a CIS recommendation ID. Apply it when RDS, EBS, AMIs, backup automation, image pipelines, or live AWS exports are in scope.
+
+**AWS-SNAP-01 -- RDS manual snapshot restore attributes**
+
+Required evidence:
+
+```text
+aws rds describe-db-snapshots --snapshot-type manual --include-public
+aws rds describe-db-snapshot-attributes --db-snapshot-identifier <snapshot-id>
+```
+
+Fail when a production-derived or sensitive manual DB snapshot has a public `restore` attribute such as `all`. Mark Not Evaluable when the review only includes live RDS IaC and has no snapshot inventory.
+
+**AWS-SNAP-02 -- EBS snapshot createVolumePermission**
+
+Required evidence:
+
+```text
+aws ec2 describe-snapshot-attribute --snapshot-id <snapshot-id> --attribute createVolumePermission
+```
+
+Fail when `createVolumePermission` includes `Group=all` unless effective account/Region guardrails are documented and the raw public attribute is being remediated.
+
+**AWS-SNAP-03 -- Regional EBS block public access state**
+
+Required evidence per Region:
+
+```text
+aws ec2 get-snapshot-block-public-access-state --region <region>
+```
+
+Record whether the Region is `block-all-sharing`, `block-new-sharing`, or unblocked. Do not treat `block-new-sharing` as proof that already-public snapshots are private.
+
+**AWS-SNAP-04 -- AMI launch permissions**
+
+Required evidence:
+
+```text
+aws ec2 describe-image-attribute --image-id <ami-id> --attribute launchPermission
+```
+
+Fail when production-derived AMIs are public or when referenced snapshot lineage is missing for a public or externally shared image.
+
+**AWS-SNAP-05 through AWS-SNAP-08 -- Governance and remediation**
+
+For each public or externally shared artifact, record:
+
+- artifact type, ID, account, Region, and inventory source;
+- data sensitivity and production/test lineage;
+- explicit shared accounts, owner, ticket, expiry/review date, and business purpose;
+- remediation verification showing the artifact attribute is private or the exception is approved;
+- post-remediation block-public-access state where EBS snapshots are involved.
+
+**Common false-positive guardrails:**
+
+- Encrypted RDS snapshots cannot be public, but explicit account sharing still needs approval and expiry evidence.
+- A public AMI and an EBS snapshot are related but not identical evidence paths; review both when image lineage is relevant.
+- A clean Terraform definition for a private DB or encrypted volume is insufficient evidence for manual snapshots, copied snapshots, or AMI permissions.
+
 ### CIS 2.4.1 -- Ensure that encryption is enabled for EFS file systems
 
 Check for EFS encryption configuration:
