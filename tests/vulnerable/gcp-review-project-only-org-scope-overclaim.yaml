@@ -1,0 +1,81 @@
+id: gcp-review-project-only-org-scope-overclaim
+skill: gcp-review
+expected: vulnerable
+description: >
+  Project-only Terraform and SCC evidence is overclaimed as organization-wide
+  GCP CIS compliance.
+scenario:
+  review_scope:
+    claimed_scope: "organization 123456789012, all folders, all production projects"
+    supplied_evidence:
+      - path: terraform/projects/prod-app/iam.tf
+        source_type: iac-only
+        scope: "project prod-app only"
+        captured: "2026-06-01"
+      - path: exports/scc/prod-app-findings.json
+        source_type: scc-finding
+        tier: Standard
+        scope: "project prod-app only"
+        captured: "2026-06-01T10:00:00Z"
+      - path: terraform/projects/prod-app/network.tf
+        source_type: iac-only
+        scope: "project prod-app us-central1 subnet"
+        captured: "2026-06-01"
+    missing_evidence:
+      - organization_project_denominator
+      - folder_hierarchy_export
+      - cloud_asset_inventory_organization_export
+      - iam_deny_policy_export
+      - principal_access_boundary_policy_export
+      - effective_organization_policy_export
+      - scc_activation_scope_and_tier_export
+      - all_subnet_flow_log_inventory
+      - flow_log_sink_and_sampling_export
+  terraform:
+    iam_binding:
+      resource_type: google_project_iam_binding
+      project: prod-app
+      role: roles/viewer
+      members:
+        - group:gcp-auditors-placeholder
+    organization_policy:
+      constraint: constraints/compute.vmExternalIpAccess
+      list_policy:
+        denied_values:
+          - "*"
+      problem: "Constraint is defined in one module without effective ancestor, override, dry-run, or exception evidence."
+    subnetwork:
+      resource_type: google_compute_subnetwork
+      name: prod-us-central1
+      log_config: null
+  reported_findings:
+    - cis_id: "1.5"
+      title: "Ensure Service Accounts Have No Admin Privileges"
+      status: Pass
+      evidence_source: iac-only
+      scope_coverage: "organization-wide"
+      problem: "Project allow-policy evidence is treated as full organization IAM evidence."
+    - cis_id: "3.8"
+      title: "Ensure VPC Flow Logs Are Enabled for Every Subnet"
+      status: Pass
+      evidence_source: iac-only
+      scope_coverage: "all projects"
+      problem: "One subnet view is treated as every subnet and omits sampling/sink evidence."
+    - cis_id: "2.13"
+      title: "Ensure Cloud Asset Inventory Is Enabled"
+      status: Pass
+      evidence_source: scc-finding
+      scope_coverage: "organization-wide"
+      problem: "Project-level SCC Standard findings are used as organization-wide coverage."
+should_trigger:
+  - GCP-EVID-SCOPE-01
+  - GCP-EVID-SCOPE-02
+  - GCP-EVID-SCOPE-03
+  - GCP-EVID-SCOPE-04
+  - GCP-EVID-SCOPE-05
+  - GCP-EVID-SCOPE-06
+  - GCP-EVID-SCOPE-07
+expected_result: >
+  The skill should downgrade the report to scoped Pass or Not Evaluable until
+  organization/folder/project denominator, effective IAM policy, SCC tier/scope,
+  Organization Policy inheritance, and per-subnet flow-log evidence are supplied.

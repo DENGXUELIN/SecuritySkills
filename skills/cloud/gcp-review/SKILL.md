@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [CIS-GCP-v2.0.0]
 difficulty: intermediate
 time_estimate: "60-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -88,7 +88,39 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, gre
 
 ---
 
-### Step 9: Compile Assessment Report
+### Step 9: Qualify Evidence Scope and Confidence
+
+Before compiling findings, qualify the evidence source and scope for each evaluated control. GCP posture evidence can come from Terraform, gcloud exports, Cloud Asset Inventory, Security Command Center findings, Organization Policy, IAM policies, and sampled project exports. Do not claim organization-wide compliance from project-only, resource-only, sampled, or IaC-only evidence unless the denominator and effective scope are proven.
+
+**Evidence confidence levels:**
+
+| Level | Meaning | Example |
+|-------|---------|---------|
+| `iac-only` | Repository configuration shows intended state, but live effective state is not proven | Terraform defines `google_project_iam_binding` |
+| `gcloud-export` | gcloud output confirms the current state for the exported scope | `gcloud projects get-iam-policy` for one project |
+| `cloud-asset-inventory` | Cloud Asset Inventory export confirms assets or policies for the requested organization, folder, project, or resource scope | Organization-wide IAM policy export with ancestor metadata |
+| `scc-finding` | Security Command Center finding or posture export confirms observed state for the configured tier/scope | SCC Premium organization-level finding export |
+| `sampled` | Evidence covers selected projects, folders, resources, or subnets only | Two production projects sampled from a larger organization |
+| `unknown` | No supplied evidence proves the control | Workspace MFA or Essential Contacts evidence is absent |
+
+**GCP evidence-scope gates:**
+
+| Gate | Requirement |
+|------|-------------|
+| `GCP-EVID-SCOPE-01` | Record evidence source, capture date, confidence level, and reviewed scope for every detailed finding. |
+| `GCP-EVID-SCOPE-02` | Record the organization, folder, project, resource, and policy denominator, including excluded projects or folders when available. |
+| `GCP-EVID-SCOPE-03` | Distinguish IAM allow policies, IAM deny policies, Principal Access Boundary policies, and organization policies before assigning IAM-related Pass or Fail. |
+| `GCP-EVID-SCOPE-04` | For Organization Policy controls, record enforced ancestor, inheritance, project override, dry-run state, exceptions, and effective policy evidence. |
+| `GCP-EVID-SCOPE-05` | For Security Command Center evidence, record tier, activation scope, finding source, and covered projects or folders; project-level SCC evidence is not organization-wide by itself. |
+| `GCP-EVID-SCOPE-06` | For VPC Flow Logs, record subnet denominator, logging config, sampling rate, metadata mode, log sink/destination, and covered projects or networks. |
+| `GCP-EVID-SCOPE-07` | Mark controls as Not Evaluable with a reason code when evidence is missing: `missing-org-export`, `missing-folder-export`, `missing-project-export`, `missing-resource-export`, `sample-only`, `paid-tier-not-enabled`, `workspace-only-control`, or `not-in-scope`. |
+| `GCP-EVID-SCOPE-08` | Surface evidence age, sampled coverage, paid-tier limitations, policy exceptions, owner, expiry, and retest trigger before assigning full Pass. |
+
+**Classification guidance:** Claiming organization-wide or all-project Pass from `iac-only`, `sampled`, project-only SCC, or project-only Cloud Asset Inventory evidence is at least **Medium** for report integrity. For release-blocking IAM, Organization Policy, audit logging, VPC Flow Logs, SCC, or public-access controls, missing organization/folder/project denominator evidence can be **High**. Paid SCC Premium/Enterprise observations should be reported from available evidence; do not enable or require paid tiers without explicit approval.
+
+---
+
+### Step 10: Compile Assessment Report
 
 
 Produce the final report using the structure defined in the Output Format section.
@@ -144,6 +176,10 @@ Produce the final report using the structure defined in the Output Format sectio
 - **Status:** Pass / Fail / Not Evaluable
 - **Severity:** Critical / High / Medium / Low
 - **CIS Profile:** Level 1 / Level 2
+- **Evidence Source:** iac-only / gcloud-export / cloud-asset-inventory / scc-finding / sampled / unknown
+- **Evidence Captured:** <date/time or export identifier>
+- **Scope Coverage:** <organization, folder, project, resource, policy, subnet, or sample scope>
+- **Not Evaluable Reason:** <reason code if applicable>
 - **File:** <path to relevant config>
 - **Line(s):** <line numbers if applicable>
 - **Description:** <what was found>
@@ -194,6 +230,10 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **Cloud SQL authorized_networks vs. private IP.** CIS 6.5 flags `0.0.0.0/0` in authorized networks, but CIS 6.6 goes further and recommends disabling public IP entirely in favor of private networking.
 5. **BigQuery dataset-level vs. table-level CMEK.** CIS 7.2 checks table-level encryption, while CIS 7.3 checks the dataset default. Both should be evaluated independently.
 6. **Default compute service account identification.** The default SA follows the pattern `PROJECT_NUMBER-compute@developer.gserviceaccount.com`. Grep for this pattern, not just the string "default."
+7. **Treating project-only evidence as organization-wide.** A project IAM policy, project SCC finding, or project Cloud Asset Inventory export cannot prove the full organization without an organization/folder/project denominator.
+8. **Ignoring IAM deny and Principal Access Boundary policies.** IAM allow bindings can look permissive while deny or PAB policies restrict access; record each policy type before deciding the effective result.
+9. **Ignoring Organization Policy inheritance and exceptions.** An ancestor policy can be overridden, dry-run only, or exempted at a folder/project/resource. Record effective policy evidence, not just one constraint definition.
+10. **Overclaiming VPC Flow Logs from a VPC-level view.** VPC Flow Logs are configured per subnet and can be sampled; report subnet coverage, sampling, metadata, and sink evidence.
 
 ---
 
@@ -216,6 +256,8 @@ Produce the final report using the structure defined in the Output Format sectio
 - CIS Google Cloud Platform Foundation Benchmark v2.0.0: https://www.cisecurity.org/benchmark/google_cloud_computing_platform
 - Google Cloud Security Best Practices: https://cloud.google.com/security/best-practices
 - Google Cloud IAM Documentation: https://cloud.google.com/iam/docs
+- Google Cloud Principal Access Boundary Policies: https://cloud.google.com/iam/docs/principal-access-boundary-policies
+- Google Cloud Security Command Center Tiers: https://cloud.google.com/security-command-center/docs/service-tiers
 - Google Cloud Audit Logs: https://cloud.google.com/logging/docs/audit
 - Google Cloud VPC Documentation: https://cloud.google.com/vpc/docs
 - Google Cloud SQL Security: https://cloud.google.com/sql/docs/mysql/configure-ssl-instance
@@ -225,4 +267,5 @@ Produce the final report using the structure defined in the Output Format sectio
 
 ## Changelog
 
+- **1.0.1** -- Added evidence confidence, GCP organization/folder/project/resource scope gates, IAM deny/PAB distinctions, SCC tier/scope handling, VPC Flow Logs sampling guidance, and Not Evaluable reason codes.
 - **1.0.0** -- Initial release. Full coverage of CIS Google Cloud Platform Foundation Benchmark v2.0.0 sections 1 through 7.
