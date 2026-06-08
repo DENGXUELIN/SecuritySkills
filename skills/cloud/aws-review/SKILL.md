@@ -91,6 +91,50 @@ Record all discovered files. If no AWS configurations are found, report that fin
 
 ---
 
+### Step 1.5: Build the Evidence Inventory and Freshness Model
+
+**Objective:** Separate intended configuration from verified deployed AWS state
+before scoring CIS controls. IaC is useful evidence, but it is not proof that
+the current account and region are compliant unless it is tied to live/exported
+state, scope coverage, freshness, and confidence.
+
+Classify evidence for each control:
+
+```
+AWS-EVID-01: Evidence basis is not recorded (IaC intent, live CLI/API export, Security Hub, AWS Config, CloudTrail, or partial/manual evidence)
+AWS-EVID-02: Evidence freshness is missing or outside the control's acceptable review window
+AWS-EVID-03: Account, region, organization unit, and resource coverage are incomplete or unknown
+AWS-EVID-04: IaC-only evidence is treated as deployed-state proof without plan/apply/export linkage
+AWS-EVID-05: Partial regional or account evidence is scored as global compliance
+AWS-EVID-06: Compensating controls such as SCPs, CloudTrail data events, Access Analyzer, or AWS Config auto-remediation are not documented
+AWS-EVID-07: Evidence limitations and source reliability are omitted from the finding
+AWS-EVID-08: Confidence is not assigned before marking a control Pass, Fail, or Not Evaluable
+```
+
+**Evidence basis vocabulary:**
+
+| Evidence Basis | Use For | Confidence Notes |
+|---|---|---|
+| IaC intent | Terraform, CloudFormation, CDK, policy source | Good design evidence; not live proof by itself |
+| Live/exported state | AWS CLI/API exports, config snapshots, console exports | Stronger when fresh and account/region complete |
+| Continuous control | AWS Config, Security Hub, Access Analyzer, SCPs, CloudTrail events | Strong when rule scope, last run, and remediation status are known |
+| Partial evidence | Single region, sampled account, screenshot, owner statement | Use only with explicit limitations and lower confidence |
+| Missing evidence | No artifact or stale/unscoped artifact | Mark Not Evaluable or low confidence, not Pass |
+
+**Minimum evidence inventory fields:**
+
+| Field | Required Evidence |
+|---|---|
+| Control | CIS recommendation ID and control title |
+| Evidence basis | IaC intent, live/exported state, continuous control, partial evidence, or missing evidence |
+| Source | File/export/tool/report name, command, account, region, and collection method |
+| Freshness | Evidence timestamp, review timestamp, acceptable age, and stale/valid result |
+| Coverage | Account IDs, regions, OUs, resource classes, and known exclusions |
+| Limitations | Provider granularity, missing regions/accounts, sampling, IaC drift, or manual assertion limits |
+| Confidence | High/medium/low with rationale before Pass/Fail/Not Evaluable is assigned |
+
+---
+
 ### Step 2 through Step 6: CIS Benchmark Evaluation (Sections 1-5)
 
 Evaluate all AWS configurations against CIS AWS v3.0.0 Sections 1 through 5, covering Identity and Access Management, Storage, Logging, Monitoring, and Networking.
@@ -156,7 +200,18 @@ Produce the final report using the structure defined in the Output Format sectio
 - **Line(s):** <line numbers if applicable>
 - **Description:** <what was found>
 - **Evidence:** <specific configuration or code snippet>
+- **Evidence Basis:** IaC intent / live-exported state / continuous control / partial evidence / missing evidence
+- **Evidence Freshness:** timestamp, acceptable age, stale/valid result
+- **Coverage:** account, region, OU, and resource scope covered by the evidence
+- **Limitations:** missing scope, provider granularity, drift risk, or compensating controls
+- **Confidence:** High / Medium / Low with rationale
 - **Remediation:** <specific fix with code example>
+
+### Evidence Inventory
+
+| CIS Control | Evidence Basis | Source / Command | Freshness | Coverage | Limitations | Confidence |
+|---|---|---|---|---|---|---|
+| [CIS X.Y] | [basis] | [file/export/tool/command] | [timestamp + age result] | [accounts/regions/resources] | [known limits] | [high/medium/low + reason] |
 
 ### Prioritized Remediation Plan
 
@@ -200,6 +255,7 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **Assuming default security groups are empty.** AWS default security groups allow all inbound traffic from the same security group and all outbound traffic. CIS 5.4 requires explicitly managing them to have zero rules.
 5. **Overlooking IMDSv2 in launch templates.** CIS 5.6 applies to both `aws_instance` and `aws_launch_template` resources. Checking only direct instance definitions misses auto-scaled instances.
 6. **Counting not-evaluable controls as passing.** If a control cannot be verified from the available IaC (e.g., contact details in CIS 1.1), mark it "Not Evaluable" rather than "Pass."
+7. **Treating IaC as live AWS proof.** Terraform or CloudFormation can show intended controls while deployed resources drift, partial regions remain unreviewed, or exports are stale. Record evidence basis, freshness, coverage, limitations, and confidence before scoring.
 
 ---
 
