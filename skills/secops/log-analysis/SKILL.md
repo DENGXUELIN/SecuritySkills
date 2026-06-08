@@ -289,6 +289,34 @@ Combine data from multiple log sources to reconstruct attack sequences and incre
 | **IOC sweep** | Search for known indicators across all log sources | Search all logs for a specific IP, domain, hash, or user agent string |
 | **Statistical correlation** | Identify events that co-occur more frequently than expected | Hosts that generate both DNS queries to DGA domains and outbound connections on unusual ports |
 
+#### OpenTelemetry Trace-Log Correlation Evidence Gate
+
+For application investigations, do not treat request IDs or timestamp proximity as complete correlation when OpenTelemetry traces are available or expected. Validate that logs can be joined to traces, spans, resources, and semantic attributes before raising confidence.
+
+| Check ID | Evidence to collect | Failure condition |
+|----------|---------------------|-------------------|
+| `OTEL-CORR-01` | Log records include OpenTelemetry `TraceId` and `SpanId`, or a documented vendor-field mapping to those fields | Logs only contain ad hoc `request_id`, `correlation_id`, or session IDs with no trace/span join |
+| `OTEL-CORR-02` | `TraceFlags` / sampled status and trace retention policy for the analysis window | Error or security logs are retained but matching spans are sampled away without a documented expected-gap decision |
+| `OTEL-CORR-03` | Resource attributes match between logs and spans, especially `service.name`, `service.namespace`, `deployment.environment`, and cloud or Kubernetes identifiers | Logs and spans disagree on service or environment context, making pivots ambiguous |
+| `OTEL-CORR-04` | Non-OTLP log formats map fields such as `trace_id`, `traceId`, `x-b3-traceid`, or W3C `traceparent` to OpenTelemetry fields | Vendor-specific trace fields are used without a documented normalization rule |
+| `OTEL-CORR-05` | HTTP, RPC, database, messaging, or queue semantic attributes needed for the investigation are present and stable | The trace join loses route, method, status, peer, topic, queue, or database context needed to explain the event |
+| `OTEL-CORR-06` | Known-positive trace-log join test for the suspicious event family and at least one known-negative or unrelated request | Correlation is asserted without proving that joins find expected related events and reject unrelated events |
+| `OTEL-CORR-07` | Clock skew and event-time handling are documented for logs and spans | Span start/end times and log timestamps cannot be ordered reliably inside the investigation window |
+| `OTEL-CORR-08` | Correlation confidence is scored as High / Medium / Low with missing-context reasons | The report states that logs and traces are correlated without confidence or evidence-gap notes |
+
+**OpenTelemetry correlation output fields:**
+
+| Field | Value |
+|-------|-------|
+| Trace field source | [native OpenTelemetry / vendor mapping / absent] |
+| Trace identifiers observed | [TraceId, SpanId, TraceFlags, traceparent, x-b3-traceid, etc.] |
+| Resource-context match | [matched / partial / mismatched, with service and environment values] |
+| Sampling and retention status | [always on / tail sampled / head sampled / unknown, with retention window] |
+| Semantic attributes verified | [http.route, http.request.method, server.address, messaging.destination.name, db.system, etc.] |
+| Join validation | [known-positive result, known-negative result, query or trace explorer reference] |
+| Timing confidence | [clock source, skew, event-time vs ingest-time note] |
+| Correlation confidence | [High / Medium / Low plus missing-context reasons] |
+
 **Cross-source correlation example -- Compromised Account Investigation:**
 
 ```
@@ -380,6 +408,18 @@ Produce log analysis findings in this structure:
 ### Visibility Gaps
 [Log sources that were not available but would have provided relevant data]
 
+### OpenTelemetry Trace-Log Correlation
+| Field | Value |
+|-------|-------|
+| Trace Field Source | [native OpenTelemetry / vendor mapping / absent] |
+| Identifiers Present | [TraceId, SpanId, TraceFlags, traceparent, x-b3-traceid, etc.] |
+| Resource Context Match | [matched / partial / mismatched] |
+| Sampling / Retention Status | [policy and expected gaps] |
+| Semantic Attributes Verified | [attributes used for the investigation] |
+| Join Validation Evidence | [known-positive and known-negative checks] |
+| Timing Confidence | [clock source and skew note] |
+| Correlation Confidence | [High / Medium / Low with reasons] |
+
 ### Recommendations
 - [ ] [Action 1]
 - [ ] [Action 2]
@@ -450,6 +490,10 @@ A single Event ID can have very different meanings depending on the context. Eve
 ### Pitfall 5: Not Establishing Baselines Before Looking for Anomalies
 
 Attempting to identify anomalous behavior without knowing what normal behavior looks like leads to both false positives (flagging normal activity as suspicious) and false negatives (missing truly anomalous activity that blends into an unfamiliar baseline). Invest in baseline establishment for high-value log sources before relying on anomaly-based analysis.
+
+### Pitfall 6: Treating Request IDs as Trace Correlation
+
+Application logs often include `request_id`, `correlation_id`, or load balancer IDs that are useful but not equivalent to OpenTelemetry trace context. If the analysis cannot map logs to `TraceId`, `SpanId`, resource attributes, sampling status, and semantic attributes, reduce confidence and document the missing trace-log evidence instead of presenting the pivot as complete.
 
 ---
 
