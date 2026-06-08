@@ -1,0 +1,120 @@
+case: azure-review-complete-diagnostic-pipeline
+skill: azure-review
+expected_risk: Low
+description: >
+  Azure diagnostic settings include subscription and resource-level coverage,
+  required categories, hardened destinations, policy-compliant retention, and
+  recent sample delivery evidence.
+environment:
+  subscription_id: sub-prod-001
+  policy_retention_days: 365
+  regulated: true
+diagnostic_inventory:
+  expected_resources:
+    key_vaults: 4
+    storage_accounts: 6
+    sql_servers: 2
+    nsgs: 18
+    app_services: 9
+  configured_settings:
+    - name: sub-activity-security
+      target_scope: subscription
+      target_resource_id: /subscriptions/sub-prod-001
+      enabled_categories:
+        - Administrative
+        - Security
+        - Policy
+        - ResourceHealth
+        - ServiceHealth
+        - Alert
+      destination:
+        type: log_analytics
+        workspace: law-sec-prod
+        retention_days: 400
+        private_link: true
+        table_retention_verified: true
+      sample_delivery:
+        Administrative: observed
+        Security: observed
+        Policy: observed
+    - name: kv-alllogs
+      target_scope: resource
+      resource_type: Microsoft.KeyVault/vaults
+      covered_resources: 4
+      coverage_denominator: 4
+      enabled_category_group: allLogs
+      required_category_sample:
+        AuditEvent: observed
+      destination:
+        type: event_hub
+        namespace: eh-sec-prod
+        hub: azure-diagnostics
+        retention_days: 7
+        consumer_archive_days: 400
+        authorization_scope: send_only
+    - name: storage-sql-nsg-appservice
+      target_scope: resource
+      resource_types:
+        - Microsoft.Storage/storageAccounts
+        - Microsoft.Sql/servers/databases
+        - Microsoft.Network/networkSecurityGroups
+        - Microsoft.Web/sites
+      covered_resources: 35
+      coverage_denominator: 35
+      enabled_category_group: allLogs
+      destination:
+        type: storage
+        account: diagsecure001
+        retention_days: 400
+        public_network_access: Disabled
+        blob_public_access: false
+        cmk_enabled: true
+        private_endpoint: true
+      sample_delivery:
+        StorageRead: observed
+        SQLSecurityAuditEvents: observed
+        NetworkSecurityGroupFlowEvent: observed
+        AppServiceHTTPLogs: observed
+coverage_gaps:
+  key_vaults_without_audit_event: []
+  sql_servers_without_diagnostics: []
+  nsgs_without_flow_logs: 0
+  app_services_without_http_logs: 0
+  regions_omitted: []
+exception:
+  owner: cloud-security-monitoring
+  expiry: none
+  monitoring: diagnostic-drift-policy
+  retest_trigger:
+    - new-subscription
+    - new-critical-resource
+    - retention-policy-change
+expected_findings:
+  - id: AZ-DIAG-01
+    status: pass
+    reason: subscription and critical resource coverage denominators are complete
+  - id: AZ-DIAG-02
+    status: pass
+    reason: required categories and allLogs groups are enabled
+  - id: AZ-DIAG-03
+    status: pass
+    reason: each setting maps to an approved production destination
+  - id: AZ-DIAG-04
+    status: pass
+    reason: workspace, storage, and consumer retention meet policy
+  - id: AZ-DIAG-05
+    status: pass
+    reason: destinations use private access, least privilege, and CMK where required
+  - id: AZ-DIAG-06
+    status: pass
+    reason: sample delivery is observed for security-relevant categories
+  - id: AZ-DIAG-07
+    status: pass
+    reason: all production regions and resources are covered
+  - id: AZ-DIAG-08
+    status: pass
+    reason: drift monitoring and retest triggers are documented
+expected_output:
+  diagnostic_pipeline_evidence: Pass
+  section_5_status: Pass
+  severity: Low

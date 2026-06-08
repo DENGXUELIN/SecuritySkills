@@ -409,9 +409,31 @@ resource "azurerm_monitor_diagnostic_setting" {
 
 Verify that Administrative, Security, ServiceHealth, Alert, Recommendation, Policy, Autoscale, and ResourceHealth categories are enabled.
 
+For each diagnostic setting, record whether the setting uses explicit categories or `category_group = "allLogs"` where supported:
+
+```hcl
+resource "azurerm_monitor_diagnostic_setting" "key_vault" {
+  target_resource_id         = azurerm_key_vault.example.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.security.id
+
+  enabled_log {
+    category = "AuditEvent"
+  }
+}
+```
+
+Treat partial category coverage as a failure when security-relevant categories are omitted. If a provider supports `category_group = "allLogs"`, verify whether policy expects the category group instead of a hand-picked subset.
+
 #### CIS 5.1.3 -- Ensure the storage container storing the activity logs is not publicly accessible
 
 Check storage account access level for the diagnostic logs container.
+
+Also verify the diagnostic destination itself:
+
+- Storage account public network access, blob public access, RBAC assignments, and container ACLs.
+- Log Analytics workspace retention and table-level retention where configured.
+- Event Hub authorization policy scope and downstream consumer retention.
+- CMK/private endpoint evidence when policy or data classification requires it.
 
 #### CIS 5.1.4 -- Ensure the storage account containing the container with activity logs is encrypted with a Customer Managed Key
 
@@ -427,6 +449,23 @@ resource "azurerm_monitor_diagnostic_setting" {
   }
 }
 ```
+
+#### Diagnostic Pipeline Integrity Checklist
+
+Use this checklist before marking CIS Section 5 diagnostic coverage as Pass:
+
+| Gate | Check |
+|------|-------|
+| AZ-DIAG-01 | Build a coverage denominator for subscription Activity Log plus each in-scope Key Vault, Storage, SQL, NSG, App Service, and other monitored resource type. |
+| AZ-DIAG-02 | Verify required categories/category groups, including Administrative, Security, Policy, ResourceHealth, and Key Vault AuditEvent. |
+| AZ-DIAG-03 | Map each diagnostic setting to a production Log Analytics workspace, Event Hub, or Storage Account destination. |
+| AZ-DIAG-04 | Verify source retention and downstream retention meet policy, including Event Hub consumer retention when logs are streamed. |
+| AZ-DIAG-05 | Verify destination hardening: no public diagnostic storage, least-privilege readers, private access, and CMK where required. |
+| AZ-DIAG-06 | Confirm sample delivery at the destination, or mark the control Not Evaluable when sample evidence is unavailable. |
+| AZ-DIAG-07 | Confirm all production regions and subscriptions are covered, not only a pilot subscription or one region. |
+| AZ-DIAG-08 | Document owner, expiry, remediation plan, monitoring, and retest trigger for any exception. |
+
+Do not downgrade missing sample delivery or retention evidence to Pass. Use Not Evaluable when configuration exists but delivery cannot be proven from the available evidence.
 
 ### CIS 5.2 -- Activity Log Alerts
 

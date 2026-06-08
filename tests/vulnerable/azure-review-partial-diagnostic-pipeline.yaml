@@ -1,0 +1,88 @@
+case: azure-review-partial-diagnostic-pipeline
+skill: azure-review
+expected_risk: High
+description: >
+  A review passes Azure logging because one subscription diagnostic setting
+  exists, but critical resource diagnostics, categories, retention, destination
+  hardening, and sample delivery evidence are missing.
+environment:
+  subscription_id: sub-prod-001
+  policy_retention_days: 365
+  regulated: true
+diagnostic_inventory:
+  expected_resources:
+    key_vaults: 4
+    storage_accounts: 6
+    sql_servers: 2
+    nsgs: 18
+    app_services: 9
+  configured_settings:
+    - name: sub-activity-basic
+      target_scope: subscription
+      target_resource_id: /subscriptions/sub-prod-001
+      enabled_categories:
+        - Administrative
+        - Alert
+      missing_categories:
+        - Security
+        - Policy
+        - ResourceHealth
+      destination:
+        type: storage
+        account: diagpublic001
+        retention_days: 30
+        public_network_access: Enabled
+        blob_public_access: true
+        cmk_enabled: false
+      sample_delivery:
+        Administrative: observed
+        Security: missing
+        Policy: missing
+coverage_gaps:
+  key_vaults_without_audit_event:
+    - kv-payments-prod
+    - kv-token-prod
+    - kv-support-prod
+    - kv-ops-prod
+  sql_servers_without_diagnostics:
+    - sql-customer-prod
+    - sql-ledger-prod
+  nsgs_without_flow_logs: 14
+  app_services_without_http_logs: 7
+  regions_omitted:
+    - eastus2
+    - westeurope
+exception:
+  owner: missing
+  expiry: missing
+  remediation_plan: missing
+  retest_trigger: missing
+expected_findings:
+  - id: AZ-DIAG-01
+    status: fail
+    reason: subscription Activity Log exists but critical resource diagnostics are missing
+  - id: AZ-DIAG-02
+    status: fail
+    reason: Security, Policy, ResourceHealth, and Key Vault AuditEvent categories are missing
+  - id: AZ-DIAG-03
+    status: pass
+    reason: the single subscription setting has a storage destination
+  - id: AZ-DIAG-04
+    status: fail
+    reason: 30 day retention is below the 365 day policy
+  - id: AZ-DIAG-05
+    status: fail
+    reason: diagnostic storage is public and lacks required CMK
+  - id: AZ-DIAG-06
+    status: fail
+    reason: no sample delivery exists for security-relevant categories
+  - id: AZ-DIAG-07
+    status: fail
+    reason: production regions are omitted from the diagnostic coverage
+  - id: AZ-DIAG-08
+    status: fail
+    reason: exceptions have no owner, expiry, remediation plan, or retest trigger
+expected_output:
+  diagnostic_pipeline_evidence: Failed
+  section_5_status: Fail
+  severity: High
