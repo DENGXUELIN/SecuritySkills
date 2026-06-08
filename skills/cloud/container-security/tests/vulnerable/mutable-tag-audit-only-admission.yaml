@@ -1,0 +1,51 @@
+---
+case: mutable-tag-audit-only-admission
+expected_result: fail
+description: Production workload uses a mutable tag, evidence for a different digest, and audit-only admission policy.
+workload:
+  kind: Deployment
+  name: payments-api
+  namespace: production
+  rendered_image: registry.internal.invalid/payments/api:1.4.2
+  runtime_resolved_digest: sha256:2222222222222222222222222222222222222222222222222222222222222222
+  imagePullPolicy: Always
+helm_rendering:
+  template_default: registry.internal.invalid/payments/api@sha256:1111111111111111111111111111111111111111111111111111111111111111
+  production_values_override: tag:1.4.2
+build_provenance:
+  source_commit: 4f2c18a
+  workflow: .github/workflows/release.yml
+  subject_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+signature:
+  verifier: cosign
+  result: pass
+  verified_reference: registry.internal.invalid/payments/api:1.4.2
+  subject_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+  trusted_identity: repo:org/payments-api:ref:refs/heads/main
+sbom:
+  format: spdx-json
+  subject_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+vulnerability_scan:
+  scanner: trivy
+  artifact_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+admission_policy:
+  engine: kyverno
+  policy: verify-production-images
+  mode: audit
+  namespaces:
+    - production
+exception:
+  owner: ""
+  expiry: ""
+  compensating_control: ""
+registry_retention:
+  protects_active_digests: false
+  protects_attached_artifacts: false
+expected_findings:
+  - CONT-PROV-01
+  - CONT-PROV-02
+  - CONT-PROV-03
+  - CONT-PROV-04
+  - CONT-PROV-06
+  - CONT-PROV-07
+  - CONT-PROV-08

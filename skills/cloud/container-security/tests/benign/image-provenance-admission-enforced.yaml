@@ -1,0 +1,51 @@
+---
+case: image-provenance-admission-enforced
+expected_result: pass
+description: Production workload uses a rendered digest with matching signature, SBOM, provenance, and enforce-mode admission.
+workload:
+  kind: Deployment
+  name: payments-api
+  namespace: production
+  rendered_image: registry.internal.invalid/payments/api@sha256:1111111111111111111111111111111111111111111111111111111111111111
+  runtime_resolved_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+  imagePullPolicy: IfNotPresent
+build_provenance:
+  source_commit: 4f2c18a
+  builder: repo:org/payments-api:ref:refs/heads/main
+  workflow: .github/workflows/release.yml
+  subject_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+signature:
+  verifier: cosign
+  result: pass
+  subject_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+  oidc_issuer: https://token.actions.githubusercontent.com
+  trusted_identity: repo:org/payments-api:ref:refs/heads/main
+  trusted_workflow: .github/workflows/release.yml
+sbom:
+  format: spdx-json
+  subject_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+vulnerability_scan:
+  scanner: trivy
+  artifact_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+  critical: 0
+  high: 0
+admission_policy:
+  engine: kyverno
+  policy: verify-production-images
+  mode: enforce
+  namespaces:
+    - production
+  allow_tagless_digest_only: true
+registry_retention:
+  protects_active_digests: true
+  protects_attached_artifacts: true
+exceptions: []
+evidence_gates:
+  CONT-PROV-01: pass
+  CONT-PROV-02: pass
+  CONT-PROV-03: pass
+  CONT-PROV-04: pass
+  CONT-PROV-05: pass
+  CONT-PROV-06: pass
+  CONT-PROV-07: pass
+  CONT-PROV-08: pass

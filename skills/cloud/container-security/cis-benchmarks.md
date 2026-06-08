@@ -592,9 +592,71 @@ Evaluate container runtime configurations against NIST SP 800-190 countermeasure
 |---------------|---------------|
 | **CM-1:** Use minimal base images | Verify Alpine, Distroless, or slim variants in FROM |
 | **CM-2:** Scan images for vulnerabilities | Check for Trivy, Grype, Snyk in CI pipeline |
-| **CM-3:** Sign and verify images | Check for Cosign signatures, Notary, or admission webhooks |
-| **CM-4:** Use immutable tags or digests | `image: nginx@sha256:...` preferred over `image: nginx:1.25` |
+| **CM-3:** Sign and verify images | Check for Cosign signatures, Notary, or admission webhooks that verify the deployed digest |
+| **CM-4:** Use immutable tags or digests | `image: nginx@sha256:...` preferred over `image: nginx:1.25`; record the runtime-resolved digest for approved tag exceptions |
 | **CM-5:** Remove unnecessary packages | No curl, wget, netcat, or shells in production images |
+
+### NIST 800-190: Image Provenance Evidence Chain
+
+Apply these checks to rendered production manifests and admission policy evidence,
+not just source templates. Record `Not Evaluable` if any required artifact is
+unavailable and explain the missing evidence.
+
+| ID | Evidence Gate | Passing Evidence | Failure Pattern |
+|----|---------------|------------------|-----------------|
+| **CONT-PROV-01** | Rendered workload image is immutable or has a captured resolved digest | `image: registry/app@sha256:<digest>` or runtime digest captured for a tag exception | `image: registry/app:latest` or `:1.4.2` with no resolved digest |
+| **CONT-PROV-02** | Signature verification targets the deployed digest | `cosign verify registry/app@sha256:<digest>` with matching subject | Signature checked against a tag while the runtime digest differs |
+| **CONT-PROV-03** | SBOM, vulnerability scan, and provenance attestation subject match the deployed digest | SBOM `subject.digest`, scan artifact digest, and SLSA/cosign attestation all match | SBOM file exists but references an older digest |
+| **CONT-PROV-04** | Production admission policy enforces trusted image requirements | Kyverno/Gatekeeper/registry policy mode is `enforce` for production namespaces | Admission policy is `audit` or `warn` only |
+| **CONT-PROV-05** | Signer identity is constrained to an approved issuer, repository, and release workflow | Fulcio/Sigstore identity, OIDC issuer, repository, and workflow path are checked | Any trusted certificate or broad organization signer is accepted |
+| **CONT-PROV-06** | Rendered Helm/Kustomize output matches the reviewed pinned image and policy | `helm template` or `kustomize build` output contains the signed digest and enforcement policy | Base template is pinned but production values override to a mutable tag |
+| **CONT-PROV-07** | Exceptions have owner, expiry, compensating control, and retest trigger | Exception record references workload, digest, owner, expiry, risk acceptance, and planned removal | Permanent exception or missing owner/expiry |
+| **CONT-PROV-08** | Registry lifecycle retains the deployed digest, signature, SBOM, and attestations while in use | Retention policy protects active production digests and attached artifacts | Lifecycle policy can garbage-collect the digest or attached evidence |
+
+**Benign example: production digest with matching provenance**
+
+```yaml
+workload: deploy/api
+namespace: production
+rendered_image: registry.internal.invalid/payments/api@sha256:1111111111111111111111111111111111111111111111111111111111111111
+build:
+  commit: 4f2c18a
+  workflow: .github/workflows/release.yml
+signature:
+  verifier: cosign
+  result: pass
+  subject_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+  trusted_identity: repo:org/payments-api:ref:refs/heads/main
+sbom:
+  format: spdx-json
+  subject_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+admission_policy:
+  engine: kyverno
+  mode: enforce
+  namespaces:
+    - production
+```
+
+**Vulnerable example: signed tag but different deployed digest**
+
+```yaml
+workload: deploy/api
+namespace: production
+rendered_image: registry.internal.invalid/payments/api:1.4.2
+runtime_resolved_digest: sha256:2222222222222222222222222222222222222222222222222222222222222222
+review_evidence:
+  signed_image: registry.internal.invalid/payments/api:1.4.2
+  signed_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+  sbom_subject_digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+admission_policy:
+  engine: kyverno
+  mode: audit
+```
+
+The vulnerable example must be reported because the signature and SBOM prove a
+different digest than the one running, and audit-only admission does not block
+untrusted production images. `imagePullPolicy: Always` would not change that
+result because it only controls pull behavior.
 
 ### NIST 800-190: Orchestrator Countermeasures
 

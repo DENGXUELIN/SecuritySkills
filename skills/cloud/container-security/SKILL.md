@@ -13,7 +13,7 @@ phase: [build, deploy, operate]
 frameworks: [CIS-Docker-v1.6.0, CIS-Kubernetes-v1.9.0, NIST-SP-800-190]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -62,6 +62,8 @@ NIST SP 800-190 identifies five risk categories: image risks, registry risks, or
 - NetworkPolicy definitions
 - Pod Security Standard configurations or OPA/Gatekeeper policies
 - Container registry configurations (if available)
+- Rendered production manifests, image digests, build provenance, signatures,
+  SBOMs, admission policy mode, and exception records for deployed images
 
 ---
 
@@ -115,7 +117,39 @@ For detailed CIS benchmark checklist items, NIST SP 800-190 countermeasure table
 
 ---
 
-### Step 7: Compile Assessment Report
+### Step 7: Verify Image Provenance and Admission Evidence Chain
+
+For every production workload image, verify an end-to-end evidence chain proving
+the deployed artifact is the same artifact that was built, scanned, signed,
+attested, and admitted by policy. Use rendered manifests rather than only
+Dockerfiles, Helm defaults, or Kustomize bases.
+
+Required checks:
+
+- **CONT-PROV-01:** Production workload uses a mutable tag without recording the
+  resolved digest.
+- **CONT-PROV-02:** Signature verification is performed against a tag or stale
+  digest instead of the deployed digest.
+- **CONT-PROV-03:** SBOM, vulnerability scan, or provenance attestation subject
+  digest does not match the deployed digest.
+- **CONT-PROV-04:** Admission policy is in `audit` or `warn` mode only for a
+  production namespace.
+- **CONT-PROV-05:** Trusted signer identity, issuer, workflow, or repository
+  constraint is missing or too broad.
+- **CONT-PROV-06:** Rendered Helm/Kustomize output differs from the reviewed
+  pinned image or admission policy.
+- **CONT-PROV-07:** Production exception lacks an owner, expiry, compensating
+  control, or retest trigger.
+- **CONT-PROV-08:** Registry retention or lifecycle policy can delete the
+  signed/SBOM-linked digest before the workload is retired.
+
+Treat `imagePullPolicy: Always` as pull behavior only. It is not provenance and
+does not prove digest pinning, signature verification, SBOM linkage, or trusted
+build origin.
+
+---
+
+### Step 8: Compile Assessment Report
 
 
 Produce the final report using the structure defined in the Output Format section.
@@ -161,6 +195,7 @@ Produce the final report using the structure defined in the Output Format sectio
 | RBAC | CIS K8s 5.1.x | X | X | X | X | X |
 | Network Policies | CIS K8s 5.3.x | X | X | X | X | X |
 | Secrets Management | CIS K8s 5.4.x | X | X | X | X | X |
+| Image Provenance | NIST 800-190 Image/Registry | X | X | X | X | X |
 | Runtime Hardening | NIST 800-190 | X | X | X | X | X |
 | Control Plane | CIS K8s 1.x-4.x | X | X | X | X | X |
 
@@ -177,6 +212,12 @@ Produce the final report using the structure defined in the Output Format sectio
 - **Description:** <what was found>
 - **Evidence:** <specific configuration>
 - **Remediation:** <fix with code example>
+
+### Image Provenance Evidence
+
+| Workload | Rendered Image | Resolved Digest | Signature / Attestation | SBOM / Scan Digest | Admission Mode | Exception |
+|----------|----------------|-----------------|-------------------------|--------------------|----------------|-----------|
+| deploy/api | registry/app@sha256:<digest> | sha256:<digest> | cosign pass, trusted workflow | matches deployed digest | enforce | none |
 
 ### Pod Security Standards Compliance Matrix
 
@@ -226,8 +267,8 @@ Produce the final report using the structure defined in the Output Format sectio
 
 | Risk Category | Key Risks | Countermeasure Focus |
 |--------------|-----------|---------------------|
-| Image Risks | Vulnerabilities, malware, embedded secrets, unpatched software | Minimal base images, scanning, signing, immutable references |
-| Registry Risks | Unauthorized access, stale images, insufficient authentication | Registry authentication, image lifecycle policies |
+| Image Risks | Vulnerabilities, malware, embedded secrets, unpatched software, unsigned or untraceable artifacts | Minimal base images, scanning, signing, immutable references, deployed-digest provenance |
+| Registry Risks | Unauthorized access, stale images, insufficient authentication, deleted evidence artifacts | Registry authentication, image lifecycle policies, signature/SBOM retention |
 | Orchestrator Risks | Unrestricted access, mixed sensitivity workloads, insufficient logging | RBAC, namespaces, network policies, audit logging |
 | Container Risks | Runtime privilege escalation, unbounded resources, writable filesystems | Non-root, capabilities, resource limits, read-only FS |
 | Host OS Risks | Shared kernel, large attack surface, unpatched hosts | Minimal host OS, regular patching, immutable infrastructure |
@@ -257,6 +298,8 @@ Produce the final report using the structure defined in the Output Format sectio
 5. **`readOnlyRootFilesystem` breaks many applications.** When recommending this control, also recommend adding writable `emptyDir` volume mounts for directories the application needs to write to (e.g., `/tmp`, `/var/cache`).
 6. **Network policies are additive, not subtractive.** A default-deny policy must be explicitly created. Without it, all pod-to-pod traffic is allowed regardless of other NetworkPolicy resources.
 7. **Distroless images have no shell.** While this is excellent for security, note that debugging requires ephemeral containers (`kubectl debug`). Flag this as a consideration, not a problem.
+8. **`imagePullPolicy: Always` is not image provenance.** It does not prove the image is signed, digest-pinned, linked to an SBOM, or admitted by an enforcing production policy.
+9. **A signed tag is not enough.** Signatures, SBOMs, vulnerability scans, and attestations must match the digest actually rendered and running in the workload.
 
 ---
 
@@ -285,6 +328,9 @@ Produce the final report using the structure defined in the Output Format sectio
 - Kubernetes Pod Security Admission: https://kubernetes.io/docs/concepts/security/pod-security-admission/
 - Kubernetes Network Policies: https://kubernetes.io/docs/concepts/services-networking/network-policies/
 - Kubernetes RBAC: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+- Kubernetes Dynamic Admission Control: https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/
+- Sigstore Cosign Verification: https://docs.sigstore.dev/cosign/verifying/verify/
+- SLSA Provenance: https://slsa.dev/spec/v1.0/provenance
 - Docker Security Best Practices: https://docs.docker.com/develop/security-best-practices/
 - Dockerfile Best Practices: https://docs.docker.com/develop/develop-images/dockerfile_best-practices/
 - NSA/CISA Kubernetes Hardening Guide: https://media.defense.gov/2022/Aug/29/2003066362/-1/-1/0/CTR_KUBERNETES_HARDENING_GUIDANCE_1.2_20220829.PDF
@@ -293,4 +339,5 @@ Produce the final report using the structure defined in the Output Format sectio
 
 ## Changelog
 
+- **1.0.1** -- Added image provenance and admission evidence-chain review gates, output evidence table, and deployed-digest matching requirements for signatures, SBOMs, scans, and attestations.
 - **1.0.0** -- Initial release. Full coverage of CIS Docker Benchmark v1.6.0 Section 4-5, CIS Kubernetes Benchmark v1.9.0 Sections 1-5, and NIST SP 800-190 countermeasures across all five risk categories.
