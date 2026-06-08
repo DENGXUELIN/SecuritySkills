@@ -12,7 +12,7 @@ phase: [design, build, review]
 frameworks: [OWASP-LLM-Top-10-2025]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -47,6 +47,7 @@ Before beginning the review, collect the following:
 - [ ] **System prompts and prompt templates** — all static instructions sent to the model.
 - [ ] **Input flow** — how user input reaches the model (direct, preprocessed, combined with retrieval context).
 - [ ] **Output flow** — how model output is rendered, parsed, or acted upon (HTML, CLI, database writes, API calls).
+- [ ] **Data-flow evidence:** entry points, trust boundaries crossed, controls reviewed, downstream sinks, evidence locations, result, and false-positive checks for every LLM finding.
 - [ ] **Tool/function-calling configuration** — any tools the LLM can invoke, their permissions, and confirmation gates.
 - [ ] **RAG pipeline architecture** — document ingestion, chunking strategy, embedding model, vector store, retrieval query construction, context window assembly.
 - [ ] **Authentication and authorization context** — how user identity propagates through the LLM pipeline, whether the model inherits user permissions or operates with elevated privileges.
@@ -59,6 +60,32 @@ Before beginning the review, collect the following:
 ## 3. Process
 
 Review the application against each of the ten OWASP LLM risk categories below. For each category, examine the codebase for the specified patterns, apply the detection methods, and recommend the listed mitigations where gaps are found.
+
+### Data-Flow Evidence Gate
+
+Before reporting findings for LLM01, LLM02, LLM05, LLM06, or LLM08, trace the concrete data path from source to sink. Do not report broad "prompt risk" findings without identifying the trust boundary crossed and the downstream control or sink that makes the issue exploitable.
+
+| Evidence Field | Required Evidence | Reject / Downgrade When |
+|---|---|---|
+| **Entry point / data source** | User prompt, retrieved document, tool result, model output, embedding query, uploaded file, or system prompt source | Source is described only as "LLM input" |
+| **Trust boundary crossed** | User-to-server, retrieval-to-prompt, model-to-renderer, model-to-tool, tenant-to-vector-store, provider-to-app | No boundary crossing is identified |
+| **Control reviewed** | Input validation, role separation, retrieval ACL, output encoding, tool allowlist, confirmation gate, tenant filter, similarity threshold | Finding assumes control absence without reviewing code/config |
+| **Downstream sink** | Prompt assembly, rendered HTML, SQL/shell/API call, tool execution, vector query, log store, response stream | No harmful or security-relevant sink exists |
+| **Evidence location** | File/function/config path, architecture component, or policy artifact | Evidence is only a narrative claim |
+| **Result** | Pass, fail, partial, or unknown | Unknown is reported as fail without caveat or pass without evidence |
+| **False-positive check** | Benign path, existing guard, scope limiter, tenant filter, read-only tool, sanitizer, or confirmation gate checked | Known safe controls are not considered |
+
+```
+LLM Data-Flow Evidence:
+- OWASP Category:        [LLM01 | LLM02 | LLM05 | LLM06 | LLM08 | other]
+- Entry Point / Source:  [source]
+- Trust Boundary:        [boundary crossed]
+- Control Reviewed:      [control and evidence]
+- Downstream Sink:        [sink]
+- Evidence Location:     [file/function/config/component]
+- Result:                [Pass | Fail | Partial | Unknown]
+- False-Positive Checks: [benign path or existing control checked]
+```
 
 ---
 
@@ -421,8 +448,13 @@ Structure the findings report as follows:
 - **Severity:** Critical | High | Medium | Low | Informational
 - **CWE:** CWE-XXX
 - **Location:** [file path, function, configuration]
+- **Entry Point / Source:** [user prompt / retrieved context / model output / tool result / embedding query]
+- **Trust Boundary:** [boundary crossed]
+- **Control Reviewed:** [input validation / retrieval ACL / output encoding / tool approval / tenant filter]
+- **Downstream Sink:** [prompt assembly / renderer / SQL / shell / tool execution / vector store / logs]
 - **Description:** [What was found]
 - **Evidence:** [Code snippet, configuration excerpt, or architectural observation]
+- **False-Positive Checks:** [Existing guards, benign path, scope limiter, or why none applies]
 - **Impact:** [What an attacker could achieve]
 - **Remediation:** [Specific, actionable fix with code example if applicable]
 - **Priority:** P1 | P2 | P3 | P4
@@ -475,6 +507,8 @@ These are the five most frequent mistakes agents make when performing LLM securi
 4. **Failing to enumerate tool permissions.** When function-calling or tool-use is configured, every tool must be enumerated with its permissions documented. Agents frequently overlook that a "search" tool also has write access, or that a "database" tool allows arbitrary SQL. This is the core of LLM06.
 
 5. **Scoping the review to the application layer only.** LLM security includes supply chain (LLM03) — model provenance, dependency versions, serialization formats — and infrastructure — vector database authentication, API key management, cost controls (LLM10). These are outside the application code but within scope of this review.
+
+6. **Reporting LLM risks without source-to-sink evidence.** A prompt, retriever, parser, tool, or renderer is rarely the whole issue by itself. Record the entry point, trust boundary, control reviewed, downstream sink, evidence location, result, and false-positive checks so severity is tied to an exploitable path rather than a broad category label.
 
 ---
 
