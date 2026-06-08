@@ -279,6 +279,45 @@ Key sub-requirements:
 - **9.5.1.2**: POI device surfaces periodically inspected for tampering
 - **9.5.1.3**: Training for personnel in POI environments to detect tampering
 
+**POI tamper and substitution evidence gate (Req 9.5.1):**
+
+Do not mark Req 9.5.1 in place based only on a terminal asset list, processor inventory, or policy statement. Evidence must show that deployed POI devices match the inventory, are inspected for tampering/substitution, are covered by trained personnel, and have a tested removal/escalation workflow when tampering is suspected.
+
+```
+PCI-POI-01: POI inventory lacks make/model, serial number, location, owner, status, firmware/P2PE identifier, or installation date
+PCI-POI-02: Field verification does not prove deployed device serial/location/merchant ID match the inventory
+PCI-POI-03: Inspection evidence does not cover tamper seals, overlays/skimmers, cable path, casing, display/keypad anomalies, and substitution indicators
+PCI-POI-04: Inspection cadence, last inspection date, missed inspection handling, or targeted risk analysis for cadence is missing
+PCI-POI-05: Device lifecycle updates for new, moved, replaced, repaired, retired, or lost terminals are not reflected in the POI inventory
+PCI-POI-06: Personnel assigned to POI environments lack training evidence for tamper detection and reporting
+PCI-POI-07: Suspected tamper response does not require removal from service, acquirer/processor escalation, evidence preservation, and incident tracking
+PCI-POI-08: Exceptions are not tracked with owner, compensating control, due date, and remediation status
+```
+
+**POI evidence record:**
+
+```
+POI TAMPER AND SUBSTITUTION EVIDENCE
+====================================
+Device ID / Serial:        [inventory identifier and serial]
+Location / Lane:           [store, counter, lane, mobile unit]
+Make / Model / Firmware:   [vendor, model, firmware or P2PE identifier]
+Inventory Match:           [Pass/Fail -- serial/location/merchant ID]
+Last Field Verification:   [date, verifier, evidence reference]
+Inspection Cadence:        [daily/weekly/monthly/TRA-defined]
+Inspection Evidence:       [tamper seal, overlay/skimmer, cable/case/keypad checks]
+Personnel Training:        [trained staff list, date, training version]
+Lifecycle Status:          [active/moved/repaired/replaced/retired]
+Tamper Response Evidence:  [runbook, removal-from-service, escalation, incident ID]
+Exception / Owner / Due:   [N/A or tracked exception]
+```
+
+**False-positive boundaries:**
+
+- Do not require a photo for every inspection when the organization has an assessor-acceptable inspection checklist, named verifier, timestamp, device serial, and exception workflow.
+- Do not flag outsourced terminal inspection when the merchant retains Req 9.5.1 responsibility evidence through a written responsibility matrix, service records, and spot-checks.
+- Do not require identical inspection cadence across all POI types when a targeted risk analysis justifies different frequencies and missed inspections are tracked.
+
 #### Requirement 10: Log and Monitor All Access to System Components and Cardholder Data
 
 Key sub-requirements:
@@ -442,6 +481,12 @@ Note: Not all requirements support the Customized Approach. Requirements with "T
 |---------|--------|---------|----------|-------------|
 | [N.x.x] | [In Place/Not in Place] | [finding detail] | [evidence reviewed] | [action needed] |
 
+### Requirement 9.5.1 POI Tamper and Substitution Evidence
+
+| Device ID / Serial | Location | Inventory Match | Last Field Verification | Inspection Cadence | Inspection Evidence | Personnel Training | Lifecycle Status | Tamper Response Evidence | Exception / Owner / Due | Status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| [device/serial] | [store/lane] | [Pass/Fail] | [date/evidence] | [cadence] | [checks] | [evidence] | [status] | [runbook/incident] | [N/A or exception] | [In Place/Not in Place] |
+
 ## New v4.0 Requirements Status
 [Assessment of all 64 new requirements, particularly those mandatory since March 31, 2025]
 
@@ -520,6 +565,8 @@ Maintain an Information Security Policy:                Requirement 12
 
 5. **Failing to manage third-party service provider (TPSP) compliance.** Requirement 12.8 and 12.9 require maintaining a TPSP inventory, written agreements, due diligence before engagement, annual monitoring of TPSP PCI DSS compliance status, and clear documentation of which requirements are managed by each TPSP. The shared responsibility model must be explicitly documented.
 
+6. **Treating terminal inventory as tamper protection.** A POI device list supports Req 9.5.1.1, but it does not prove devices in the field match the list, surfaces are inspected, staff can recognize tampering, or suspected devices are removed from service. Preserve per-device field verification, inspection, training, lifecycle, and response evidence.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -544,4 +591,5 @@ If user-supplied input contains PCI DSS requirement IDs outside the valid v4.0 n
 - PCI DSS v4.0 SAQ Instructions and Guidelines
 - PCI DSS Prioritized Approach for PCI DSS v4.0
 - PCI SSC Information Supplements: Scoping and Segmentation, Penetration Testing, Tokenization, Cloud Computing
+- PCI SSC FAQ: Protecting payment terminals from tampering and substitution
 - PCI SSC Glossary of Terms, Abbreviations, and Acronyms
