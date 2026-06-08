@@ -319,6 +319,26 @@ Build or review the SoA. For each of the 93 Annex A controls, document:
 | Control ID | Control Title | Applicable? | Justification (if excluded) | Implementation Status | Maturity Score | Gap Description |
 ```
 
+#### 5.1 SoA Evidence Linkage Gate
+
+For every included or excluded Annex A control, require audit-ready traceability before treating the SoA row as complete:
+
+- `ISO-SOA-01` **Control decision completeness**: record the control ID, control title, included/excluded decision, decision rationale, and implementation status.
+- `ISO-SOA-02` **Risk or requirement linkage**: link the decision to at least one risk register item, legal requirement, contractual requirement, interested-party requirement, business objective, or documented scope constraint.
+- `ISO-SOA-03` **Treatment decision linkage**: record the selected treatment decision such as treat, accept, avoid, transfer, or not applicable, plus the risk owner or approval source.
+- `ISO-SOA-04` **Scope and asset boundary**: state the business unit, product, location, platform, process, or asset boundary where the decision applies.
+- `ISO-SOA-05` **Design and operating evidence**: distinguish design evidence such as policies or procedures from operating evidence such as tickets, logs, review samples, audit records, or monitoring results.
+- `ISO-SOA-06` **Evidence ownership and currentness**: capture evidence artifact, owner, date, period covered, and currentness status: current, stale, or unknown.
+- `ISO-SOA-07` **Excluded-control support**: require excluded controls to cite the ISMS scope, obligations, and risk treatment basis proving the exclusion does not affect conformity.
+- `ISO-SOA-08` **Unknown/finding behavior**: mark the row `Unknown` or raise a finding when risk linkage, treatment decision, owner, date, scope boundary, or evidence currentness is missing.
+
+Use this matrix for each SoA row:
+
+```
+| Control ID | Decision | Rationale | Risk/Requirement Link | Treatment Decision | Scope/Asset Boundary | Design Evidence | Operating Evidence | Evidence Owner | Evidence Date/Period | Currentness | Result |
+|------------|----------|-----------|-----------------------|--------------------|----------------------|-----------------|--------------------|----------------|----------------------|-------------|--------|
+```
+
 Exclusions are permitted only where the control is genuinely not applicable to the ISMS scope. A control cannot be excluded solely because it is difficult to implement.
 
 ---
@@ -409,6 +429,12 @@ Classify each finding using the following severity levels:
 - Controls applicable: [count] / 93
 - Controls excluded: [count] — [list with justification]
 - Average maturity of applicable controls: [score] / 5.0
+
+### SoA Evidence Linkage Matrix
+
+| Control ID | Decision | Rationale | Risk/Requirement Link | Treatment Decision | Scope/Asset Boundary | Design Evidence | Operating Evidence | Evidence Owner | Evidence Date/Period | Currentness | Result |
+|------------|----------|-----------|-----------------------|--------------------|----------------------|-----------------|--------------------|----------------|----------------------|-------------|--------|
+| A.5.1 | [Included/Excluded] | [why] | [risk/legal/contract/interested-party/business link] | [treat/accept/avoid/transfer/not applicable] | [scope] | [policy/procedure] | [sample/log/ticket/audit record] | [owner] | [date and period] | [Current/Stale/Unknown] | [Pass/Fail/Unknown] |
 
 ## Risk Assessment Findings
 [Summary of risk methodology review, gaps in risk register, treatment plan status]
@@ -512,6 +538,8 @@ Each control in ISO 27002:2022 is tagged with five attributes:
 4. **Neglecting the 11 new controls introduced in the 2022 revision.** Organizations transitioning from 2013 often miss that controls like A.5.7 (Threat intelligence), A.5.23 (Cloud services security), A.8.9 (Configuration management), A.8.11 (Data masking), A.8.12 (Data leakage prevention), and A.8.16 (Monitoring activities) require explicit consideration in the SoA even if determined not applicable.
 
 5. **Scope exclusions without adequate justification.** Excluding organizational units, locations, or controls from ISMS scope requires documented justification demonstrating the exclusion does not affect the organization's ability or responsibility to provide information security. Auditors will challenge poorly justified exclusions.
+
+6. **Publishing a SoA without risk and evidence links.** A SoA row that says "implemented" or "not applicable" without a risk/requirement link, treatment decision, evidence owner, evidence date, and currentness status is not audit-ready. Treat missing linkage as `Unknown` or a finding rather than implied conformity.
 
 ---
 
