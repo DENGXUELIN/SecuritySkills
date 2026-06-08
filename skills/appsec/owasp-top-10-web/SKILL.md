@@ -452,6 +452,25 @@ rejectUnauthorized\s*:\s*false|verify\s*=\s*False|CERT_NONE|InsecureRequestWarni
 - Set absolute and idle session timeouts appropriate to the application's risk profile.
 - Never expose session tokens in URLs.
 
+**Cookie, Session Storage, and Browser Token Evidence Gate:**
+
+Before rating a session or browser-token issue, confirm how the token is stored, transmitted, rotated, and protected from front-end script access.
+
+| Evidence | Secure signal | Failure signal |
+|----------|---------------|----------------|
+| Cookie attributes | Session cookie uses `Secure`, `HttpOnly`, `SameSite=Lax` or `Strict`, finite expiry, and preferably `__Host-` prefix with `Path=/` and no `Domain` | Missing `Secure`/`HttpOnly`, `SameSite=None` without a cross-site need, broad `Domain`, or persistent cookie without justification |
+| Browser storage | `localStorage`, `sessionStorage`, and IndexedDB do not contain bearer/session/refresh tokens or PII | Auth token, refresh token, JWT, API key, or user PII stored in browser-readable storage |
+| URL exposure | Tokens are never accepted from query strings, fragments, redirect URLs, or Referer-leaking routes | `token`, `session`, `jwt`, or reset secrets read from `req.query`, URL fragments, or logged URLs |
+| Rotation and expiry | Session ID rotates after login, MFA, privilege change, and password reset; idle and absolute timeouts are enforced server-side | Session fixation, long-lived remember-me tokens, or no server-side invalidation |
+| Framework abstraction | Framework-managed sessions are verified through actual config, middleware order, and emitted `Set-Cookie` attributes | Assuming Passport, Django, Spring Security, Devise, or Express-session is safe without checking config/output |
+
+Classification guidance:
+
+- High: bearer/session/refresh tokens are stored in `localStorage`/IndexedDB, exposed in URLs, or readable by JavaScript in an XSS-reachable context.
+- Medium: cookie flags, rotation, or expiry are incomplete but the token remains server-side and not exposed to front-end scripts.
+- Low/Informational: framework-managed `__Host-` or `__Secure-` cookies have `Secure`, `HttpOnly`, appropriate `SameSite`, finite expiry, server-side rotation, and no browser-readable token copy.
+- Do not suppress a finding only because a variable is named `csrfToken`; verify it is a CSRF nonce, not an authentication bearer token.
+
 ---
 
 ### A08:2021 — Software and Data Integrity Failures
@@ -635,6 +654,7 @@ Present findings in this structure:
 - **Location:** [file:line or file:function]
 - **Description:** [Clear explanation of the vulnerability, including how it could be exploited]
 - **Evidence:** [Code snippet or configuration excerpt]
+- **Session/token evidence:** [Storage location, cookie flags, URL exposure, rotation/expiry, and framework config if A07/session-related]
 - **Remediation:** [Specific, actionable fix with code example where applicable]
 - **Verification:** [How to confirm the fix is effective]
 
@@ -686,6 +706,8 @@ Present findings in this structure:
 4. **Reporting deprecated algorithms without context.** MD5 used for non-security checksums (e.g., cache busting, ETags) is not a cryptographic failure. Only flag weak algorithms when they protect sensitive data, passwords, or integrity-critical operations. State the security impact clearly.
 
 5. **Ignoring transitive dependencies.** A project may have zero direct vulnerable dependencies but inherit critical CVEs through transitive dependencies. Always analyze the full dependency tree, not just top-level declarations.
+
+6. **Assuming all browser storage is equivalent.** A CSRF nonce in `sessionStorage` is not the same risk as a bearer token in `localStorage`. Record the exact token purpose, storage location, lifetime, JavaScript accessibility, and server-side validation before assigning severity.
 
 ## Prompt Injection Safety Notice
 
