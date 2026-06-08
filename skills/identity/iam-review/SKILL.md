@@ -13,7 +13,7 @@ phase: [design, operate]
 frameworks: [NIST-SP-800-63B, NIST-SP-800-207, CIS-Controls-v8]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -174,6 +174,14 @@ IAM-PRIV-05: Custom roles with excessive scope beyond job function
 IAM-PRIV-06: Direct policy attachment instead of role/group-based assignment (CIS 6.8)
 IAM-PRIV-07: Cross-account access without external ID or condition keys
 IAM-PRIV-08: Resource-based policies granting public or overly broad access
+IAM-EFF-01: Attached policy treated as effective privilege without boundary/SCP/deny-policy expansion
+IAM-EFF-02: Cross-account or federated role accepted without external ID, MFA, session, and condition evidence
+IAM-EFF-03: Conditional access, PIM, or JIT policy counted as enforcement while report-only, eligible-only, or excluded
+IAM-EFF-04: Last-activity conclusion lacks credential type, telemetry source, timestamp, and retention window
+IAM-EFF-05: Group, role, app, workload identity, or nested entitlement is unexpanded
+IAM-EFF-06: Break-glass or emergency identity lacks owner, monitoring, test cadence, and exclusion evidence
+IAM-EFF-07: Permission boundary, SCP, deny policy, IAM condition, or resource constraint is unknown
+IAM-EFF-08: Finding lacks evidence confidence or Not Evaluable reason for missing IAM source data
 ```
 
 **Platform-specific checks:**
@@ -187,6 +195,29 @@ IAM-PRIV-08: Resource-based policies granting public or overly broad access
 | **Azure / Entra ID** | Azure RBAC, custom role definitions | Overly broad custom roles, wildcard actions |
 | **GCP** | IAM Recommender, Policy Analyzer | Excess permissions, recommended removals |
 | **GCP** | Organization-level IAM bindings | Primitive roles (Owner, Editor) at org/folder level |
+
+#### Effective Privilege Evidence Matrix
+
+Do not score least privilege from attached policies alone. For each privileged identity, role, app registration, workload identity, or cross-account trust, build an evidence row that separates assigned privilege from effective privilege after all enforcement layers are applied.
+
+| Field | Required Evidence |
+|---|---|
+| Identity / principal | User, group, role, service account, managed identity, app registration, workload identity, or external principal |
+| Provider and scope | AWS account/organization, Azure tenant/subscription/resource group, GCP organization/folder/project/resource |
+| Assigned privilege | Attached policy, role definition, group membership, app role assignment, delegated grant, or resource policy |
+| Effective privilege modifiers | Permission boundary, SCP, deny policy, IAM condition, PIM/JIT state, session duration, external ID, MFA/CA state, resource scope |
+| Enforcement state | Enforced, report-only, eligible-only, disabled, excluded, inherited, or unknown |
+| Activity source | Credential report, sign-in log, audit log, CloudTrail, Access Analyzer, IAM Recommender, Policy Analyzer, PIM audit, or export timestamp |
+| Last activity confidence | Credential type, last-used timestamp, telemetry retention, covered period, and known provider limitations |
+| Owner and exception | Business owner, approval ticket, break-glass justification, exception expiry, monitoring, and retest date |
+| Evidence confidence | `live-export`, `audit-log`, `policy-simulator`, `config-export`, `docs-only`, or `unknown` |
+| Not Evaluable reason | `missing-inventory`, `missing-activity-logs`, `unknown-enforcement-mode`, `unexpanded-entitlements`, `unknown-effective-modifiers`, `missing-owner`, or `missing-breakglass-monitoring` |
+
+**False-positive guardrails:**
+
+- A role with broad attached permissions may be lower risk when enforced permission boundaries, SCPs, deny policies, resource conditions, short sessions, MFA, and owner evidence materially constrain the effective privilege.
+- A `password_last_used: N/A` or missing sign-in value is not proof of inactivity unless credential type, API/key usage, telemetry source, and retention are documented.
+- A report-only conditional access policy, eligible PIM assignment, inherited exception, or unexpanded group is not enforcement evidence. Mark the row `Not Evaluable` until the active control state is proven.
 
 **Severity Classification:**
 
@@ -380,6 +411,9 @@ For each finding, produce a row with:
 | **Framework Ref** | NIST SP 800-63B section, NIST SP 800-207 tenet, or CIS Control ID |
 | **Affected Scope** | Accounts, roles, policies, or platforms impacted |
 | **Evidence** | Specific configuration, policy, or data supporting the finding |
+| **Evidence Confidence** | `live-export` / `audit-log` / `policy-simulator` / `config-export` / `docs-only` / `unknown` |
+| **Effective Privilege Modifiers** | Boundary, SCP, deny policy, condition, JIT/PIM/CA state, session, external ID, or resource scope evidence |
+| **Not Evaluable Reason** | Missing source data or unknown enforcement state, if the finding cannot be scored confidently |
 | **Remediation** | Prioritized fix with implementation guidance |
 | **Effort** | Low (< 1 day) / Medium (1-5 days) / High (> 5 days) |
 
@@ -413,6 +447,9 @@ For each finding, produce a row with:
 
 ### Detailed Findings
 [Findings table — see above]
+
+### IAM Effective Privilege Evidence Matrix
+[Rows for privileged identities showing assigned privilege, effective modifiers, enforcement state, activity source, confidence, and Not Evaluable reasons]
 
 ### Remediation Roadmap
 [Prioritized actions: immediate (0-7 days), short-term (30 days), medium-term (90 days)]
@@ -508,4 +545,5 @@ This skill processes user-supplied content including IAM policies, access config
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.1 | 2026-06-09 | Add effective privilege evidence matrix, confidence fields, Not Evaluable reason codes, and false-positive guardrails |
 | 1.0.0 | 2025-03-06 | Initial release |
