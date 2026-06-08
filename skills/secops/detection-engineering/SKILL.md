@@ -345,6 +345,43 @@ detections/
 5. **Deploy:** Push converted rules to SIEM via API (Sentinel Analytics Rules API, Splunk REST API)
 6. **Monitor:** Track rule performance metrics (fire rate, TP rate, MTTD)
 
+### Step 6.1: Backend Conversion Semantics Evidence
+
+**Objective:** Prove the converted target-SIEM query preserves the Sigma rule's
+meaning before declaring the detection deployable. Passing Sigma YAML validation
+is not enough if conversion changes field mappings, operators, case handling,
+grouping, negation, correlation, or backend limits.
+
+Collect these evidence gates for every target backend:
+
+```
+DE-CONV-01: Target backend, converter package/version, backend config, and exact command are missing
+DE-CONV-02: Generated query and converter warning/error output are not preserved
+DE-CONV-03: Field mapping evidence is missing, partial, or points to the wrong table/index/data model
+DE-CONV-04: Unsupported modifiers/operators are ignored or treated as generic warnings
+DE-CONV-05: Logic parity is not checked for selections, filters, negation, grouping, list handling, or correlation windows
+DE-CONV-06: Manual edits or post-processing are not recorded before deployment
+DE-CONV-07: Known-positive and known-negative sample execution evidence is incomplete
+DE-CONV-08: Query runtime, scanned volume, timeout/row-limit risk, and backend constraints are not captured
+```
+
+**Conversion evidence record:**
+
+| Field | Required Evidence |
+|---|---|
+| Rule and backend | Sigma rule ID, target backend, SIEM product/table/index, converter version |
+| Command | Exact conversion command, backend config, generated query, warnings/errors |
+| Mapping | Sigma field, backend field, data model/table/index, mapping status, limitations |
+| Operators | Modifiers/operators used, supported/rewritten/dropped status, semantic risk |
+| Logic parity | Selection/filter/negation/grouping/correlation parity check and result |
+| Manual edits | Post-processing diff, owner, reason, and drift-control method |
+| Sample execution | Known-positive result, known-negative result, fixture IDs or raw-event references |
+| Performance | Runtime, scanned volume, timeout/row-limit constraints, deployment decision |
+
+Do not move a converted rule to `stable`, `Operational`, or production deployment
+unless conversion evidence is complete or the residual semantic risk is accepted
+with a documented owner and compensating test plan.
+
 ---
 
 ## 4. Findings Classification
@@ -392,6 +429,7 @@ Produce detection engineering deliverables in this structure:
 ### Deployment Notes
 - **Target SIEM:** [Platform]
 - **Converted Query:** [KQL/SPL/EQL equivalent if requested]
+- **Conversion Evidence:** [converter version, command, mapping, warnings, manual edits, TP/TN execution, performance]
 - **Estimated False Positive Rate:** [Low / Medium / High]
 - **Tuning Recommendations:** [Specific filter additions]
 ```
@@ -493,6 +531,15 @@ Detection rules are not write-once artifacts. Log sources change, environments e
 ### Pitfall 5: Mapping Detections to ATT&CK Techniques Incorrectly
 
 Overly broad or incorrect ATT&CK mappings undermine coverage analysis. A rule that detects a specific PowerShell obfuscation technique should map to T1059.001 (PowerShell) and potentially T1027 (Obfuscated Files or Information), not to the parent T1059 alone. Use sub-technique IDs when the detection is specific to a sub-technique. Validate mappings against the ATT&CK technique definition and procedure examples.
+
+### Pitfall 6: Trusting Converted Queries Without Semantic Evidence
+
+Sigma conversion can produce syntactically valid KQL, SPL, EQL, or QRadar queries
+that no longer preserve the original detection. Field mappings can point at empty
+tables, modifiers such as `contains|all` or `re` can be rewritten, case
+sensitivity can change, and backend limits can truncate results. Capture
+conversion command, generated query, mapping, warnings, manual edits, TP/TN
+sample execution, and performance evidence before deployment.
 
 ---
 
