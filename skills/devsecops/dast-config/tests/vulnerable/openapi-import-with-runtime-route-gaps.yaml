@@ -1,0 +1,57 @@
+case: openapi-import-with-runtime-route-gaps
+skill: dast-config
+expected_result: finding
+target:
+  environment: staging
+  build_id: webapi-2026-06-08.43
+openapi:
+  source: checked-in-spec
+  commit: 3a91d0e
+  generated_at: "2026-05-01T12:00:00Z"
+zap_import:
+  imported_operations: 42
+  failed_operations: 5
+  warnings:
+    - unsupported auth scheme for /api/billing/*
+scan_summary:
+  high_findings: 0
+  status: pass
+runtime_inventory:
+  source: framework-route-dump
+  build_id: webapi-2026-06-08.43
+  total_routes: 64
+  routes_missing_from_openapi:
+    - POST /api/admin/reindex
+    - DELETE /api/users/{id}
+route_coverage:
+  - method: POST
+    path: /api/admin/reindex
+    in_openapi: false
+    imported: false
+    request_evidence: none
+    auth_context: admin
+    gap_reason: runtime-only route missing from OpenAPI
+  - method: DELETE
+    path: /api/users/{id}
+    in_openapi: false
+    imported: false
+    request_evidence: none
+    auth_context: admin
+    gap_reason: destructive runtime route missing from OpenAPI
+  - method: POST
+    path: /api/orders/{id}/refund
+    in_openapi: true
+    imported: true
+    request_evidence: none
+    auth_context: user
+    gap_reason: scanner session lacks finance role
+controls:
+  route_owner_assigned: false
+  waf_blocks_recorded_as_gaps: false
+  coverage_claim: openapi-import-success-equals-pass
+finding_expectation:
+  - DAST-ROUTE-01
+  - DAST-ROUTE-03
+  - DAST-ROUTE-04
+  - DAST-ROUTE-05
+  - DAST-ROUTE-08

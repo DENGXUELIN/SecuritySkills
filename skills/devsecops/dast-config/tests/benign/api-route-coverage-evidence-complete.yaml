@@ -1,0 +1,49 @@
+case: api-route-coverage-evidence-complete
+skill: dast-config
+expected_result: covered
+target:
+  environment: staging
+  build_id: webapi-2026-06-08.42
+openapi:
+  source: generated-from-deployed-build
+  commit: 8f4b2c7
+  generated_at: "2026-06-08T09:10:00Z"
+zap_import:
+  imported_operations: 64
+  failed_operations: 0
+  warnings: []
+runtime_inventory:
+  source: api-gateway-export
+  build_id: webapi-2026-06-08.42
+  total_routes: 64
+route_coverage:
+  - method: GET
+    path: /api/orders/{id}
+    in_openapi: true
+    imported: true
+    request_evidence: har-and-access-log
+    auth_context: user
+    status: covered
+  - method: POST
+    path: /api/orders/{id}/refund
+    in_openapi: true
+    imported: true
+    request_evidence: har-and-access-log
+    auth_context: finance
+    status: covered
+  - method: POST
+    path: /api/admin/reindex
+    in_openapi: true
+    imported: true
+    request_evidence: passive-manual-test-log
+    auth_context: admin
+    status: covered-with-approved-passive-test
+controls:
+  destructive_routes:
+    dry_run_or_manual_evidence: true
+    owner_approval: platform-security
+  waf_blocks_recorded_as_gaps: true
+  coverage_threshold_met: true
+finding_expectation:
+  - no_dast_route_coverage_gap
+  - no_false_positive_for_approved_passive_destructive_route
