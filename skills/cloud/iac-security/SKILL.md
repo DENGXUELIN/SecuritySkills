@@ -96,6 +96,34 @@ Evaluate all IaC configurations across eight security domains: Hardcoded Secrets
 
 For detailed tool-specific rule sets, detection patterns, vulnerable code examples, and remediation guidance for Checkov, tfsec, and KICS equivalents across all eight domains, see [tool-rules.md](tool-rules.md) in this skill directory.
 
+#### Terraform/OpenTofu State Backend and Drift Evidence Gate
+
+Treat Terraform/OpenTofu state as a control-plane and secret-bearing asset. Do not mark IaC secure only because resource definitions pass static checks; verify backend security, state access, secret minimization, and drift evidence.
+
+| Check ID | Evidence to collect | Failure condition |
+|----------|---------------------|-------------------|
+| `IAC-STATE-01` | Backend type and location for every workspace or stack, including local, S3, GCS, AzureRM, Terraform Cloud, or OpenTofu equivalent | Local or undocumented backend stores production state outside governed storage |
+| `IAC-STATE-02` | Backend encryption, KMS/CMK ownership, public access block, bucket/container ACLs, and network restrictions | Remote state can be read publicly, cross-account broadly, or without encryption evidence |
+| `IAC-STATE-03` | State locking, versioning, retention, object lock/immutability, and recovery procedure | State can be overwritten concurrently or rolled back without version/recovery evidence |
+| `IAC-STATE-04` | IAM/RBAC split for state read, plan, apply, import, force-unlock, and backend administration | Same broad principal can read secrets from state and apply production changes without approval |
+| `IAC-STATE-05` | Sensitive attribute inventory for resources that persist values in state, including database passwords, generated secrets, private keys, kubeconfigs, and connection strings | Review assumes `sensitive = true` keeps values out of state or ignores provider attributes persisted in plaintext state |
+| `IAC-STATE-06` | Drift detection cadence, last drift run, plan output, reviewed deltas, and owner sign-off | IaC passes static scan but live infrastructure differs from reviewed code |
+| `IAC-STATE-07` | Backend audit logs for reads, writes, deletes, lock operations, and failed access attempts | State access cannot be attributed or monitored |
+| `IAC-STATE-08` | State migration, workspace separation, and break-glass/restore evidence for incidents | Shared state, manual state edits, or recovery paths are undocumented and untested |
+
+**State backend output fields:**
+
+| Field | Value |
+|-------|-------|
+| Backend type and scope | [local / S3 / GCS / AzureRM / Terraform Cloud / mixed; workspaces covered] |
+| Encryption and access status | [KMS/CMK, public block, IAM/RBAC, network restriction] |
+| Locking and recovery status | [lock table, versioning, retention, restore test] |
+| State reader vs apply permissions | [separated / partially separated / same broad principal] |
+| Sensitive values in state | [none found / known provider attributes / unknown; evidence reference] |
+| Drift detection status | [cadence, last run, owner, unresolved drift] |
+| State audit coverage | [read/write/delete/lock logs and retention] |
+| State governance confidence | [High / Medium / Low plus missing evidence] |
+
 ---
 
 
@@ -170,6 +198,18 @@ Produce the final report using the structure defined in the Output Format sectio
 - State locking: <enabled / disabled>
 - Lock file committed: <yes / no>
 
+### State Backend and Drift Evidence
+| Field | Value |
+|-------|-------|
+| Backend Type and Scope | <local / S3 / GCS / AzureRM / Terraform Cloud / mixed; workspaces covered> |
+| Encryption and Access Status | <KMS/CMK, public block, IAM/RBAC, network restriction> |
+| Locking and Recovery Status | <lock table, versioning, retention, restore test> |
+| State Reader vs Apply Permissions | <separated / partially separated / same broad principal> |
+| Sensitive Values in State | <none found / known provider attributes / unknown; evidence reference> |
+| Drift Detection Status | <cadence, last run, owner, unresolved drift> |
+| State Audit Coverage | <read/write/delete/lock logs and retention> |
+| State Governance Confidence | <High / Medium / Low plus missing evidence> |
+
 ### Prioritized Remediation Plan
 
 1. **[Critical]** <finding> -- <action>
@@ -230,6 +270,7 @@ This skill applies checks equivalent to the following high-impact rules:
 5. **Confusing `aws_s3_bucket_acl` with `aws_s3_bucket_public_access_block`.** The public access block overrides ACLs. Check both, but the access block is the stronger control.
 6. **Terraform state file secrets.** Even when variables are marked `sensitive`, they may appear in plaintext in the state file. Verify state encryption and access controls.
 7. **Provider-specific encryption defaults.** Some providers encrypt by default (e.g., AWS S3 since January 2023). Know the defaults before flagging missing explicit encryption configuration.
+8. **Treating clean code as proof of clean infrastructure.** Remote state can contain older secrets, manual imports, drifted live resources, and broad state-reader permissions even when the latest `.tf` files scan clean. Require backend, state access, secret-in-state, drift, and audit evidence before closing IaC risk.
 
 ---
 
