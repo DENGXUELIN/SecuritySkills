@@ -1,0 +1,100 @@
+case: dns-security-validated-delegation
+skill: dns-security
+expected_risk: Low
+description: >
+  A signed public zone includes current parent and child delegation evidence,
+  valid in-bailiwick glue, authoritative SOA responses from every nameserver,
+  IPv4 and IPv6 parity, controlled delegated hostnames, and restricted transfers.
+zone:
+  name: corp.example
+  signed: true
+  dnssec_status: valid
+evidence:
+  parent_ns:
+    source: registrar-export
+    exported_at: 2026-06-08T09:15:00Z
+    records:
+      - ns1.corp.example
+      - ns2.corp.example
+      - ns3.dns-provider.example.net
+  child_apex_ns:
+    source: zonefile-export
+    exported_at: 2026-06-08T09:16:00Z
+    records:
+      - ns1.corp.example
+      - ns2.corp.example
+      - ns3.dns-provider.example.net
+  glue:
+    ns1.corp.example:
+      parent_a: 192.0.2.10
+      authoritative_a: 192.0.2.10
+      parent_aaaa: 2001:db8:10::10
+      authoritative_aaaa: 2001:db8:10::10
+      controlled: true
+    ns2.corp.example:
+      parent_a: 192.0.2.20
+      authoritative_a: 192.0.2.20
+      parent_aaaa: 2001:db8:10::20
+      authoritative_aaaa: 2001:db8:10::20
+      controlled: true
+    ns3.dns-provider.example.net:
+      out_of_bailiwick: true
+      contract: dns-provider-managed-zone-8842
+      active_tenant_binding: true
+  authoritative_checks:
+    ns1.corp.example:
+      authoritative: true
+      soa_serial: 2026060803
+      ipv4_authoritative: true
+      ipv6_authoritative: true
+    ns2.corp.example:
+      authoritative: true
+      soa_serial: 2026060803
+      ipv4_authoritative: true
+      ipv6_authoritative: true
+    ns3.dns-provider.example.net:
+      authoritative: true
+      soa_serial: 2026060803
+      ipv4_authoritative: true
+      ipv6_authoritative: true
+  zone_transfer:
+    untrusted_axfr:
+      source: external-audit-vantage
+      result: refused
+    approved_peer_ixfr:
+      source: secondary-replica
+      result: succeeded_with_tsig
+      acl: dns-transfer-approved-secondaries
+  exception:
+    migration_window: none
+    owner: dns-platform
+    monitoring: delegation-drift-alert
+expected_findings:
+  - id: DNS-DELEG-01
+    status: pass
+    reason: parent and child NS sets match
+  - id: DNS-DELEG-02
+    status: pass
+    reason: in-bailiwick glue matches authoritative A and AAAA records
+  - id: DNS-DELEG-03
+    status: pass
+    reason: every delegated nameserver returns authoritative SOA
+  - id: DNS-DELEG-04
+    status: pass
+    reason: SOA serials are consistent across all authoritative servers
+  - id: DNS-DELEG-05
+    status: pass
+    reason: third-party delegated hostname has an active tenant binding
+  - id: DNS-DELEG-06
+    status: pass
+    reason: IPv4 and IPv6 authoritative paths both succeed
+  - id: DNS-DELEG-07
+    status: pass
+    reason: public AXFR is refused and approved IXFR uses TSIG
+  - id: DNS-DELEG-08
+    status: pass
+    reason: owner and drift monitoring are documented
+expected_output:
+  authoritative_delegation_integrity: Pass
+  severity: Low
+  dnssec_alone_is_sufficient: false

@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [NIST-SP-800-81-Rev2, CIS-Controls-v8]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -23,7 +23,7 @@ argument-hint: "[target-file-or-directory]"
 
 # DNS Security Review
 
-A structured, repeatable process for evaluating DNS security posture against NIST SP 800-81 Rev 2 (Secure Domain Name System Deployment Guide) and CIS Controls v8 Control 9.2 (Use DNS Filtering Services). This skill covers DNSSEC deployment, encrypted DNS transport, Response Policy Zones, DNS exfiltration detection, and protective DNS services. All findings are mapped to framework controls with severity ratings and actionable remediation.
+A structured, repeatable process for evaluating DNS security posture against NIST SP 800-81 Rev 2 (Secure Domain Name System Deployment Guide) and CIS Controls v8 Control 9.2 (Use DNS Filtering Services). This skill covers DNSSEC deployment, authoritative delegation integrity, encrypted DNS transport, Response Policy Zones, DNS exfiltration detection, and protective DNS services. All findings are mapped to framework controls with severity ratings and actionable remediation.
 
 ---
 
@@ -33,6 +33,7 @@ If a target is provided via arguments, focus the review on: $ARGUMENTS
 
 - DNS infrastructure security review as part of network security assessment.
 - DNSSEC deployment readiness evaluation or post-deployment validation.
+- Authoritative delegation review for glue, lame nameservers, SOA drift, and zone transfer exposure.
 - Investigation of suspected DNS-based data exfiltration or command-and-control.
 - Compliance audits requiring NIST SP 800-81 alignment.
 - Protective DNS service evaluation or deployment planning.
@@ -156,11 +157,45 @@ dnssec
 
 ---
 
-### Step 3: Encrypted DNS Transport Review
+### Step 3: Authoritative Delegation Integrity Review
+
+DNSSEC can validate signed data while the zone is still unavailable or unsafe because the parent delegation is wrong. For every externally delegated zone, review approved evidence such as registrar/TLD exports, zone files, cloud DNS exports, resolver logs, or saved `dig` transcripts before treating the DNS posture as healthy.
+
+#### 3.1 Delegation Evidence to Collect
+
+For each zone, collect:
+
+- Parent/TLD NS records and child apex NS records.
+- Glue A and AAAA records for every in-bailiwick delegated nameserver.
+- Direct authoritative SOA responses from every delegated nameserver.
+- Current A and AAAA answers for out-of-bailiwick delegated nameserver hostnames.
+- SOA serials and refresh windows across all authoritative servers.
+- AXFR/IXFR test evidence from an untrusted source and an approved transfer peer.
+- Ownership or contract evidence for third-party/cloud delegated nameserver hostnames.
+- Migration window, rollback, and owner approval if parent and child NS sets intentionally differ.
+
+#### 3.2 Delegation Integrity Gates
+
+| Gate | Requirement | Fail / Escalate When |
+|------|-------------|----------------------|
+| DNS-DELEG-01 | Parent/TLD NS set matches the child apex NS set, or a dated migration exception explains the difference. | Parent and child NS sets differ outside a documented migration window. |
+| DNS-DELEG-02 | In-bailiwick glue A and AAAA records match the authoritative address records and point to controlled infrastructure. | Glue is stale, missing, or points to an uncontrolled IP address. |
+| DNS-DELEG-03 | Every delegated nameserver returns authoritative answers and an SOA for the reviewed zone. | A delegated server is lame, recursive-only, unreachable, or not authoritative for the zone. |
+| DNS-DELEG-04 | SOA serials are consistent across authoritative servers within the documented replication window. | Serial drift exceeds the expected window or secondaries are not receiving updates. |
+| DNS-DELEG-05 | Delegated nameserver hostnames are owned, contracted, or otherwise controlled by the organization. | A delegated NS hostname is dangling, expired, reusable by another tenant, or outside any active contract. |
+| DNS-DELEG-06 | IPv4 and IPv6 delegation paths are both tested when A and AAAA/glue records exist. | IPv6 glue or authoritative service fails while IPv4 succeeds, or IPv6 coverage is omitted. |
+| DNS-DELEG-07 | AXFR/IXFR is denied to untrusted sources and limited to approved transfer peers with TSIG or network ACLs. | Public zone transfer succeeds or transfer restrictions are undocumented. |
+| DNS-DELEG-08 | Exceptions include owner, expiry, rollback, monitoring, and retest triggers. | A mismatch, lame server, stale glue, or transfer exception is accepted without governance evidence. |
+
+**Finding classification:** Multiple lame delegated nameservers, stale glue to uncontrolled IPs, dangling delegated nameserver hostnames, and public AXFR exposure are **High**. Parent/child NS mismatch outside a migration window, one lame nameserver with sufficient healthy redundancy, SOA serial drift beyond the expected replication window, or IPv6-only delegation failure is **Medium** unless it creates a broader outage or takeover path.
+
+---
+
+### Step 4: Encrypted DNS Transport Review
 
 Evaluate whether DNS queries are protected in transit.
 
-#### 3.1 DNS over HTTPS (DoH) and DNS over TLS (DoT)
+#### 4.1 DNS over HTTPS (DoH) and DNS over TLS (DoT)
 
 | Transport | Port | Standard | Use Case |
 |-----------|------|----------|----------|
@@ -194,11 +229,11 @@ forwarders { 1.1.1.1; };  # Plaintext -- flag as finding
 
 ---
 
-### Step 4: Response Policy Zones (RPZ) and Protective DNS (CIS Control 9.2)
+### Step 5: Response Policy Zones (RPZ) and Protective DNS (CIS Control 9.2)
 
 CIS Control 9.2 requires the use of DNS filtering services to block access to known malicious domains. RPZ (Response Policy Zones, defined by ISC) is the standard mechanism for DNS-based filtering on recursive resolvers.
 
-#### 4.1 RPZ Configuration
+#### 5.1 RPZ Configuration
 
 **Verify RPZ is deployed and configured:**
 
@@ -223,7 +258,7 @@ rpz:
 - Update frequency is at least daily.
 - Logging of RPZ-blocked queries is enabled for incident detection.
 
-#### 4.2 Protective DNS Service Evaluation
+#### 5.2 Protective DNS Service Evaluation
 
 If a cloud-based protective DNS service is used (Cisco Umbrella, Cloudflare Gateway, Quad9, CISA Protective DNS), verify:
 
@@ -237,11 +272,11 @@ If a cloud-based protective DNS service is used (Cisco Umbrella, Cloudflare Gate
 
 ---
 
-### Step 5: DNS Exfiltration and Tunneling Detection Patterns
+### Step 6: DNS Exfiltration and Tunneling Detection Patterns
 
 DNS tunneling encodes data in DNS query names or TXT record responses to create a covert communication channel. Detection requires pattern analysis, not just domain reputation.
 
-#### 5.1 Exfiltration Indicators
+#### 6.1 Exfiltration Indicators
 
 | Indicator | Normal | Suspicious | Detection Method |
 |-----------|--------|-----------|-----------------|
@@ -252,7 +287,7 @@ DNS tunneling encodes data in DNS query names or TXT record responses to create 
 | **Query volume per domain** | < 100/hr to a single domain | > 1000/hr to single obscure domain | Volumetric per-domain threshold |
 | **Response size** | < 512 bytes | TXT responses > 512 bytes, multiple TXT records | Monitor response payload sizes |
 
-#### 5.2 Tunneling Tool Signatures
+#### 6.2 Tunneling Tool Signatures
 
 Common DNS tunneling tools produce distinctive query patterns:
 
@@ -270,7 +305,7 @@ abcdef0123456789.dnscat.example.com TXT
 0001.<encoded>.d.example.com KEY
 ```
 
-#### 5.3 Detection Configuration
+#### 6.3 Detection Configuration
 
 **Where to implement detection:**
 
@@ -286,7 +321,7 @@ abcdef0123456789.dnscat.example.com TXT
 
 ---
 
-### Step 6: Domain Categorization and Newly Registered Domain (NRD) Blocking
+### Step 7: Domain Categorization and Newly Registered Domain (NRD) Blocking
 
 - **NRD blocking:** Domains registered within the past 30 days are disproportionately associated with phishing and malware. CIS Control 9.2 supports blocking or flagging NRDs.
 - **DGA detection:** Domain Generation Algorithms produce random-appearing domain names. Detection relies on entropy analysis and machine learning classifiers integrated into protective DNS services.
@@ -299,8 +334,8 @@ abcdef0123456789.dnscat.example.com TXT
 | Severity | Definition |
 |----------|-----------|
 | **Critical** | Broken DNSSEC chain of trust (missing DS record in parent); authoritative zones serving invalid signatures. |
-| **High** | DNSSEC validation disabled on resolvers; no DNS filtering/RPZ; unsigned public authoritative zones; DNS bypass paths around protective DNS; no DNS query logging; weak signing algorithms. |
-| **Medium** | Plaintext DNS forwarding over untrusted networks; stale RPZ feeds; undocumented NTAs; no NRD blocking; no exfiltration detection; DoH bypass not controlled. |
+| **High** | DNSSEC validation disabled on resolvers; no DNS filtering/RPZ; unsigned public authoritative zones; DNS bypass paths around protective DNS; no DNS query logging; weak signing algorithms; multiple lame delegated nameservers; stale glue to uncontrolled IPs; dangling delegated nameserver; public AXFR exposure. |
+| **Medium** | Plaintext DNS forwarding over untrusted networks; stale RPZ feeds; undocumented NTAs; no NRD blocking; no exfiltration detection; DoH bypass not controlled; parent/child NS mismatch outside a migration window; single lame delegated nameserver; SOA serial drift beyond the expected replication window; incomplete IPv6 delegation parity. |
 | **Low** | Missing documentation of DNS architecture; resolver software not at latest version; cosmetic configuration issues. |
 
 ---
@@ -321,6 +356,12 @@ abcdef0123456789.dnscat.example.com TXT
 | Zone | Signed | Algorithm | Key Sizes | DS in Parent | NSEC Version | Status |
 |------|--------|-----------|-----------|--------------|-------------|--------|
 | example.com | Yes/No | 13/8/15 | KSK:2048/ZSK:1024 | Yes/No | NSEC3 | Pass/Fail |
+
+### Authoritative Delegation Integrity
+
+| Zone | Parent NS Match | Glue Validated | Authoritative SOA From All NS | SOA Serial Status | NS Ownership | IPv4/IPv6 Parity | AXFR/IXFR Restricted | Status |
+|------|-----------------|----------------|-------------------------------|-------------------|--------------|------------------|----------------------|--------|
+| example.com | Pass/Fail | Pass/Fail/NA | Pass/Fail | Consistent/Drift | Verified/Unknown | Pass/Fail/NA | Yes/No | Pass/Fail |
 
 ### Resolver Security
 
@@ -380,9 +421,13 @@ abcdef0123456789.dnscat.example.com TXT
 
 2. **Blocking DoH at the network level without deploying enterprise DoT/DoH.** If you block public DoH endpoints to enforce corporate DNS policy, you must provide a corporate encrypted DNS alternative. Otherwise, you degrade client DNS security without improving organizational visibility.
 
-3. **Relying solely on domain reputation lists for exfiltration detection.** Attackers use attacker-controlled domains that are not yet categorized. Behavioral detection (entropy, volume, query type anomalies) catches novel exfiltration domains that reputation feeds miss.
+3. **Treating DNSSEC validation as proof that delegation is healthy.** A signed zone can still be lame, delegated to stale glue, exposed through public AXFR, or split between parent and child NS sets. Always verify authoritative delegation evidence separately from DNSSEC records.
 
-4. **Ignoring DNS over TCP.** DNS is not UDP-only. DNS over TCP (port 53) supports large responses and is required for zone transfers. Some tunneling tools prefer TCP for reliability. Firewall rules and monitoring must cover both UDP and TCP port 53.
+4. **Checking only IPv4 delegation paths.** IPv4 can look healthy while AAAA glue or IPv6 authoritative service is broken. If IPv6 glue or address records exist, test and report the IPv6 path explicitly.
+
+5. **Relying solely on domain reputation lists for exfiltration detection.** Attackers use attacker-controlled domains that are not yet categorized. Behavioral detection (entropy, volume, query type anomalies) catches novel exfiltration domains that reputation feeds miss.
+
+6. **Ignoring DNS over TCP.** DNS is not UDP-only. DNS over TCP (port 53) supports large responses and is required for zone transfers. Some tunneling tools prefer TCP for reliability. Firewall rules and monitoring must cover both UDP and TCP port 53.
 
 ---
 
@@ -413,4 +458,5 @@ This skill processes DNS configuration files that may contain user-supplied zone
 
 ## Changelog
 
+- **1.0.1** -- Added authoritative delegation integrity review gates for parent/child NS mismatch, glue, lame nameservers, SOA serial drift, delegated NS control, IPv4/IPv6 parity, and AXFR/IXFR restrictions.
 - **1.0.0** -- Initial release. Full coverage of NIST SP 800-81 Rev 2 and CIS Controls v8 Control 9.2 for DNS security review.

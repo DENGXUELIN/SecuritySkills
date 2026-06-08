@@ -1,0 +1,97 @@
+case: dns-security-stale-glue-lame-delegation
+skill: dns-security
+expected_risk: High
+description: >
+  A signed public zone is accepted as healthy even though the parent delegation
+  still points at stale glue, a lame nameserver, an uncontrolled third-party
+  hostname, broken IPv6 service, SOA serial drift, and public AXFR exposure.
+zone:
+  name: corp.example
+  signed: true
+  dnssec_status: valid
+evidence:
+  parent_ns:
+    source: registrar-export
+    records:
+      - ns1.corp.example
+      - ns2.corp.example
+      - ns-old.hosting.example.net
+  child_apex_ns:
+    source: zonefile-export
+    records:
+      - ns1.corp.example
+      - ns2.corp.example
+      - ns3.corp.example
+  glue:
+    ns1.corp.example:
+      parent_a: 192.0.2.10
+      authoritative_a: 192.0.2.10
+      parent_aaaa: 2001:db8:10::10
+      authoritative_aaaa: 2001:db8:10::10
+      controlled: true
+    ns2.corp.example:
+      parent_a: 198.51.100.77
+      authoritative_a: 192.0.2.20
+      parent_aaaa: 2001:db8:77::20
+      authoritative_aaaa: 2001:db8:10::20
+      controlled: false
+  authoritative_checks:
+    ns1.corp.example:
+      authoritative: true
+      soa_serial: 2026060801
+      ipv6_authoritative: false
+    ns2.corp.example:
+      authoritative: false
+      response: recursion_available_no_aa
+      soa_serial: null
+      ipv6_authoritative: false
+    ns-old.hosting.example.net:
+      authoritative: false
+      ownership_evidence: expired_vendor_account
+      takeover_risk: tenant_reusable_hostname
+    ns3.corp.example:
+      authoritative: true
+      soa_serial: 2026052401
+      delegated_in_parent: false
+  zone_transfer:
+    untrusted_axfr:
+      source: external-audit-vantage
+      result: succeeded
+      records_returned: 1284
+    approved_peer_ixfr:
+      source: secondary-replica
+      result: not_documented
+  exception:
+    migration_window: none
+    owner: missing
+    expiry: missing
+    monitoring: missing
+expected_findings:
+  - id: DNS-DELEG-01
+    status: fail
+    reason: parent and child NS sets differ without a migration window
+  - id: DNS-DELEG-02
+    status: fail
+    reason: ns2 parent glue points to an uncontrolled stale address
+  - id: DNS-DELEG-03
+    status: fail
+    reason: ns2 and ns-old do not answer authoritatively for the zone
+  - id: DNS-DELEG-04
+    status: fail
+    reason: ns3 SOA serial is outside the replication window
+  - id: DNS-DELEG-05
+    status: fail
+    reason: ns-old hostname is no longer under active vendor control
+  - id: DNS-DELEG-06
+    status: fail
+    reason: IPv6 authoritative path fails while IPv4 appears partly healthy
+  - id: DNS-DELEG-07
+    status: fail
+    reason: AXFR succeeds from an untrusted source
+  - id: DNS-DELEG-08
+    status: fail
+    reason: delegation exceptions have no owner, expiry, rollback, or monitoring
+expected_output:
+  authoritative_delegation_integrity: Failed
+  severity: High
+  dnssec_alone_is_sufficient: false
