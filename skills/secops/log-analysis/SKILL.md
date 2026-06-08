@@ -317,6 +317,22 @@ Step 5: Build timeline
   -> Identify gaps in visibility (log sources not available)
 ```
 
+### Step 8: Log Redaction and Sensitive-Field Provenance
+
+When analyzing logs that contain credentials, tokens, PII, payment data, internal identifiers, or regulated fields, verify both the redaction result and the provenance of the fields being redacted. A value that appears redacted in one view may still exist in raw storage, enrichment fields, forwarded copies, or downstream exports.
+
+| Evidence Field | What to Verify | Fails When |
+|----------------|----------------|------------|
+| **Sensitive field inventory** | Field names, source parser, data class, owner, and downstream destinations are documented | Analysts rely on ad hoc string matching or do not know which fields may contain sensitive values |
+| **Parser and enrichment provenance** | The pipeline records whether sensitive fields came from raw events, parsed fields, enrichment, lookup tables, or joins | Enriched user, token, or URL fields bypass redaction because they were not in the original raw event |
+| **Redaction stage** | Redaction happens before broad indexing, forwarding, exports, tickets, and AI-assisted summaries | Raw sensitive values are stored or copied before masking |
+| **Raw-to-redacted linkage** | A stable event ID or hash links redacted analyst views to the original event without exposing the value | Investigators cannot prove what was redacted or correlate safely |
+| **Role-based access** | Only approved break-glass roles can view raw sensitive values, with audit logging and expiry | All analysts or automation can query unredacted logs |
+| **Sample verification** | Positive and negative samples show credentials/PII are masked while security-relevant context remains | Masking removes needed context or misses nested/encoded fields |
+| **Export and case-note controls** | SIEM exports, tickets, chat summaries, and reports inherit redaction rules | Sensitive values reappear in downstream artifacts |
+
+**Classification guidance:** Mark as **High** when sensitive values are available in normal analyst views, exported tickets, or AI summaries without role-gated access. Escalate to **Critical** when live credentials, session tokens, payment data, or regulated health/identity data are exposed broadly or retained without rotation/notification handling. Suppress the finding only when raw access is role-gated, redaction occurs before broad storage/export, and sample evidence proves sensitive fields are masked without breaking the investigation.
+
 ---
 
 ## 4. Findings Classification
@@ -379,6 +395,11 @@ Produce log analysis findings in this structure:
 
 ### Visibility Gaps
 [Log sources that were not available but would have provided relevant data]
+
+### Redaction and Sensitive-Field Provenance
+| Field | Source / Parser | Data Class | Redaction Stage | Raw Access Control | Downstream Exports Checked | Status |
+|-------|-----------------|------------|-----------------|--------------------|----------------------------|--------|
+| [field name] | [raw/parser/enrichment] | [credential/PII/payment/etc.] | [pre-index/post-index/missing] | [role-gated/open/N/A] | [yes/no] | [pass/fail/partial] |
 
 ### Recommendations
 - [ ] [Action 1]
@@ -450,6 +471,10 @@ A single Event ID can have very different meanings depending on the context. Eve
 ### Pitfall 5: Not Establishing Baselines Before Looking for Anomalies
 
 Attempting to identify anomalous behavior without knowing what normal behavior looks like leads to both false positives (flagging normal activity as suspicious) and false negatives (missing truly anomalous activity that blends into an unfamiliar baseline). Invest in baseline establishment for high-value log sources before relying on anomaly-based analysis.
+
+### Pitfall 6: Redacting Only Raw Messages
+
+Many pipelines parse, enrich, normalize, and forward log fields before analysts see them. A token or email address can be masked in `_raw` while still present in `url.query`, `Authorization`, `user.email`, enrichment tables, case notes, or exported CSV files. Verify redaction at every storage and forwarding stage, not only in the rendered event text.
 
 ---
 
