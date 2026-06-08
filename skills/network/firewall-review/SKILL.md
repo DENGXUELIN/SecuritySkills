@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [CIS-Controls-v8, NIST-SP-800-41-Rev1]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -254,7 +254,30 @@ Egress filtering prevents compromised internal hosts from establishing unrestric
 
 ---
 
-### Step 3: Compile Assessment Report
+### Step 3: Build Rule Evidence Matrix
+
+Before compiling findings, normalize each reviewed rule into an evidence matrix. Firewall rule severity depends on effective exposure, not just the literal rule text. Object groups, NAT, first-match order, cloud defaults, IPv6 parity, runtime counters, and flow logs can all change the conclusion.
+
+**Rule evidence gates:**
+
+| Gate | Requirement |
+|------|-------------|
+| `FW-EVID-01` | Record rule ID, platform, direction, source zone, destination zone, action, protocol/service, source, destination, owner, change ticket, and intended business flow. |
+| `FW-EVID-02` | Expand source/destination/service objects and groups before rating severity; record stale, broad, mixed-environment, or unexpanded members. |
+| `FW-EVID-03` | Record NAT stage and translated source/destination/service for pre-NAT and post-NAT policy evaluation. |
+| `FW-EVID-04` | Record first-match order, shadowing relationship, default policy, and whether the finding depends on rule order. |
+| `FW-EVID-05` | Record hit count, counter baseline timestamp, last-used timestamp, failover/reload resets, and corroborating flow/SIEM evidence before recommending removal. |
+| `FW-EVID-06` | Record logging state, log destination, log field completeness, and retention for deny rules and sensitive permits. |
+| `FW-EVID-07` | Record IPv4/IPv6 parity, cloud implicit defaults, egress path, management-plane scope, and out-of-scope policy sets. |
+| `FW-EVID-08` | Mark controls as Not Evaluable with a reason code when evidence is missing: `missing-object-expansion`, `missing-nat-stage`, `missing-rule-order`, `missing-counter-baseline`, `missing-flow-logs`, `missing-owner-ticket`, `missing-ipv6-policy`, `missing-egress-path`, or `stale-export`. |
+
+**Evidence confidence levels:** Use `high` for exported policy plus expanded objects plus current counters/flow evidence; `medium` for exported policy with partial runtime evidence; `low` for IaC or documentation only; `unknown` when rule text or runtime context is unavailable.
+
+**Classification guidance:** Any/any inbound remains **Critical**, but a broad-looking private east-west permit with owner, ticket, object expansion, NAT context, logging, and current flow evidence can be scoped lower. Zero-hit rules should not be removed solely from counters when the counter baseline is recent or reset by failover. Unexpanded broad objects, missing NAT stage, or missing IPv6/egress evidence should produce Not Evaluable or reduced-confidence findings instead of speculative conclusions.
+
+---
+
+### Step 4: Compile Assessment Report
 
 Produce the final report using the following structure.
 
@@ -294,6 +317,12 @@ Produce the final report using the following structure.
 #### [F-001] <Finding Title>
 - **Severity:** Critical / High / Medium / Low
 - **Control Reference:** CIS 4.4 / NIST SP 800-41 Section X.X
+- **Evidence Confidence:** high / medium / low / unknown
+- **Not Evaluable Reason:** <reason code if applicable>
+- **Owner / Ticket:** <business owner and change reference>
+- **Object Expansion:** <expanded source/destination/service members or gap>
+- **NAT Stage:** <pre-NAT/post-NAT/none/unknown>
+- **Counter Baseline:** <hit count, last used, reset timestamp, flow-log evidence>
 - **File:** <path to config file>
 - **Rule(s):** <rule number(s) or line(s)>
 - **Description:** <what was found>
@@ -361,6 +390,14 @@ Produce the final report using the following structure.
 
 5. **Conflating network ACLs with security groups in cloud environments.** In AWS, NACLs are stateless and operate at the subnet level; security groups are stateful and operate at the instance level. Both must be audited. A permissive NACL can undermine restrictive security group rules for responses.
 
+6. **Rating object names without expansion.** Friendly names such as `APP_PROD` can hide `0.0.0.0/0`, mixed environments, stale hosts, or nested groups. Expand members before severity assignment.
+
+7. **Ignoring NAT stage.** A rule that appears private pre-NAT can expose a public translated address post-NAT, and a post-NAT rule can miss the original source context.
+
+8. **Removing zero-hit rules after a reset.** Counter baselines can reset during failover, policy install, reboot, or HA sync. Require baseline age and flow evidence before removal.
+
+9. **Omitting management-plane and emergency rules.** Out-of-band management, break-glass, and emergency access policies often live in separate rule sets. Mark them Not Evaluable if they are not supplied.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -386,4 +423,5 @@ This skill processes firewall configurations that may contain user-supplied comm
 
 ## Changelog
 
+- **1.0.1** -- Added normalized rule evidence gates, object expansion/NAT/counter-baseline fields, evidence confidence, and Not Evaluable reason codes.
 - **1.0.0** -- Initial release. Full coverage of CIS Controls v8 (4.4, 4.5) and NIST SP 800-41 Rev 1 firewall audit methodology.

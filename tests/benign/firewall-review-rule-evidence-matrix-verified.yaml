@@ -1,0 +1,67 @@
+id: firewall-review-rule-evidence-matrix-verified
+skill: firewall-review
+expected: benign
+description: >
+  Firewall review uses a normalized rule evidence matrix with expanded objects,
+  NAT context, order, counters, logging, ownership, IPv6 parity, and flow logs.
+scenario:
+  platform: "Firewall manager export with runtime counters and SIEM flows"
+  evidence_inventory:
+    - name: policy_export
+      source_type: firewall-manager-export
+      captured: "2026-06-01T08:00:00Z"
+      coverage: "IPv4 and IPv6 security policy, NAT policy, rule order"
+    - name: object_expansion
+      source_type: firewall-manager-export
+      captured: "2026-06-01T08:05:00Z"
+      coverage: "nested address and service groups expanded"
+    - name: runtime_counters
+      source_type: runtime-counter
+      captured: "2026-06-01T08:10:00Z"
+      coverage: "90-day counter baseline with no failover reset"
+    - name: flow_logs
+      source_type: siem-flow-log
+      captured: "2026-06-01T08:20:00Z"
+      coverage: "source, destination, service, action, rule ID, 90-day lookback"
+  rule_evidence_matrix:
+    - rule_id: "120"
+      action: allow
+      direction: ingress
+      source_zone: untrust
+      destination_zone: dmz
+      source: "approved partner CIDRs"
+      expanded_source:
+        - 203.0.113.0/24
+      destination: "APP_PROD"
+      expanded_destination:
+        - 10.20.4.10
+        - 10.20.4.11
+      service: tcp/443
+      nat_stage: "post-NAT destination 10.20.4.10/31 from public VIP 198.51.100.20"
+      owner_ticket: "payments-platform / CHG-1842"
+      hit_count: 184233
+      counter_baseline: "90 days, no reset"
+      logging: enabled_to_siem
+      evidence_confidence: high
+      result: "scoped Pass with owner and logging"
+    - rule_id: "240"
+      action: allow
+      direction: egress
+      source_zone: app
+      destination_zone: internet
+      source: "legacy batch subnet"
+      destination: any
+      service: tcp/25
+      hit_count: 0
+      counter_baseline: "90 days"
+      flow_logs: "no matching flows"
+      owner_ticket: "mail migration / CHG-1901"
+      result: "candidate removal with rollback and owner approval"
+should_not_trigger:
+  - "object name rated without expansion"
+  - "zero-hit removal after recent counter reset"
+  - "NAT stage missing"
+expected_result: >
+  The skill should accept scoped findings because object expansion, NAT stage,
+  rule order, counters, flow logs, owner/ticket, logging, and IPv6 parity are
+  documented. Unused-rule removal advice is evidence-backed and owner-approved.

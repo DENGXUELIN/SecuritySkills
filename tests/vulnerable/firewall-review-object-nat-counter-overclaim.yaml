@@ -1,0 +1,61 @@
+id: firewall-review-object-nat-counter-overclaim
+skill: firewall-review
+expected: vulnerable
+description: >
+  Firewall review rates rule severity and removal safety without object
+  expansion, NAT stage, counter baseline, IPv6, owner, or flow-log evidence.
+scenario:
+  platform: "Palo Alto export plus partial runtime counters"
+  supplied_evidence:
+    - source_type: exported-policy
+      captured: "2026-06-01"
+      coverage: "IPv4 security policy only"
+    - source_type: runtime-counter
+      captured: "2026-06-01T10:00:00Z"
+      coverage: "counter reset after HA failover two hours earlier"
+  missing_evidence:
+    - expanded_destination_object_members
+    - expanded_service_group_members
+    - post_nat_translation
+    - ipv6_policy_export
+    - owner_and_change_ticket
+    - flow_log_or_siem_corroboration
+    - management_plane_policy_set
+  rules:
+    - id: "120"
+      action: allow
+      direction: ingress
+      source_zone: untrust
+      destination_zone: dmz
+      source: any
+      destination: object-group:APP_PROD
+      service: service-group:WEB_EXT
+      logging: disabled
+      hit_count: 0
+      counter_baseline: "reset two hours ago during HA failover"
+      nat_stage: unknown
+      reported_status: "unused broad permit, safe to remove"
+    - id: "130"
+      action: deny
+      direction: ingress
+      source_zone: untrust
+      destination_zone: dmz
+      source: any
+      destination: host:10.5.10.20
+      service: tcp/22
+      reported_status: "effective deny"
+      problem: "Earlier unexpanded allow may shadow this deny after object/service expansion."
+should_trigger:
+  - FW-EVID-01
+  - FW-EVID-02
+  - FW-EVID-03
+  - FW-EVID-04
+  - FW-EVID-05
+  - FW-EVID-06
+  - FW-EVID-07
+  - FW-EVID-08
+expected_result: >
+  The skill should mark severity and removal advice as low-confidence or Not
+  Evaluable until object/service expansion, NAT stage, rule order, counter
+  baseline age, flow evidence, owner/ticket, IPv6 parity, and missing policy
+  sets are supplied.
