@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [CIS-Azure-v2.1.0]
 difficulty: intermediate
 time_estimate: "60-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -88,6 +88,28 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, Bic
 
 ---
 
+### Step 10.1: App Service Deployment-Plane Basic Authentication Evidence
+
+For App Service, Function Apps, and deployment slots, verify the deployment plane separately from runtime authentication. Passing `auth_settings_v2`, `https_only`, TLS, client certificates, HTTP/2, or `ftps_state = "Disabled"` does not prove that Kudu/SCM, WebDeploy, ZipDeploy, Local Git, or FTP publishing credentials are blocked.
+
+Apply these gates before marking App Service publishing posture as compliant:
+
+- **AZ-APP-PUBLISH-01 -- Resource inventory:** enumerate every `Microsoft.Web/sites` and `Microsoft.Web/sites/slots` resource, including Linux Web Apps, Windows Web Apps, Function Apps, and deployment slots.
+- **AZ-APP-PUBLISH-02 -- SCM policy evidence:** require `Microsoft.Web/sites/basicPublishingCredentialsPolicies/scm` or slot equivalent with `properties.allow = false`; Terraform evidence can include `webdeploy_publish_basic_authentication_enabled = false`.
+- **AZ-APP-PUBLISH-03 -- FTP policy evidence:** require `Microsoft.Web/sites/basicPublishingCredentialsPolicies/ftp` or slot equivalent with `properties.allow = false`; Terraform evidence can include `ftp_publish_basic_authentication_enabled = false`.
+- **AZ-APP-PUBLISH-04 -- Slot parity:** verify every deployment slot has the same SCM and FTP basic publishing credential policy as production.
+- **AZ-APP-PUBLISH-05 -- Non-basic deployment replacement:** record the approved deployment method, such as Microsoft Entra ID, managed identity, federated service principal, OIDC-backed GitHub Actions, or Azure Pipelines service connection.
+- **AZ-APP-PUBLISH-06 -- Credential invalidation:** after disabling publishing basic auth, require evidence that publish profiles, user-scope deployment credentials, stored service connections, and automation secrets were rotated, removed, or invalidated where they were previously exposed.
+- **AZ-APP-PUBLISH-07 -- Policy and audit coverage:** verify Azure Policy or role controls prevent re-enabling basic publishing credentials, and that `AppServiceAuditLogs` or equivalent telemetry captures FTP/WebDeploy authorization attempts.
+- **AZ-APP-PUBLISH-08 -- Unsupported evidence:** do not credit runtime-only controls, comments, ticket due dates, `ftps_state` alone, or successful Entra deployment as proof that SCM/FTP basic publishing credentials are disabled.
+
+Use this supplemental output table for App Service publishing evidence:
+
+| App/Slot | SCM Basic Auth | FTP Basic Auth | Evidence Source | Deployment Method | Credential Rotation | Audit/Policy Evidence | Status |
+|----------|----------------|----------------|-----------------|-------------------|---------------------|-----------------------|--------|
+| `<name>` | Disabled / Enabled / Not Evaluable | Disabled / Enabled / Not Evaluable | Terraform / ARM / Azure CLI / Policy export | Entra / OIDC / Managed Identity / Basic / Unknown | Rotated / Missing / Not Applicable | Present / Missing / Not Evaluable | Pass / Fail / Not Evaluable |
+
+Treat enabled SCM or FTP basic publishing credentials on production apps or slots as **High** severity when deployment credentials or publish profiles are broadly accessible, and **Medium** when exposure is limited but policy/audit coverage is missing. Use **Not Evaluable** when the app inventory exists but the `basicPublishingCredentialsPolicies` export or equivalent Terraform fields are absent.
 
 ---
 
@@ -141,6 +163,12 @@ Produce the final report using the structure defined in the Output Format sectio
 | 7 | Virtual Machines | X | Y | Z | nn% |
 | 8 | Key Vault | X | Y | Z | nn% |
 | 9 | App Service | X | Y | Z | nn% |
+
+### Supplemental App Service Publishing Evidence
+
+| App/Slot | SCM Basic Auth | FTP Basic Auth | Evidence Source | Deployment Method | Credential Rotation | Audit/Policy Evidence | Status |
+|----------|----------------|----------------|-----------------|-------------------|---------------------|-----------------------|--------|
+| <name> | Disabled / Enabled / Not Evaluable | Disabled / Enabled / Not Evaluable | <source> | <method> | <status> | <status> | Pass / Fail / Not Evaluable |
 
 ### Detailed Findings
 
@@ -200,6 +228,7 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **NSG rules using service tags.** A rule with `source_address_prefix = "Internet"` is equivalent to `0.0.0.0/0`. Both must be flagged for CIS 6.1 and 6.2.
 5. **Key Vault purge protection is irreversible.** CIS 8.5 requires `purge_protection_enabled = true`. Note this cannot be disabled once enabled -- flag this for awareness during remediation.
 6. **App Service TLS version on both Linux and Windows.** Check `azurerm_linux_web_app` and `azurerm_windows_web_app` resources separately.
+7. **Runtime App Service controls are not publishing-plane controls.** `auth_settings_v2`, `https_only`, client certificates, and `ftps_state = "Disabled"` do not disable SCM/Kudu/WebDeploy/ZipDeploy basic authentication. Require `basicPublishingCredentialsPolicies/scm` and `basicPublishingCredentialsPolicies/ftp` evidence or equivalent Terraform fields.
 
 ---
 
@@ -225,10 +254,13 @@ Produce the final report using the structure defined in the Output Format sectio
 - Azure Storage Security: https://learn.microsoft.com/en-us/azure/storage/common/storage-security-guide
 - Azure Key Vault Best Practices: https://learn.microsoft.com/en-us/azure/key-vault/general/best-practices
 - Azure App Service Security: https://learn.microsoft.com/en-us/azure/app-service/overview-security
+- Disable basic authentication in Azure App Service deployments: https://learn.microsoft.com/en-us/azure/app-service/configure-basic-auth-disable
+- Authentication types by deployment methods in Azure App Service: https://learn.microsoft.com/en-us/azure/app-service/deploy-authentication-types
 - Terraform AzureRM Provider Documentation: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs
 
 ---
 
 ## Changelog
 
+- **1.0.1** -- Adds App Service SCM/FTP publishing basic authentication evidence gates, output fields, severity guidance, and validation expectations.
 - **1.0.0** -- Initial release. Full coverage of CIS Microsoft Azure Foundations Benchmark v2.1.0 sections 1 through 9.

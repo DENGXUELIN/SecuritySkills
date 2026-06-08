@@ -704,3 +704,107 @@ resource "azurerm_linux_web_app" {
   }
 }
 ```
+
+### Supplemental -- App Service Deployment-Plane Basic Authentication
+
+Review SCM/Kudu/WebDeploy/ZipDeploy and FTP publishing basic authentication separately from runtime App Service settings. `ftps_state = "Disabled"` blocks FTP protocol use, but it is not proof that the FTP or SCM publishing credential policies are disabled across apps and slots.
+
+Required evidence:
+
+- App and slot inventory for `Microsoft.Web/sites` and `Microsoft.Web/sites/slots`.
+- SCM policy export showing `basicPublishingCredentialsPolicies/scm` with `properties.allow = false`.
+- FTP policy export showing `basicPublishingCredentialsPolicies/ftp` with `properties.allow = false`.
+- Terraform fields such as `webdeploy_publish_basic_authentication_enabled = false` and `ftp_publish_basic_authentication_enabled = false` where the AzureRM provider manages the app.
+- Non-basic deployment method evidence, such as Microsoft Entra ID, OIDC-backed GitHub Actions, managed identity, or an Azure Pipelines service connection.
+- Publish-profile and deployment-credential rotation/invalidation evidence if basic auth was previously enabled.
+- Azure Policy, custom role, or monitoring evidence preventing or detecting re-enable attempts.
+- `AppServiceAuditLogs` or equivalent diagnostic evidence for FTP/WebDeploy authorization attempts.
+
+Terraform AzureRM example:
+
+```hcl
+resource "azurerm_linux_web_app" "api" {
+  name                                           = "app-prod-api"
+  resource_group_name                            = azurerm_resource_group.prod.name
+  location                                       = azurerm_resource_group.prod.location
+  service_plan_id                                = azurerm_service_plan.prod.id
+  https_only                                     = true
+  ftp_publish_basic_authentication_enabled       = false
+  webdeploy_publish_basic_authentication_enabled = false
+
+  site_config {
+    ftps_state          = "Disabled"
+    minimum_tls_version = "1.2"
+  }
+}
+```
+
+ARM/AzAPI child resource evidence:
+
+```hcl
+resource "azapi_resource" "api_scm_basic_auth" {
+  type      = "Microsoft.Web/sites/basicPublishingCredentialsPolicies@2022-09-01"
+  name      = "scm"
+  parent_id = azurerm_linux_web_app.api.id
+  body = {
+    properties = {
+      allow = false
+    }
+  }
+}
+
+resource "azapi_resource" "api_ftp_basic_auth" {
+  type      = "Microsoft.Web/sites/basicPublishingCredentialsPolicies@2022-09-01"
+  name      = "ftp"
+  parent_id = azurerm_linux_web_app.api.id
+  body = {
+    properties = {
+      allow = false
+    }
+  }
+}
+```
+
+Slot parity example:
+
+```hcl
+resource "azurerm_linux_web_app_slot" "staging" {
+  name                                           = "staging"
+  app_service_id                                 = azurerm_linux_web_app.api.id
+  ftp_publish_basic_authentication_enabled       = false
+  webdeploy_publish_basic_authentication_enabled = false
+
+  site_config {
+    ftps_state = "Disabled"
+  }
+}
+```
+
+Azure CLI evidence commands:
+
+```bash
+az resource show \
+  --resource-group <resource-group> \
+  --namespace Microsoft.Web \
+  --resource-type basicPublishingCredentialsPolicies \
+  --parent sites/<app-name> \
+  --name scm \
+  --query properties.allow
+
+az resource show \
+  --resource-group <resource-group> \
+  --namespace Microsoft.Web \
+  --resource-type basicPublishingCredentialsPolicies \
+  --parent sites/<app-name> \
+  --name ftp \
+  --query properties.allow
+```
+
+Review checks:
+
+- Fail if either SCM or FTP publishing basic auth is enabled on an in-scope production app, Function App, or deployment slot.
+- Fail if the app has runtime authentication enabled but no deployment-plane basic authentication policy evidence.
+- Fail if production is disabled but a staging or deployment slot still permits SCM or FTP basic publishing credentials.
+- Mark Not Evaluable when the inventory is present but policy export, Terraform field, or equivalent evidence is missing.
+- Do not accept comments, planned tickets, or `ftps_state` alone as evidence that basic publishing credentials are disabled.
+- Prefer policy-as-code or custom-role evidence that blocks `Microsoft.Web/sites/basicPublishingCredentialsPolicies/write` and `Microsoft.Web/sites/slots/basicPublishingCredentialsPolicies/write` for lower-privileged operators.
