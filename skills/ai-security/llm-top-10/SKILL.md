@@ -12,7 +12,7 @@ phase: [design, build, review]
 frameworks: [OWASP-LLM-Top-10-2025]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -328,6 +328,8 @@ Review the application against each of the ten OWASP LLM risk categories below. 
 - No human review step for model-generated content published to external audiences (customer-facing documentation, medical advice, legal guidance).
 - Automated pipelines that take model output and write it directly to production databases, CMSes, or knowledge bases without verification.
 - Temperature settings set high (>1.0) for use cases requiring factual accuracy.
+- Citations are displayed without extracting the material factual claims they are supposed to support.
+- RAG responses treat any retrieved or linked source as proof even when the cited source is fabricated, stale, inaccessible, or does not support the specific claim.
 
 **Detection methods:**
 
@@ -335,6 +337,15 @@ Review the application against each of the ten OWASP LLM risk categories below. 
 - Review whether source citations or references are included in model output and whether they are validated (do the cited sources actually exist and support the claim?).
 - Search for automated publish flows where model output reaches end users without human review.
 - Check model configuration: temperature, top-p, and other sampling parameters relative to the use case's factual accuracy requirements.
+- For high-stakes outputs, require a claim-source support matrix:
+  - `LLM-CITE-01`: each material factual claim is extracted as a reviewable row.
+  - `LLM-CITE-02`: every material claim has one or more cited source IDs or is explicitly marked unsupported.
+  - `LLM-CITE-03`: each cited source exists, is reachable to the reviewer, and has stable identity metadata.
+  - `LLM-CITE-04`: the cited source actually supports the claim, not just the broad topic.
+  - `LLM-CITE-05`: time-sensitive claims record source publication date, retrieval time, and freshness decision.
+  - `LLM-CITE-06`: generated citations are bound to retrieved source records and cannot be fabricated by the model.
+  - `LLM-CITE-07`: unsupported, stale, or conflicting claims are routed to Unknown/Needs Review instead of being presented as authoritative.
+  - `LLM-CITE-08`: high-stakes domains have human review or deterministic policy gates before publication or user-facing advice.
 
 **Mitigations:**
 
@@ -344,6 +355,9 @@ Review the application against each of the ten OWASP LLM risk categories below. 
 - Require human review before publishing model-generated content in high-stakes domains (medical, legal, financial).
 - Use lower temperature settings (0.0-0.3) for factual, deterministic use cases.
 - Implement cross-referencing or fact-checking pipelines for critical content generation workflows.
+- Store retrieved source IDs, source titles, canonical URLs or document IDs, retrieval timestamps, and content hashes with the generated answer.
+- Fail closed for fabricated citations, missing sources, stale sources for time-sensitive claims, and citations that do not entail the claim.
+- Separate "source exists" from "source supports this claim" in review tooling and user-facing confidence signals.
 
 **CWE Mapping:** CWE-1188 (Initialization with Hard-Coded Network Resource Configuration Reference — analogous: reliance on unvalidated information source)
 
@@ -427,6 +441,12 @@ Structure the findings report as follows:
 - **Remediation:** [Specific, actionable fix with code example if applicable]
 - **Priority:** P1 | P2 | P3 | P4
 
+#### Factual Claim Citation Verification (for LLM09)
+
+| Claim ID | Material claim | Citation/source ID | Source exists? | Source supports claim? | Fresh enough? | Publication/retrieval time | Status |
+|----------|----------------|--------------------|----------------|------------------------|---------------|----------------------------|--------|
+| CLAIM-001 | [Specific factual statement] | [DOC-123 / URL / KB item] | Yes/No/Unknown | Supported/Unsupported/Partial/Unknown | Yes/No/N/A | [dates] | Supported / Needs Review / Do Not Publish |
+
 [Repeat for each finding]
 
 ## Summary Table
@@ -464,7 +484,7 @@ Key differences from the 2023 edition:
 
 ## 7. Common Pitfalls
 
-These are the five most frequent mistakes agents make when performing LLM security reviews:
+These are frequent mistakes agents make when performing LLM security reviews:
 
 1. **Reviewing only the prompt, not the data flow.** The prompt is one attack surface. The full data flow — from user input through retrieval, prompt assembly, model inference, output parsing, tool execution, and response rendering — must be traced end to end. Findings missed in output handling (LLM05) and excessive agency (LLM06) are the most common gaps.
 
@@ -475,6 +495,8 @@ These are the five most frequent mistakes agents make when performing LLM securi
 4. **Failing to enumerate tool permissions.** When function-calling or tool-use is configured, every tool must be enumerated with its permissions documented. Agents frequently overlook that a "search" tool also has write access, or that a "database" tool allows arbitrary SQL. This is the core of LLM06.
 
 5. **Scoping the review to the application layer only.** LLM security includes supply chain (LLM03) — model provenance, dependency versions, serialization formats — and infrastructure — vector database authentication, API key management, cost controls (LLM10). These are outside the application code but within scope of this review.
+
+6. **Accepting citations without checking claim support.** A link or retrieved chunk proves little by itself. For LLM09, extract each material factual claim, verify the source exists, then verify that the source actually supports that exact claim and is fresh enough for the context.
 
 ---
 
