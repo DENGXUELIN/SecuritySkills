@@ -12,7 +12,7 @@ phase: [build, review]
 frameworks: [OWASP-Top-10-2021]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.1"
+version: "1.0.2"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -306,6 +306,8 @@ failedAttempts|failed_attempts|lockout|max_attempts
 - Cloud storage buckets with public access (S3, GCS, Azure Blob).
 - XML parsers configured to allow external entities (XXE).
 - Verbose error pages that expose stack traces, framework versions, or internal paths.
+- CDN, reverse proxy, framework, or object cache keys that omit attacker-controlled inputs used by the origin response.
+- Cacheable responses influenced by unkeyed `Host`, `X-Forwarded-Host`, `X-Original-URL`, `X-Rewrite-URL`, query parameter, cookie, `Accept-Language`, path suffix, request body, or normalization behavior.
 
 **CWE Mappings:**
 
@@ -335,6 +337,8 @@ X-Content-Type-Options|X-Frame-Options|Content-Security-Policy|Strict-Transport-
 admin.*admin|password.*password|default.*key|changeme|TODO.*password
 # Verbose errors
 stack.*trace|stackTrace|detailed.*error|showErrors\s*:\s*true
+# Cache-key and unkeyed-input indicators
+X-Forwarded-Host|X-Original-URL|X-Rewrite-URL|Surrogate-Control|Cache-Control.*public|Vary|cdn-cache|x-cache|req\.headers\.host|req\.get\(
 ```
 
 **Mitigations:**
@@ -346,6 +350,35 @@ stack.*trace|stackTrace|detailed.*error|showErrors\s*:\s*true
 - Deploy security headers via middleware or reverse proxy — audit with tools like securityheaders.com.
 - Configure custom error pages that reveal no internal details; log full errors server-side only.
 - Run periodic configuration audits (CIS Benchmarks, cloud provider security tools).
+- Inventory all cache boundaries and verify exact cache-key inputs from CDN, reverse proxy, framework, and object-cache configuration.
+- Include every origin-influencing input in the cache key or remove it from response generation; otherwise mark cacheable responses as vulnerable to web cache poisoning.
+- Use `Vary`, CDN cache-key configuration, and normalization rules consistently across CDN/proxy and origin routing.
+- Disable shared caching for personalized, tenant-scoped, authenticated, redirect, metadata, JSON, and security-sensitive responses unless separation is proven.
+
+---
+
+#### Web Cache Poisoning / Cache-Key Evidence Gate
+
+For A05 cache-related findings, require reviewers to prove both cacheability and cache-key safety. `Cache-Control`, `Age`, `ETag`, or a cache HIT only proves that a response can be cached; it does not prove which request inputs are part of the cache key.
+
+Apply these checks before clearing cache-sensitive routes:
+
+- **CACHE-KEY-01 -- Cache boundary inventory:** identify CDN, reverse proxy, framework, ISR/SSG, edge function, and object-cache layers that can store the response.
+- **CACHE-KEY-02 -- Cache key inputs:** record the exact cache key from configuration or exported policy, including method, host, path, query parameters, headers, cookies, locale, tenant, auth state, and normalization rules.
+- **CACHE-KEY-03 -- Origin input inventory:** identify origin code that reads `Host`, `X-Forwarded-Host`, `X-Original-URL`, `X-Rewrite-URL`, query strings, cookies, `Accept-Language`, body fields, or path suffixes.
+- **CACHE-KEY-04 -- Unkeyed influence:** fail when an attacker-controlled origin input changes redirects, canonical URLs, asset URLs, metadata, JSON/HTML, error pages, or security-sensitive headers but is absent from the cache key.
+- **CACHE-KEY-05 -- Cacheability evidence:** require response evidence such as `Cache-Control`, `Surrogate-Control`, `Age`, `ETag`, `Vary`, CDN debug headers, or framework cache configuration.
+- **CACHE-KEY-06 -- User and tenant separation:** verify authenticated, personalized, tenant, region, language, and role-specific responses are private, vary correctly, or are excluded from shared caches.
+- **CACHE-KEY-07 -- Normalization parity:** compare CDN/proxy normalization with origin routing for path casing, encoded separators, duplicate query parameters, trailing slashes, and rewrite headers.
+- **CACHE-KEY-08 -- Poison impact:** record whether poisoning affects redirects, script/style links, HTML/JSON content, metadata, error pages, cookies, or security headers and rate severity by cross-user reach.
+
+Use this supplemental output table for cache-key evidence:
+
+| Route / Asset | Cache Layer | Cache Key Inputs | Origin Inputs | Unkeyed Influence | Cacheability Evidence | User/Tenant Separation | Status |
+|---------------|-------------|------------------|---------------|-------------------|-----------------------|------------------------|--------|
+| `<path>` | CDN / Proxy / Framework / Object | Host / path / query / headers / cookies / locale | Headers / query / cookies / body / path suffix | Yes / No | Cache-Control / Age / Vary / CDN debug / config | Private / Vary / Missing / N/A | Pass / Fail / Not Evaluable |
+
+Treat cacheable cross-user poisoning of redirects, HTML, JavaScript, JSON, metadata, or security-sensitive headers as **High** severity. Treat cache-key evidence gaps on public static routes as **Medium** unless the response is not cacheable or origin influence is absent. Mark **Not Evaluable** when cache layers exist but cache-key configuration or cacheability evidence is missing.
 
 ---
 
@@ -660,6 +693,12 @@ Present findings in this structure:
 - **Categories Clear:** [list]
 ```
 
+### Supplemental Cache-Key Evidence
+
+| Route / Asset | Cache Layer | Cache Key Inputs | Origin Inputs | Unkeyed Influence | Cacheability Evidence | User/Tenant Separation | Status |
+|---------------|-------------|------------------|---------------|-------------------|-----------------------|------------------------|--------|
+| <path> | <layer> | <key inputs> | <origin inputs> | Yes / No | <evidence> | <status> | Pass / Fail / Not Evaluable |
+
 ## Framework Reference
 
 | OWASP ID | Category | Key CWEs | Primary Risk |
@@ -668,7 +707,7 @@ Present findings in this structure:
 | A02:2021 | Cryptographic Failures | CWE-259, CWE-327, CWE-328, CWE-330, CWE-798 | Sensitive data exposure |
 | A03:2021 | Injection | CWE-77, CWE-78, CWE-79, CWE-89, CWE-94 | Arbitrary command/query execution |
 | A04:2021 | Insecure Design | CWE-209, CWE-501, CWE-522, CWE-602, CWE-840 | Architectural security gaps |
-| A05:2021 | Security Misconfiguration | CWE-16, CWE-611, CWE-614, CWE-756, CWE-942 | Exploitable default/weak settings |
+| A05:2021 | Security Misconfiguration | CWE-16, CWE-444, CWE-611, CWE-614, CWE-756, CWE-942 | Exploitable default/weak settings |
 | A06:2021 | Vulnerable and Outdated Components | CWE-829, CWE-1035, CWE-1104 | Known-CVE exploitation |
 | A07:2021 | Identification and Authentication Failures | CWE-287, CWE-306, CWE-307, CWE-384, CWE-613 | Identity compromise |
 | A08:2021 | Software and Data Integrity Failures | CWE-345, CWE-494, CWE-502, CWE-565 | Tampering and malicious updates |
@@ -686,6 +725,8 @@ Present findings in this structure:
 4. **Reporting deprecated algorithms without context.** MD5 used for non-security checksums (e.g., cache busting, ETags) is not a cryptographic failure. Only flag weak algorithms when they protect sensitive data, passwords, or integrity-critical operations. State the security impact clearly.
 
 5. **Ignoring transitive dependencies.** A project may have zero direct vulnerable dependencies but inherit critical CVEs through transitive dependencies. Always analyze the full dependency tree, not just top-level declarations.
+
+6. **Treating cacheability headers as cache-key proof.** `Cache-Control`, `Age`, `ETag`, and cache HIT headers show that a response can be stored, not whether attacker-controlled headers, query parameters, cookies, or rewrite inputs are keyed. Require cache-key configuration or equivalent evidence.
 
 ## Prompt Injection Safety Notice
 
@@ -709,6 +750,9 @@ This skill processes source code and configuration files that may contain advers
 - OWASP Top 10:2021 — A08 Software and Data Integrity Failures — https://owasp.org/Top10/A08_2021-Software_and_Data_Integrity_Failures/
 - OWASP Top 10:2021 — A09 Security Logging and Monitoring Failures — https://owasp.org/Top10/A09_2021-Security_Logging_and_Monitoring_Failures/
 - OWASP Top 10:2021 — A10 Server-Side Request Forgery — https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/
+- OWASP Web Cache Poisoning - https://owasp.org/www-community/attacks/Cache_Poisoning
+- PortSwigger Web Cache Poisoning - https://portswigger.net/web-security/web-cache-poisoning
+- PortSwigger Web Cache Deception - https://portswigger.net/web-security/web-cache-deception
 - MITRE CWE List — https://cwe.mitre.org/
 - NIST SP 800-63B Digital Identity Guidelines — https://pages.nist.gov/800-63-3/sp800-63b.html
 - OWASP Cheat Sheet Series — https://cheatsheetseries.owasp.org/
