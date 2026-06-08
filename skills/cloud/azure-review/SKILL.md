@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [CIS-Azure-v2.1.0]
 difficulty: intermediate
 time_estimate: "60-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -78,6 +78,25 @@ Use Glob to locate all Azure-related infrastructure definitions.
 
 Record all discovered files. If no Azure configurations are found, report that finding and halt.
 
+Before scoring any CIS control, build an Azure evidence freshness inventory:
+
+```
+| Evidence ID | Basis | Source / Query | Collected By | Collection Date | Tenant / Management Group / Subscription Scope | Region / Resource Scope | Controls Supported | Limitations | Confidence |
+|-------------|-------|----------------|--------------|-----------------|-----------------------------------------------|-------------------------|--------------------|-------------|------------|
+| AZ-EVID-01 | IaC intent / live-exported / partial / missing | <Terraform, Bicep, ARM, az, Resource Graph, Defender, Azure Policy> | <owner/tool> | <date> | <tenant/management groups/subscriptions> | <regions/resource groups/services> | <CIS IDs> | <coverage gaps/drift risk> | High / Medium / Low |
+```
+
+Apply these evidence gates before assigning Pass or Fail:
+
+- **AZ-EVID-01 Evidence basis:** classify each artifact as IaC intent, current live/exported state, partial evidence, or missing evidence. IaC alone is intended state and cannot prove deployed Azure state when drift is in scope.
+- **AZ-EVID-02 Source provenance:** identify the exact source or query, such as `az`, Azure Resource Graph, Defender for Cloud, Azure Policy, Entra ID, PIM, Activity Log, or portal export.
+- **AZ-EVID-03 Date and freshness:** record the collection date and compare it to the control's change velocity. RBAC, PIM, Conditional Access, NSG, Key Vault, and Defender-plan evidence usually needs fresher support than stable inherited Azure Policy.
+- **AZ-EVID-04 Scope coverage:** map evidence to the assessed tenant, management group, subscription, region, resource group, and service set. Partial subscription or regional exports cannot support full-environment Pass results.
+- **AZ-EVID-05 Inherited authority:** when management group, Azure Policy, or parent-scope RBAC evidence covers child subscriptions, document the hierarchy, assignment path, excluded children, and enforcement mode.
+- **AZ-EVID-06 Effective access path:** evaluate PIM activation history, eligible assignments, permanent assignments, Conditional Access, and emergency access exclusions before concluding that stale static RBAC evidence represents actual access.
+- **AZ-EVID-07 Drift and conflicts:** check recent Activity Log, policy assignment, Conditional Access, NSG, Defender, Key Vault, and RBAC changes where available. A stale artifact with no change-control evidence should be lower-confidence or Not Evaluable.
+- **AZ-EVID-08 Result confidence:** set High only when source, date, scope, inheritance, effective access, limitations, and drift checks support the conclusion. Use Medium/Low or Not Evaluable when evidence is stale, partial, or IaC-only.
+
 ---
 
 ### Step 2 through Step 10: CIS Benchmark Evaluation (Sections 1-9)
@@ -94,6 +113,13 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, Bic
 ### Step 11: Compile Assessment Report
 
 Produce the final report using the structure defined in the Output Format section.
+
+Before finalizing, ensure every Passed or Failed control references at least one
+inventory row and includes evidence basis, source, date, coverage, limitations,
+effective-access context, and confidence. If deployed-state drift matters and
+current live/exported evidence is unavailable, mark the control Not Evaluable or
+lower confidence instead of treating IaC intent as proof of the active Azure
+environment.
 
 ---
 
@@ -119,6 +145,16 @@ Produce the final report using the structure defined in the Output Format sectio
 - Date: <assessment date>
 - Framework: CIS Microsoft Azure Foundations Benchmark v2.1.0
 - Files reviewed: <list of IaC files>
+- Evidence basis: <IaC intent / live-exported / partial / missing / mixed>
+- Evidence freshness: <collection dates, git commits, and change-window rationale>
+- Tenant/Management Group/Subscription/Region coverage: <scope assessed and gaps>
+- Evidence limitations: <stale exports, missing services, inherited-scope gaps, live-state gaps>
+
+### Evidence Freshness Inventory
+
+| Evidence ID | Basis | Source / Query | Date | Scope | Controls Supported | Limitations | Confidence |
+|-------------|-------|----------------|------|-------|--------------------|-------------|------------|
+| AZ-EVID-01 | <basis> | <artifact/query> | <date> | <tenant/management-group/subscription/region/resource> | <CIS IDs> | <gaps> | High / Medium / Low |
 
 ### Executive Summary
 - Total CIS recommendations evaluated: <N>
@@ -152,6 +188,13 @@ Produce the final report using the structure defined in the Output Format sectio
 - **Line(s):** <line numbers if applicable>
 - **Description:** <what was found>
 - **Evidence:** <specific configuration or code snippet>
+- **Evidence ID(s):** <AZ-EVID-## rows used>
+- **Evidence Source:** <IaC file / az export / Resource Graph / Defender / Azure Policy / PIM / live observation>
+- **Evidence Date:** <timestamp, commit, or observation date>
+- **Coverage:** <tenant, management group, subscription, region, resource group, service, and inherited scope>
+- **Effective Access Context:** <PIM, eligible/permanent assignment, Conditional Access, break-glass exclusions, if applicable>
+- **Limitations:** <missing subscriptions/services, stale exports, drift risk, or source constraints>
+- **Confidence:** High / Medium / Low
 - **Remediation:** <specific fix with code example>
 
 ### Prioritized Remediation Plan
@@ -200,6 +243,7 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **NSG rules using service tags.** A rule with `source_address_prefix = "Internet"` is equivalent to `0.0.0.0/0`. Both must be flagged for CIS 6.1 and 6.2.
 5. **Key Vault purge protection is irreversible.** CIS 8.5 requires `purge_protection_enabled = true`. Note this cannot be disabled once enabled -- flag this for awareness during remediation.
 6. **App Service TLS version on both Linux and Windows.** Check `azurerm_linux_web_app` and `azurerm_windows_web_app` resources separately.
+7. **Treating IaC as live deployed evidence.** Terraform, Bicep, ARM templates, and policy files show intended state, not necessarily active Azure state. For controls affected by portal changes, management group inheritance, PIM activation, Conditional Access drift, regional services, or recent RBAC/NSG/Key Vault changes, require fresh live/exported evidence or mark the conclusion lower-confidence or Not Evaluable.
 
 ---
 
@@ -231,4 +275,5 @@ Produce the final report using the structure defined in the Output Format sectio
 
 ## Changelog
 
+- **1.0.1** -- Added Azure evidence freshness, coverage, inherited-scope, effective-access, drift, and confidence gates plus report fields.
 - **1.0.0** -- Initial release. Full coverage of CIS Microsoft Azure Foundations Benchmark v2.1.0 sections 1 through 9.
