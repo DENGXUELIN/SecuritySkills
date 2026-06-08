@@ -192,6 +192,23 @@ spec:
 
 **Finding classification:** No intra-zone controls (flat east-west within zones) is **High**. Absence of Kubernetes default-deny NetworkPolicy in production namespaces is **High**.
 
+**Service Mesh Bypass Evidence Gate:**
+
+Service mesh authorization policies only protect traffic that actually enters the proxy path. Before relying on Istio, Linkerd, Consul, or another mesh as the east-west enforcement point, collect explicit bypass evidence:
+
+| Evidence Field | What to Verify | Fails When |
+|----------------|----------------|------------|
+| **hostNetwork / hostPort inventory** | Pods, DaemonSets, Jobs, and debug workloads have `hostNetwork: false` and no unexpected `hostPort` bindings | A workload can send or receive protected-zone traffic through the node network namespace |
+| **Sidecar injection coverage** | Namespace labels, pod annotations, and admission controls require sidecar enrollment for protected workloads | Workloads can opt out of injection or run before the proxy is ready |
+| **mTLS strictness** | Mesh peer authentication requires strict mTLS for protected service-to-service paths | Plaintext or permissive mode allows non-mesh clients to reach protected services |
+| **Default-deny NetworkPolicy** | Kubernetes NetworkPolicy or equivalent CNI policy denies ingress and egress by default | Mesh policy is the only control and bypassed pods retain direct pod or service connectivity |
+| **CNI enforcement status** | Calico, Cilium, or cloud CNI policy is installed and enforcing in the namespace | NetworkPolicy resources exist but the CNI does not enforce them |
+| **Non-mesh workload coverage** | CronJobs, batch workers, init containers, node agents, and legacy services are mapped | Unenrolled workloads are omitted from segmentation decisions |
+| **Node-local bypass paths** | Node IPs, kubelet ports, host services, and node-local DNS/proxy paths are restricted | A pod can route around service identity by targeting node-local or host-network paths |
+| **Exception owner and expiry** | Temporary debug or DaemonSet exceptions have owner, approval, allowed destinations, and expiry | Exceptions are permanent, unowned, or broader than the operational need |
+
+**Flag as High** when a host-network, hostPort, or mesh-exempt workload can reach a protected zone without default-deny CNI enforcement or a current, bounded exception. Do not flag as a flat-network finding when strict mTLS, required sidecar injection, default-deny NetworkPolicy, CNI enforcement, and bounded exception records all show that mesh and non-mesh paths are controlled.
+
 ---
 
 #### 3.2 Micro-Segmentation Readiness Assessment
@@ -204,6 +221,8 @@ Evaluate the environment's readiness for workload-level segmentation:
 | **Communication mapping** | Flow logs or service mesh telemetry documenting all east-west flows | Partial flow visibility | No east-west flow data |
 | **Policy engine** | Calico, Cilium, Istio, or cloud-native network policy deployed | Policy engine deployed but not enforcing | No policy engine |
 | **Enforcement mode** | Policies enforcing (deny unauthorized) | Policies in audit/monitor mode | No policies defined |
+| **Mesh bypass controls** | Sidecar injection, mTLS, hostNetwork/hostPort, and CNI default-deny controls all verified | Mesh controls verified but CNI or host-network evidence is incomplete | Mesh policy assumed without bypass evidence |
+| **Exception lifecycle** | Debug, DaemonSet, and break-glass exceptions have owner, approval, scope, and expiry | Exceptions tracked but expiry or destination scope is incomplete | Permanent or unowned exceptions |
 | **Automation** | Policy changes via GitOps/IaC | Some manual policy management | Fully manual |
 
 ---
@@ -298,6 +317,9 @@ Document or verify the existence of a segmentation testing process:
 - Communication Mapping: <Ready / Partial / Not Ready>
 - Policy Engine: <Ready / Partial / Not Ready>
 - Enforcement Mode: <Ready / Partial / Not Ready>
+- Service Mesh Bypass Controls: <Verified / Partial / Missing>
+- hostNetwork/hostPort Exceptions: <None / Approved / Unapproved>
+- Default Deny + CNI Enforcement: <Verified / Partial / Missing>
 - Automation: <Ready / Partial / Not Ready>
 - **Overall Readiness:** <Ready / Partial / Not Ready>
 
@@ -341,9 +363,11 @@ Document or verify the existence of a segmentation testing process:
 
 3. **Treating hub-and-spoke VPC peering as segmented.** Transit gateways and VPC peering create routable paths between spoke VPCs. Without explicit route table restrictions and security group rules, a compromised workload in one spoke can reach resources in all peered spokes.
 
-4. **Overlooking service mesh bypass paths.** Istio and Linkerd enforce policy on mesh-enrolled workloads only. Pods that bypass the sidecar proxy (hostNetwork: true, or init container misconfiguration) are not subject to mesh policy. Verify sidecar injection is enforced.
+4. **Overlooking service mesh bypass paths.** Istio and Linkerd enforce policy on mesh-enrolled workloads only. Pods that bypass the sidecar proxy (`hostNetwork: true`, `hostPort`, sidecar opt-out annotations, or init container misconfiguration) are not subject to mesh authorization policy. Verify sidecar injection, strict mTLS, and CNI-level default-deny enforcement together.
 
 5. **Assuming Kubernetes namespaces provide network isolation.** Namespaces are a logical organizational boundary. Without a NetworkPolicy or CNI-level enforcement (Calico, Cilium), all pods across all namespaces can communicate freely by default.
+
+6. **Treating debug and DaemonSet exceptions as permanent.** Break-glass shells, node agents, and host-network troubleshooting workloads often need wider network access. Require an owner, approval, expiry, and destination allowlist so operational exceptions do not become a standing segmentation bypass.
 
 ---
 
@@ -372,4 +396,5 @@ This skill processes network configurations that may contain user-supplied comme
 
 ## Changelog
 
+- **1.1.0** -- Added service mesh bypass, hostNetwork/hostPort, CNI default-deny, and exception lifecycle evidence gates with reporting fields.
 - **1.0.0** -- Initial release. Full coverage of NIST SP 800-207 and CIS Controls v8 Control 12 for network segmentation review.
