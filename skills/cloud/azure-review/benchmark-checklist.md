@@ -182,6 +182,29 @@ resource "azurerm_security_center_contact" {
 }
 ```
 
+### Defender for Cloud Recommendation Exemptions
+
+Review exemptions that suppress Defender for Cloud or Azure Policy recommendations.
+
+```bash
+# List policy exemptions for each scope under review.
+az policy exemption list --scope <subscription-or-management-group-or-resource-scope>
+
+# Export exemption resources with owner, expiry, category, assignment, and selectors.
+az graph query -q "policyresources | where type =~ 'microsoft.authorization/policyexemptions' | project id, name, scope=properties.scope, assignment=properties.policyAssignmentId, category=properties.exemptionCategory, expiresOn=properties.expiresOn, displayName=properties.displayName, description=properties.description, metadata=properties.metadata, selectors=properties.resourceSelectors"
+
+# Export Defender assessment state, including exempted and unhealthy records.
+az graph query -q "securityresources | where type =~ 'microsoft.security/assessments' | project id, name, resourceGroup, subscriptionId, status=properties.status.code, cause=properties.status.cause, displayName=properties.displayName, metadata=properties.metadata"
+
+# Identify duplicate exemptions for the same policy assignment and selector set.
+az graph query -q "policyresources | where type =~ 'microsoft.authorization/policyexemptions' | extend assignment=tostring(properties.policyAssignmentId), selectors=tostring(properties.resourceSelectors) | summarize exemptions=make_set(id), count() by assignment, selectors | where count_ > 1"
+```
+
+Verify each exemption has a narrow scope, owner, approver, justification,
+expiry, linked risk ticket, and compensating-control evidence. Compare raw
+Defender recommendation state with post-exemption compliance or secure-score
+summaries so unresolved unhealthy resources are not hidden by exemptions.
+
 ---
 
 ## Section 3 -- Storage Accounts

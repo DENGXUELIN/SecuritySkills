@@ -88,6 +88,31 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, Bic
 
 ---
 
+### Step 10b: Defender for Cloud Exemption Governance
+
+After evaluating Defender for Cloud enablement and CIS recommendation status, review Defender for Cloud and Azure Policy exemptions that change the visible recommendation state or secure-score impact. Treat exemptions as evidence that needs ownership and scope validation, not as automatic proof that the underlying risk is remediated.
+
+**Evidence to collect:**
+
+- Policy exemption inventory from each subscription, management group, and resource scope reviewed.
+- Defender for Cloud recommendation exports that include exempted and raw unhealthy assessment state.
+- Exemption category (`Mitigated` or `Waiver`), owner, approver, description, expiry, linked ticket, and compensating-control evidence.
+- Scope evidence showing whether the exemption targets a single resource/resource group, subscription, or management group.
+- Duplicate or conflicting exemption evidence for the same recommendation, policy assignment, or resource selector.
+
+**What to flag:**
+
+```
+AZ-DEF-EXEMPT-01: Defender recommendation exemption lacks owner, approver, description, expiry, or ticket evidence
+AZ-DEF-EXEMPT-02: Exemption scope is broader than the affected resource set or covers a management group without justification
+AZ-DEF-EXEMPT-03: Expired exemption still suppresses unhealthy Defender recommendations
+AZ-DEF-EXEMPT-04: High-impact CIS or regulatory recommendation is exempted without compensating-control evidence
+AZ-DEF-EXEMPT-05: Report relies on post-exemption secure-score/compliance only and omits raw unhealthy recommendation state
+AZ-DEF-EXEMPT-06: Duplicate or conflicting exemptions exist for the same recommendation, assignment, or resource selector
+```
+
+Rate unmanaged or stale exemptions as **Medium** by default. Escalate to **High** when an exemption suppresses internet exposure, privileged access, data protection, regulatory, or Critical/High Defender recommendations without time-bound risk acceptance and compensating evidence.
+
 
 ---
 
@@ -160,6 +185,12 @@ Produce the final report using the structure defined in the Output Format sectio
 2. **[High]** CIS X.Y.Z -- <action item>
 3. ...
 
+### Defender for Cloud Exemption Governance
+
+| Scope | Recommendation/Policy Assignment | Category | Owner/Approver | Expiry | Raw Status | Exempted Status | Risk Decision | Compensating Evidence |
+|-------|----------------------------------|----------|----------------|--------|------------|-----------------|---------------|-----------------------|
+| <scope> | <recommendation or policy assignment> | <Mitigated/Waiver> | <owner/approver> | <date/none> | <Healthy/Unhealthy> | <Exempt/NotApplicable> | <ticket/decision> | <link/summary> |
+
 ### Summary
 - Critical findings: <N>
 - High findings: <N>
@@ -200,6 +231,7 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **NSG rules using service tags.** A rule with `source_address_prefix = "Internet"` is equivalent to `0.0.0.0/0`. Both must be flagged for CIS 6.1 and 6.2.
 5. **Key Vault purge protection is irreversible.** CIS 8.5 requires `purge_protection_enabled = true`. Note this cannot be disabled once enabled -- flag this for awareness during remediation.
 6. **App Service TLS version on both Linux and Windows.** Check `azurerm_linux_web_app` and `azurerm_windows_web_app` resources separately.
+7. **Post-exemption compliance is not raw risk status.** Defender for Cloud exemptions can remove resources from unhealthy recommendation views or secure-score impact. Always report raw recommendation state separately from exempted status.
 
 ---
 
@@ -221,6 +253,9 @@ Produce the final report using the structure defined in the Output Format sectio
 
 - CIS Microsoft Azure Foundations Benchmark v2.1.0: https://www.cisecurity.org/benchmark/azure
 - Microsoft Defender for Cloud Documentation: https://learn.microsoft.com/en-us/azure/defender-for-cloud/
+- Microsoft Defender for Cloud Recommendation Exemptions: https://learn.microsoft.com/en-us/azure/defender-for-cloud/exempt-resource
+- Microsoft Defender for Cloud Exemption Review: https://learn.microsoft.com/en-us/azure/defender-for-cloud/review-exemptions
+- Azure Policy Exemption Structure: https://learn.microsoft.com/en-us/azure/governance/policy/concepts/exemption-structure
 - Microsoft Entra ID Security: https://learn.microsoft.com/en-us/entra/identity/
 - Azure Storage Security: https://learn.microsoft.com/en-us/azure/storage/common/storage-security-guide
 - Azure Key Vault Best Practices: https://learn.microsoft.com/en-us/azure/key-vault/general/best-practices
