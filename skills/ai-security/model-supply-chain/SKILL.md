@@ -382,6 +382,23 @@ Assess whether architectural and procedural controls exist to detect model backd
 |---|---|---|---|---|---|
 | [name] | [source] | [format] | [Yes/No] | [Yes/No] | [Complete/Partial/Missing] |
 
+## Artifact Verification Evidence
+
+For each production or evaluation model artifact, replace Yes/No verification fields with reproducible evidence:
+
+- `MSC-ART-01` **Exact artifact identity**: record the model, artifact type, source URL or registry, repository owner, and storage location used for deployment or evaluation.
+- `MSC-ART-02` **Immutable revision**: record the commit, immutable revision, release tag, object version, or registry digest; floating branches, `latest`, and unpinned model names are not sufficient.
+- `MSC-ART-03` **Digest evidence**: record the SHA-256 digest for weights, adapters, tokenizer files, and critical configuration files.
+- `MSC-ART-04` **Signature or attestation**: record the signature, Sigstore/cosign entry, SLSA/in-toto provenance, or equivalent attestation reference where available.
+- `MSC-ART-05` **Trust root**: identify the key, certificate identity, transparency log, internal registry policy, or trusted publisher identity used to validate the signature or attestation.
+- `MSC-ART-06` **Independent verification source**: verify the digest or signature against a source not controlled by the same mutable artifact location, such as a signed release, attestation service, or first-ingest internal registry record.
+- `MSC-ART-07` **Verifier and timestamp**: record who ran the verification, when it ran, and the verification command or pipeline run.
+- `MSC-ART-08` **Deployment binding and result**: bind the verified artifact to the deployed model image, endpoint, or evaluation job and mark `Pass`, `Fail`, or `Unknown`.
+
+| Model | Artifact | Source | Revision | SHA-256 | Signature/Attestation | Trust Root | Independent Verification Source | Verifier/Time | Deployment Binding | Result |
+|---|---|---|---|---|---|---|---|---|---|---|
+| [name] | [weights/tokenizer/adapter/config] | [source] | [commit/digest/tag] | [sha256] | [ref] | [root] | [source] | [who/when] | [endpoint/image/job] | [Pass/Fail/Unknown] |
+
 ## Findings
 
 ### Finding [N]: [Title]
@@ -440,6 +457,8 @@ Assess whether architectural and procedural controls exist to detect model backd
 4. **Assuming Hugging Face models are vetted.** Hugging Face Hub is a hosting platform, not a curation service. Any user can upload any model. While Hugging Face has introduced malware scanning and model signing capabilities, the majority of hosted models have no cryptographic provenance. Treat Hugging Face models as untrusted artifacts requiring verification, the same way you treat npm packages.
 
 5. **Evaluating models only on benchmarks.** Standard benchmarks measure general capability, not supply chain integrity. A backdoored model will perform normally on benchmarks by design. Behavioral differential testing with curated, domain-specific test sets that probe for targeted manipulation is required to surface backdoors.
+
+6. **Treating Yes/No verification fields as audit evidence.** `Checksum Verified: Yes` is not reproducible unless the report includes the exact revision, digest, signature or attestation reference, trust root, independent verification source, verifier, timestamp, and deployment binding. Same-registry checksums or mutable model-card values should be treated as `Unknown`.
 
 ---
 
