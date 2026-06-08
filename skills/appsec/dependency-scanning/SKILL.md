@@ -91,6 +91,49 @@ Direct dependencies are explicitly declared. Transitive dependencies are pulled 
 - Pin critical transitive dependencies using overrides/resolutions (`npm overrides`, `pip` constraints files, `go.mod replace`).
 - Evaluate dependency tree depth before adopting new packages: `npm ls --all`, `pipdeptree`, `go mod graph`.
 
+## Override and Replacement Governance
+
+Overrides, resolutions, constraints, `replace` directives, and `[patch]` sections are powerful supply-chain controls. They can safely pin a vulnerable transitive package to a fixed version, but they can also redirect a trusted package name to an unreviewed fork, mutable branch, local path, stale constraint, or vulnerable downgrade. Review them as dependency-graph rewrites, not as automatically safe mitigations.
+
+### Mechanisms to Inspect
+
+| Ecosystem | Mechanism | Files to Review |
+|---|---|---|
+| npm | `overrides` | `package.json`, `package-lock.json`, `npm-shrinkwrap.json` |
+| Yarn | `resolutions` | `package.json`, `yarn.lock` |
+| pnpm | `pnpm.overrides` | `package.json`, `pnpm-lock.yaml`, workspace manifests |
+| Go | `replace` | `go.mod`, `go.sum`, release build metadata |
+| Rust | `[patch.crates-io]` / `[replace]` | `Cargo.toml`, `Cargo.lock` |
+| Maven / Gradle | dependency management, constraints, substitutions | `pom.xml`, `build.gradle`, lockfiles |
+| Python | constraints, alternate indexes, direct URLs | `constraints.txt`, `requirements.txt`, lockfiles |
+
+### Evidence Gates
+
+```
+DEP-OVERRIDE-01: Override/replacement has no documented reason, owner, approval, or review date
+DEP-OVERRIDE-02: Override/resolution/constraint forces a version below the fixed or vendor-recommended safe version
+DEP-OVERRIDE-03: Registry dependency is redirected to an unpinned git URL, mutable branch/tag, local path, alternate registry, or unreviewed fork
+DEP-OVERRIDE-04: Manifest override is not reflected in the committed lockfile or SBOM relationship data
+DEP-OVERRIDE-05: Temporary override has no expiry, upstream tracking issue, or re-evaluation trigger
+DEP-OVERRIDE-06: Development-only local path replacement appears in production or release artifact build inputs
+DEP-OVERRIDE-07: Scanner/SBOM evidence covers the original package name but not the resolved replacement artifact
+```
+
+### False-Positive Boundaries
+
+- Do not flag a fixed-version override that pins a vulnerable transitive dependency to a patched version from the same trusted registry when the lockfile, owner approval, reason, and review trigger are present.
+- Do not flag workspace path replacements used only for local development unless they are included in production build inputs, release artifacts, or deployment lockfiles.
+- Do not treat every Go `replace` or Rust `[patch]` directive as malicious; classify by source trust, immutable pinning, build context, and approval evidence.
+- Do not credit an override as a mitigation if it is missing from the lockfile/SBOM, downgrades below the fixed version, or masks an upstream update without a removal plan.
+
+### Review Steps
+
+1. Locate override controls in manifests, lockfiles, package-manager config, and workspace files.
+2. Compare each target version/source with known fixed versions, vendor advisories, and scanner output.
+3. Verify the lockfile and SBOM represent the final resolved artifact, not just the original package name.
+4. Require immutable source references for git replacements (commit SHA preferred; branches and tags require extra verification and protection evidence).
+5. Record owner, reason, approval, lockfile evidence, and expiry/review trigger for each production override.
+
 ## Vulnerability Triage: EPSS + CVSS + CISA KEV
 
 ### Triage Framework
@@ -212,11 +255,18 @@ When performing a dependency scan, produce findings in the following structure:
 - [ ] Packages with install scripts
 - [ ] Unmaintained packages (no release in 2+ years)
 - [ ] Dependency confusion risk (internal name collisions)
+- [ ] Override/replacement directives present
 
 ### Recommendations
 
 1. [Prioritized list of remediation actions]
 ```
+
+### Override / Replacement Review
+
+| Package | Ecosystem | Mechanism | Original Source | Replacement Source | Resolved Version / Commit | Lockfile / SBOM Evidence | Owner / Rationale | Expiry / Review Trigger | Disposition |
+|---|---|---|---|---|---|---|---|---|---|
+| [package] | [npm/Go/Rust/etc.] | [override/replace/patch/constraint] | [registry/version] | [version, registry, git SHA, path] | [resolved artifact] | [present/missing] | [owner/reason] | [date/issue] | [Mitigation / Monitor / Finding] |
 
 ## Procedure
 
@@ -226,8 +276,9 @@ When performing a dependency scan, produce findings in the following structure:
 4. **Vulnerability scan**: Cross-reference packages and versions against known CVE databases. Apply the EPSS+CVSS+KEV triage model.
 5. **License audit**: Extract license declarations from lockfiles or registry metadata. Flag copyleft and unlicensed packages.
 6. **Typosquatting check**: Review dependency names for patterns described in the detection section.
-7. **Supply chain assessment**: Evaluate SLSA posture -- lockfile presence, pinned versions, provenance availability.
-8. **Report**: Produce the assessment using the output template above, with prioritized remediation recommendations.
+7. **Override/replacement review**: Inspect overrides, resolutions, constraints, Go `replace`, Rust `[patch]`, Maven/Gradle substitutions, and Python direct URLs for source provenance, fixed-version safety, owner approval, expiry, and lockfile/SBOM consistency.
+8. **Supply chain assessment**: Evaluate SLSA posture -- lockfile presence, pinned versions, provenance availability.
+9. **Report**: Produce the assessment using the output template above, with prioritized remediation recommendations.
 
 ## Prompt Injection Safety Notice
 
@@ -251,3 +302,8 @@ This skill processes user-supplied content including package manifests, lockfile
 - [NIST NVD](https://nvd.nist.gov/)
 - [OpenSSF Scorecard](https://securityscorecards.dev/)
 - [Executive Order 14028 - Improving the Nation's Cybersecurity](https://www.whitehouse.gov/briefing-room/presidential-actions/2021/05/12/executive-order-on-improving-the-nations-cybersecurity/)
+- [npm package overrides](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#overrides)
+- [Yarn selective dependency resolutions](https://yarnpkg.com/features/resolutions)
+- [pnpm overrides](https://pnpm.io/package_json#pnpmoverrides)
+- [Go modules replace directive](https://go.dev/ref/mod#go-mod-file-replace)
+- [Cargo overriding dependencies](https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html)
