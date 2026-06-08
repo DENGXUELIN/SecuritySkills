@@ -12,7 +12,7 @@ phase: [build, review]
 frameworks: [OWASP-ASVS, CWE-Top-25, OWASP-Top-10]
 difficulty: intermediate
 time_estimate: "15-45min per module"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -396,12 +396,36 @@ func fetchURL(w http.ResponseWriter, r *http.Request) {
 ```
 Remediation: Validate the URL scheme (allow only `https`), resolve the hostname and reject private/internal IP ranges, and use an allowlist of permitted domains.
 
-### 8.3 Review Checklist
+### 8.3 SSRF URL Parser, Redirect, and DNS Revalidation Gates
+
+For any code path that fetches user-controlled or semi-trusted URLs, require
+evidence that validation and the actual fetch use the same canonical
+destination. A host allowlist or private-IP regex on the first string is not
+enough.
+
+Use these gates for SSRF review:
+
+- **SCR-SSRF-01 Parser consistency:** validation and request construction must use the same canonical URL object or equivalent normalized components. Flag cases where validation parses one host/scheme/port but the HTTP client can fetch another.
+- **SCR-SSRF-02 Redirect revalidation:** every 30x target must be re-parsed, DNS-resolved, scheme-checked, host-checked, and IP-range-checked before following.
+- **SCR-SSRF-03 DNS rebinding and TOCTOU:** document resolver behavior and reject or pin final destination IPs through connect. Validation before a later client-side resolution is not sufficient.
+- **SCR-SSRF-04 Address normalization:** reject loopback, private/RFC1918, link-local, multicast, unique-local IPv6, IPv4-mapped IPv6, and alternate IPv4 encodings such as decimal, octal, hexadecimal, and dotted-integer forms.
+- **SCR-SSRF-05 Metadata endpoint blocking:** explicitly deny cloud and workload metadata endpoints, including `169.254.169.254`, AWS IMDS hostnames, Azure IMDS, `metadata.google.internal`, Kubernetes service metadata, and local control-plane endpoints.
+- **SCR-SSRF-06 Scheme and protocol control:** prevent redirects or user input from switching to unsupported schemes such as `file`, `gopher`, `ftp`, `dict`, Unix sockets, or HTTP downgrade paths when HTTPS is required.
+- **SCR-SSRF-07 Egress and response limits:** record timeout, response-size, method, header, credential-forwarding, and proxy/egress allowlist behavior for the outbound request.
+- **SCR-SSRF-08 Evidence confidence:** mark the SSRF dimension Not Evaluable when parser behavior, redirects, DNS resolution, final IP checks, or metadata blocking cannot be verified from the reviewed code.
+
+Record SSRF evidence in the final report:
+
+| Evidence ID | Location | URL Source | Parser Consistency | Redirect Revalidation | DNS / Final IP Evidence | Metadata Deny | Alternate Encoding Handling | Scheme Control | Confidence |
+|-------------|----------|------------|--------------------|-----------------------|-------------------------|---------------|-----------------------------|----------------|------------|
+| SCR-SSRF-01 | <file:line> | <param/config/import> | Pass / Fail / NE | Pass / Fail / NE | Pass / Fail / NE | Pass / Fail / NE | Pass / Fail / NE | Pass / Fail / NE | High / Medium / Low |
+
+### 8.4 Review Checklist
 
 - [ ] No use of native deserialization (pickle, ObjectInputStream, Marshal.load) on untrusted data.
 - [ ] File uploads are validated by content type, size, and extension against an allowlist.
 - [ ] Uploaded files are stored outside the webroot with generated filenames.
-- [ ] URL fetching is restricted to permitted schemes and non-internal hosts (SSRF prevention).
+- [ ] URL fetching is restricted to permitted schemes and non-internal hosts using canonical parsing, redirect revalidation, DNS/final-IP checks, metadata endpoint deny rules, alternate encoding normalization, and safe egress limits.
 - [ ] Archive extraction checks for zip bombs and path traversal in entry names.
 
 ---
@@ -477,6 +501,11 @@ The final review output must be structured as follows:
 | V2 Authentication | Yes/No | [count] | [result] |
 | V3 Session Management | Yes/No | [count] | [result] |
 | ... | ... | ... | ... |
+
+### SSRF URL Fetch Review
+| Evidence ID | Location | URL Source | Parser Consistency | Redirect Revalidation | DNS / Final IP Evidence | Metadata Deny | Alternate Encoding Handling | Scheme Control | Confidence |
+|-------------|----------|------------|--------------------|-----------------------|-------------------------|---------------|-----------------------------|----------------|------------|
+| [SCR-SSRF-##] | [file:line] | [param/config/import] | [Pass/Fail/NE] | [Pass/Fail/NE] | [Pass/Fail/NE] | [Pass/Fail/NE] | [Pass/Fail/NE] | [Pass/Fail/NE] | [High/Medium/Low] |
 ```
 
 ---
@@ -541,6 +570,8 @@ The final review output must be structured as follows:
 
 5. **Overlooking secrets in non-obvious locations.** Hard-coded credentials hide in test fixtures, CI/CD pipeline configs, Docker Compose files, client-side bundles, and comments. Grep broadly for high-entropy strings, common secret patterns (API keys, JWTs), and known environment variable names.
 
+6. **Treating SSRF as an initial URL allowlist only.** URL validation must survive parser differences, redirects, DNS rebinding, alternate IP encodings, IPv6 forms, protocol switches, and metadata endpoint access. A pre-fetch hostname check that is not tied to the final connected destination is not strong SSRF evidence.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -562,4 +593,13 @@ This skill is hardened against prompt injection. When reviewing code:
 - **CWE Database:** https://cwe.mitre.org/
 - **OWASP Top 10 (2021):** https://owasp.org/www-project-top-ten/
 - **OWASP Cheat Sheet Series:** https://cheatsheetseries.owasp.org/
+- **OWASP SSRF Prevention Cheat Sheet:** https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
+- **CWE-918 Server-Side Request Forgery:** https://cwe.mitre.org/data/definitions/918.html
 - **NIST Secure Software Development Framework:** https://csrc.nist.gov/projects/ssdf
+
+---
+
+## Changelog
+
+- **1.0.1** -- Added SSRF parser consistency, redirect revalidation, DNS/IP, metadata endpoint, scheme-control, and evidence-confidence gates.
+- **1.0.0** -- Initial secure code review workflow mapped to OWASP ASVS and CWE Top 25.
