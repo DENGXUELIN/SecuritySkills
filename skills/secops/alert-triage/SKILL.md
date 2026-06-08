@@ -13,7 +13,7 @@ phase: [operate, respond]
 frameworks: [MITRE-ATT&CK-v16, NIST-SP-800-61-Rev2]
 difficulty: beginner
 time_estimate: "10-20min per alert"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -52,6 +52,7 @@ Before beginning triage, gather or confirm:
 
 - [ ] **Alert details:** Rule name, severity, timestamp, source system (SIEM, EDR, IDS, cloud security).
 - [ ] **Alert data:** The raw event(s) that triggered the alert -- including all available fields (source IP, destination IP, username, hostname, process name, command line, file hash, URL).
+- [ ] **Visual payload context:** For email, chat, SMS, ticket, PDF, image, or attachment alerts, preserve safe-rendered screenshots, attachment metadata, OCR output, decoded QR payloads, and any shortened/redirected destinations.
 - [ ] **ATT&CK mapping:** If the alert rule maps to a MITRE ATT&CK technique, note the technique ID.
 - [ ] **Asset context:** What is the affected asset? (Server, workstation, cloud instance, network device.) What is its business criticality? (Revenue-generating, customer-facing, development, test.)
 - [ ] **User context:** Who is the associated user? (Role, department, normal working hours, recent activity patterns.)
@@ -79,6 +80,7 @@ Gather all data associated with the alert. Do not make a disposition decision un
 | **Network telemetry** | NetFlow, DNS queries, proxy logs for the source/destination | Firewall, proxy, DNS logs |
 | **Threat intelligence** | IOC lookups for IPs, domains, hashes, URLs | VirusTotal, OTX, MISP, TI platform |
 | **Previous alerts** | Historical alerts for same user, host, or IOC | SIEM, case management |
+| **Visual payload evidence** | Safe-rendered image/PDF views, OCR text, decoded QR payloads, shortened URL expansion, attachment hash | Sandbox, mail gateway, OCR/QR decoder, case evidence store |
 
 **NIST SP 800-61 alignment:** This phase corresponds to Section 3.2 "Detection and Analysis" -- specifically the initial analysis and validation of the alert before classification.
 
@@ -93,6 +95,20 @@ Connect the alert data with surrounding context to build a picture of what happe
 3. **Behavioral correlation:** Does this activity match known ATT&CK technique patterns? Does it match the user's or system's normal behavior baseline?
 4. **Threat intel correlation:** Do any indicators match known threat actor infrastructure, malware campaigns, or published IOCs?
 5. **Kill chain correlation:** Where does this activity fall in the attack lifecycle? Is there evidence of preceding (reconnaissance, initial access) or subsequent (persistence, lateral movement, exfiltration) stages?
+6. **Visual payload correlation:** If the alert involves an image, PDF, QR code, screenshot, chat attachment, or SMS link, what destination is revealed by safe OCR/QR extraction, and do identity, proxy, DNS, or sign-in logs show activity after delivery?
+
+**QR Code / Visual Phishing Evidence Gate:**
+
+Use this gate before closing visual phishing alerts as FP or low-confidence BTP:
+
+- `QR-PHISH-01`: preserve the original message, attachment, image, or chat/SMS artifact with hash and source metadata.
+- `QR-PHISH-02`: perform safe visual extraction using sandboxed rendering, OCR, and QR decoding without following links from the analyst workstation.
+- `QR-PHISH-03`: record decoded URL, shortened URL expansion, redirect chain, final domain, and reputation at triage time.
+- `QR-PHISH-04`: scope delivery to all recipients, mailboxes, chats, tickets, or shared channels that received the same artifact or hash.
+- `QR-PHISH-05`: check user interaction evidence beyond enterprise URL rewriting, including IdP sign-ins, MFA prompts, mobile browser user agents, DNS/proxy logs, and reported scans.
+- `QR-PHISH-06`: account for cross-device context where the scan may occur on unmanaged mobile devices with no EDR or rewritten-click telemetry.
+- `QR-PHISH-07`: document containment for delivered copies, decoded destinations, compromised sessions, and follow-on identity events.
+- `QR-PHISH-08`: if extraction cannot be performed or recipient interaction is unknown, classify as Unknown/Needs Investigation instead of FP.
 
 **ATT&CK-based correlation framework:**
 
@@ -234,6 +250,17 @@ Produce the triage decision as a structured report:
 - **Threat Intel:** [IOC match results]
 - **Kill Chain Position:** [Where this falls in the attack lifecycle]
 
+### QR / Visual Phishing Evidence
+| Control | Evidence | Result |
+|---------|----------|--------|
+| Original artifact preserved | [Message ID, attachment hash, screenshot evidence] | Present / Missing / Unknown |
+| Safe OCR/QR extraction | [Tool/run ID, decoded payload, extraction notes] | Complete / Partial / Not Performed |
+| Decoded URL and redirect chain | [Decoded URL, expanded URL, final domain, reputation] | Malicious / Benign / Unknown |
+| Recipient scope | [Delivered recipients, same-hash messages, chat/ticket scope] | Complete / Partial / Unknown |
+| User interaction | [IdP, MFA, DNS, proxy, mobile/browser, reported scan evidence] | Confirmed / Not Seen / Unknown |
+| Cross-device context | [Managed/unmanaged device assumptions and gaps] | Addressed / Gap |
+| Containment decision | [Quarantine, takedown/block, session reset, account action] | Complete / Pending / Not Needed |
+
 ### Recommended Actions
 - [ ] [Action 1 -- e.g., isolate host, disable account, block IP]
 - [ ] [Action 2 -- e.g., collect forensic artifacts, memory dump]
@@ -318,6 +345,10 @@ Investigating an alert in isolation without checking for activity before and aft
 ### Pitfall 5: Delaying Escalation While Seeking Perfect Information
 
 Waiting for complete certainty before escalating a high-priority alert costs response time. NIST SP 800-61 recommends erring on the side of over-notification. If 20 minutes of investigation has not resolved the disposition and the alert involves a critical asset or privileged account, escalate to Tier 2 or the IR team with your current findings and continue investigation in parallel.
+
+### Pitfall 6: Treating QR Phishing as a Normal URL Alert
+
+QR codes, screenshots, and image-only lures can move the destination out of rewritten URL telemetry. Do not close a suspicious email, chat, or PDF alert as FP just because no text URL or rewritten-click event exists. Safely extract the visual payload, decode destinations, scope delivered copies, and correlate follow-on identity activity before disposition.
 
 ---
 
