@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [NIST-SP-800-81-Rev2, CIS-Controls-v8]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -294,6 +294,27 @@ abcdef0123456789.dnscat.example.com TXT
 
 ---
 
+### Step 7: Control-Plane Evidence and Bypass Review
+
+Before final reporting, tie each DNS finding to the control-plane and data-plane evidence that proves it. DNSSEC, protective DNS, RPZ, encrypted transport, and exfiltration detection can all look present in configuration while failing in public validation, client path enforcement, feed freshness, or logging coverage.
+
+**DNS evidence gates:**
+
+| Gate | Requirement |
+|------|-------------|
+| `DNS-CTRL-01` | Record evidence source and confidence for each control: configuration, authoritative query, parent DS query, resolver query result, egress policy, RPZ feed export, log/SIEM sample, docs-only, or unknown. |
+| `DNS-CTRL-02` | For authoritative DNSSEC, verify signed zone records, algorithm/key size, DNSKEY/KSK fingerprint, matching DS in the parent, and external validation status. |
+| `DNS-CTRL-03` | For recursive DNSSEC, verify resolver validation setting, trust-anchor freshness, NTA inventory, and positive/negative validation query results. |
+| `DNS-CTRL-04` | For protective DNS/RPZ, verify feed source, update automation, last update time, block action, test-domain result, blocked-query logging, and SIEM forwarding. |
+| `DNS-CTRL-05` | For client path enforcement, verify DHCP/resolver settings, endpoint policy, direct UDP/TCP 53 egress controls, browser DoH policy, and known public DoH endpoint handling. |
+| `DNS-CTRL-06` | For exfiltration detection, verify resolver logs include source, qname, qtype, response code, response size, entropy/volume rules, and TCP/UDP 53 coverage. |
+| `DNS-CTRL-07` | Mark controls as Not Evaluable with a reason code when evidence is missing: `missing-parent-ds`, `missing-external-validation`, `missing-resolver-path`, `missing-egress-policy`, `missing-doh-policy`, `missing-rpz-feed`, `missing-query-logs`, `missing-siem-forwarding`, or `sample-only`. |
+| `DNS-CTRL-08` | Record split-horizon scope, exception owner, expiry, compensating controls, and retest trigger before downgrading or accepting risk. |
+
+**Classification guidance:** A locally signed zone without parent DS and external validation evidence is at least **High** and can be **Critical** when public clients rely on DNSSEC. Protective DNS configured on the resolver but bypassable through direct DNS or public DoH is **High**. RPZ/protective DNS without feed freshness or block logging is **Medium**. Exfiltration detection without source-attributed logs or TCP/UDP coverage is **Medium** to **High** depending on exposure.
+
+---
+
 ## Findings Classification
 
 | Severity | Definition |
@@ -333,6 +354,11 @@ abcdef0123456789.dnscat.example.com TXT
 #### [F-001] <Finding Title>
 - **Severity:** Critical / High / Medium / Low
 - **Control Reference:** NIST SP 800-81 Section X / CIS 9.2
+- **Asset Role:** authoritative / recursive / client / protective-dns / siem
+- **Evidence Source:** configuration / authoritative-query / parent-ds-query / resolver-query / egress-policy / rpz-feed / log-siem-sample / docs-only / unknown
+- **Evidence Confidence:** high / medium / low / unknown
+- **Not Evaluable Reason:** <reason code if applicable>
+- **Bypass Path:** <direct DNS, public DoH, split-horizon gap, or none>
 - **File:** <path to config file>
 - **Description:** <what was found>
 - **Evidence:** <specific configuration snippet>
@@ -384,6 +410,14 @@ abcdef0123456789.dnscat.example.com TXT
 
 4. **Ignoring DNS over TCP.** DNS is not UDP-only. DNS over TCP (port 53) supports large responses and is required for zone transfers. Some tunneling tools prefer TCP for reliability. Firewall rules and monitoring must cover both UDP and TCP port 53.
 
+5. **Accepting signed zone files without parent-chain proof.** RRSIG and DNSKEY records in a local zone file do not prove public DNSSEC validation. Query the parent DS record and validate externally.
+
+6. **Treating resolver hardening as client enforcement.** DNSSEC-validating or RPZ-enabled resolvers do not protect endpoints that can use direct DNS or public browser DoH.
+
+7. **Accepting stale RPZ feeds.** RPZ configuration is not enough without feed source, automated update evidence, last update time, block behavior, and logging.
+
+8. **Logging without source attribution.** DNS exfiltration detection needs source identity, qname, qtype, response code, and response size. Aggregate-only counts are insufficient for triage.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -413,4 +447,5 @@ This skill processes DNS configuration files that may contain user-supplied zone
 
 ## Changelog
 
+- **1.0.1** -- Added DNS control-plane evidence gates, evidence confidence fields, DNSSEC parent-chain validation, client bypass review, RPZ freshness/logging requirements, and Not Evaluable reason codes.
 - **1.0.0** -- Initial release. Full coverage of NIST SP 800-81 Rev 2 and CIS Controls v8 Control 9.2 for DNS security review.

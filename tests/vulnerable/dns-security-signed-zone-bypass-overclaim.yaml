@@ -1,0 +1,70 @@
+id: dns-security-signed-zone-bypass-overclaim
+skill: dns-security
+expected: vulnerable
+description: >
+  Local DNSSEC and RPZ configuration are overclaimed as effective DNS security
+  without parent-chain, resolver-path, egress, DoH, feed, or logging evidence.
+scenario:
+  authoritative_zone:
+    zone: example.test
+    local_zone_file: zones/example.test.signed
+    local_records:
+      - DNSKEY
+      - RRSIG
+      - NSEC3PARAM
+    missing_evidence:
+      - parent_ds_query
+      - external_dnssec_validation_result
+      - ksk_fingerprint_match
+      - registrar_or_parent_update_ticket
+  recursive_resolver:
+    software: BIND
+    config:
+      dnssec_validation: auto
+      response_policy_zone: malware-block.rpz
+    missing_evidence:
+      - trust_anchor_freshness
+      - validating_resolver_query_result
+      - negative_trust_anchor_inventory
+      - rpz_feed_source
+      - rpz_last_update_time
+      - rpz_test_block_result
+      - blocked_query_logs
+  client_path:
+    claimed_scope: "all enterprise endpoints"
+    missing_evidence:
+      - dhcp_resolver_assignment
+      - endpoint_dns_policy
+      - udp_53_egress_block
+      - tcp_53_egress_block
+      - browser_doh_policy
+      - public_doh_endpoint_policy
+  reported_findings:
+    - title: "DNSSEC deployed for public zone"
+      status: Pass
+      evidence_source: configuration
+      evidence_confidence: low
+      problem: "Local signed zone records are treated as public chain-of-trust validation."
+    - title: "Protective DNS enforced for endpoints"
+      status: Pass
+      evidence_source: configuration
+      evidence_confidence: low
+      problem: "Resolver RPZ exists, but clients can bypass through direct DNS or browser DoH."
+    - title: "DNS exfiltration detection ready"
+      status: Pass
+      evidence_source: docs-only
+      evidence_confidence: low
+      problem: "No source-attributed DNS query logs or TCP/UDP coverage evidence is supplied."
+should_trigger:
+  - DNS-CTRL-01
+  - DNS-CTRL-02
+  - DNS-CTRL-03
+  - DNS-CTRL-04
+  - DNS-CTRL-05
+  - DNS-CTRL-06
+  - DNS-CTRL-07
+expected_result: >
+  The skill should flag the assessment as overconfident. DNSSEC should remain
+  Fail or Not Evaluable until parent DS and external validation evidence exist,
+  protective DNS should be High risk when client bypass paths are not controlled,
+  and exfiltration readiness should require source-attributed DNS logs.

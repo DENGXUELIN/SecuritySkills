@@ -1,0 +1,65 @@
+id: dns-security-control-plane-evidence-verified
+skill: dns-security
+expected: benign
+description: >
+  DNS review ties each finding to authoritative, recursive, client path, RPZ,
+  and SIEM evidence before assigning scoped Pass results.
+scenario:
+  evidence_inventory:
+    - name: authoritative_dnssec_validation
+      source_type: authoritative-query
+      captured: "2026-06-01T08:00:00Z"
+      coverage: "public zone example.test, DNSKEY/KSK fingerprint, parent DS query, external validation pass"
+    - name: recursive_validation_queries
+      source_type: resolver-query
+      captured: "2026-06-01T08:10:00Z"
+      coverage: "enterprise resolvers, valid and intentionally broken DNSSEC test domains"
+    - name: client_path_enforcement
+      source_type: egress-policy
+      captured: "2026-06-01T08:20:00Z"
+      coverage: "DHCP resolver assignment, endpoint policy, UDP/TCP 53 egress deny except resolvers, browser DoH disabled"
+    - name: rpz_feed_and_block_logs
+      source_type: rpz-feed
+      captured: "2026-06-01T08:30:00Z"
+      coverage: "feed source, automated transfer, last update, test domain blocked, blocked-query logs"
+    - name: dns_siem_detection_sample
+      source_type: log-siem-sample
+      captured: "2026-06-01T08:40:00Z"
+      coverage: "source, qname, qtype, rcode, response size, entropy and volume alerts, UDP/TCP 53"
+  reported_findings:
+    - title: "DNSSEC deployed for public zone"
+      status: Pass
+      severity: Low
+      asset_role: authoritative
+      evidence_source: authoritative-query
+      evidence_confidence: high
+      bypass_path: none
+      notes:
+        - "Parent DS matches KSK fingerprint and external validation passes."
+    - title: "Protective DNS enforced for endpoints"
+      status: Pass
+      severity: Low
+      asset_role: protective-dns
+      evidence_source: egress-policy
+      evidence_confidence: high
+      bypass_path: none
+      notes:
+        - "Direct UDP/TCP 53 and browser DoH bypass paths are controlled."
+        - "RPZ feed freshness and blocked-query logging are verified."
+    - title: "Split-horizon internal DNSSEC"
+      status: Not Evaluable
+      severity: Informational
+      asset_role: authoritative
+      evidence_source: unknown
+      not_evaluable_reason: sample-only
+      notes:
+        - "Internal split-horizon zone was outside the supplied sample."
+should_not_trigger:
+  - "signed zone accepted without parent DS"
+  - "resolver RPZ treated as client enforcement"
+  - "exfiltration detection accepted without source-attributed logs"
+expected_result: >
+  The skill should accept scoped Pass findings where control-plane and
+  data-plane evidence exists, preserve Not Evaluable reason codes for unsampled
+  split-horizon zones, and avoid overclaiming protective DNS when bypass evidence
+  is missing.
