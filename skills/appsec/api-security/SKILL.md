@@ -51,6 +51,37 @@ For detailed checklist items with vulnerable code patterns, remediation examples
 
 ---
 
+## Cross-Cutting Gate: Idempotency and Replay Evidence
+
+For state-changing operations, verify that retries, duplicate delivery, and concurrent requests cannot produce duplicate side effects. This gate applies to REST create/update/delete endpoints, GraphQL mutations, webhooks, async event consumers, queue workers, and job enqueue APIs.
+
+**Evidence to collect:**
+
+- Inventory of high-impact state-changing operations, including charges, transfers, approvals, deletes, restores, workflow transitions, inventory changes, quota changes, webhook handlers, job producers, and GraphQL mutations.
+- Idempotency key, event ID, nonce, timestamp/signature, version check, or equivalent duplicate-control requirement for each high-impact operation.
+- Binding evidence showing replay controls are tied to actor, tenant, operation, resource, and payload hash.
+- Atomic duplicate-detection evidence across replicas, queues, retries, and failover paths, such as unique constraints, durable ledgers, compare-and-swap, or transactional outbox records.
+- Retry response behavior showing the original result, conflict, or replay rejection instead of a second side effect.
+- Replay-window evidence for webhook signatures, nonces, timestamps, and event IDs.
+- Logging and alerting evidence for duplicate rejects, replay rejects, retry storms, and concurrency conflicts.
+
+**What to flag:**
+
+```
+API-REPLAY-01: State-changing operation lacks idempotency key, event ID, nonce, version check, or equivalent duplicate control
+API-REPLAY-02: Idempotency key or nonce is not bound to actor, tenant, operation, resource, and payload hash
+API-REPLAY-03: Duplicate detection is non-atomic across replicas, queues, retries, or failover paths
+API-REPLAY-04: Retry returns a second side effect instead of original result, conflict, or replay rejection
+API-REPLAY-05: Webhook or async event handler accepts duplicate event IDs without durable replay tracking
+API-REPLAY-06: Replay window for signatures, timestamps, or nonces is missing or too broad
+API-REPLAY-07: Balance, inventory, quota, approval, or uniqueness-sensitive operation lacks concurrency evidence
+API-REPLAY-08: Duplicate/replay rejects and retry storms are not logged or alerted
+```
+
+Map these findings primarily to **API6:2023 -- Unrestricted Access to Sensitive Business Flows** for repeated business actions, and to **API4:2023 -- Unrestricted Resource Consumption** when retries or redelivery create resource exhaustion. Escalate to **High** when duplicate side effects can create charges, transfers, approvals, inventory loss, destructive deletes, or privilege changes.
+
+---
+
 ## Findings Classification
 
 Each finding produced by this review must include the following fields:
@@ -111,6 +142,12 @@ The final review output must be structured as follows:
 
 **Total Findings:** [count]
 **Critical:** [count] | **High:** [count] | **Medium:** [count] | **Low:** [count] | **Info:** [count]
+
+### Idempotency and Replay Control Matrix
+
+| Operation | API Style | Side Effect | Replay Control | Binding | Atomicity Evidence | Retry Response | Replay Window | Logging/Alerting |
+|---|---|---|---|---|---|---|---|---|
+| [POST /payments] | [REST/GraphQL/Webhook/Queue] | [charge/approval/delete/job] | [key/event/nonce/version] | [actor/tenant/resource/payload] | [unique constraint/ledger/CAS] | [original/conflict/reject] | [duration] | [signals] |
 
 ### Findings
 
@@ -214,6 +251,8 @@ Unlike REST, where authorization can be enforced per endpoint, GraphQL requires 
 5. **Applying rate limiting only to authentication endpoints.** Every API endpoint requires rate limiting proportional to its cost and sensitivity. Data-heavy endpoints, search functions, and export operations are frequent targets for abuse even when properly authenticated.
 
 6. **Ignoring upstream API trust.** Data received from third-party APIs and even internal microservices must be validated before use. A compromised upstream service can inject SQL, XSS, or SSRF payloads through otherwise trusted data channels.
+
+7. **Treating retries as harmless.** Client retries, mobile double-taps, webhook redelivery, and queue redelivery can repeat the same business action unless state-changing operations have durable idempotency or replay controls.
 
 ---
 
