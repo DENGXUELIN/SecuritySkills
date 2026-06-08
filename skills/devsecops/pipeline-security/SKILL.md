@@ -392,6 +392,8 @@ docker.sock
 - No SBOM (Software Bill of Materials) generation in the build pipeline.
 - Downloaded dependencies or tools without checksum verification.
 - Missing provenance attestation (SLSA provenance, in-toto, Sigstore).
+- Integrity evidence that is generated but not enforced before deployment.
+- Signatures, SBOMs, provenance, and deployment references that point to different artifact digests or build runs.
 
 **Grep patterns:**
 
@@ -414,7 +416,48 @@ image: nginx@sha256:abcdef...  # GOOD
 image: nginx:latest            # BAD
 ```
 
-**Finding format:** Report whether artifacts are signed, whether provenance is generated, whether SBOMs are produced, and whether container images use digest pinning.
+#### CICD-SEC-9.1 Artifact Integrity Evidence Gate
+
+Do not mark CICD-SEC-9 as passing just because a pipeline generates a signature, SBOM, or provenance file. Require evidence that the released or deployed artifact is the same immutable artifact produced by the trusted build, and that release tooling verifies the evidence before use.
+
+**Artifact integrity findings:**
+
+```
+PIPE-ART-01: Artifact digest is missing, mutable, or recorded only as a tag/filename
+PIPE-ART-02: Signature or signing identity is missing for a release artifact
+PIPE-ART-03: Provenance does not bind the digest to source repo, commit, build run, builder identity, and build config
+PIPE-ART-04: SBOM is missing or references a different digest, build run, package, image, or release bundle
+PIPE-ART-05: Verification command, admission policy, or release gate is missing or not enforced before deploy
+PIPE-ART-06: Deployment reference uses a mutable tag or filename while evidence is tied to another digest
+PIPE-ART-07: Promotion across environments changes tag, registry, chart, or package without re-verifying the same digest
+PIPE-ART-08: Failed, unknown, or skipped verification lacks owner, exception approval, expiry, and remediation path
+```
+
+**Artifact integrity evidence record:**
+
+```
+PIPELINE ARTIFACT INTEGRITY EVIDENCE
+====================================
+Artifact:                 [image/package/binary/chart/release bundle]
+Build Run:                [CI run ID/link, workflow, timestamp]
+Digest:                   [sha256/OCI digest; not just tag]
+Signature:                [cosign/GPG/registry signature reference]
+Signing Identity:         [OIDC subject, KMS key, cert subject, service principal]
+Provenance:               [SLSA/in-toto attestation bound to digest]
+SBOM:                     [CycloneDX/SPDX reference bound to digest]
+Verification Command:     [cosign verify, slsa-verifier, admission policy, release gate]
+Verification Result:      [Pass | Fail | Unknown]
+Deployment Reference:     [environment, manifest, release, digest used]
+Exception / Owner:        [N/A or owner, approval, expiry, remediation]
+```
+
+**False-positive boundaries:**
+
+- Do not require public transparency-log evidence for private artifacts when an internal KMS/HSM signature and policy verification log bind the same digest.
+- Do not flag digest-based promotion without re-signing when the signature/provenance policy explicitly allows the same digest across environments and deployment verifies it.
+- Do not require SBOM regeneration at deploy time when the SBOM is generated at build time and cryptographically bound to the deployed digest.
+
+**Finding format:** Report whether artifacts are signed, whether provenance is generated, whether SBOMs are produced, whether the evidence binds to the same digest/build run, whether verification is enforced before deployment, and whether deployments use digest pinning.
 
 ---
 
@@ -488,7 +531,14 @@ Produce the final report using the following structure:
 - **File:** <path to relevant config>
 - **Line(s):** <line numbers if applicable>
 - **Description:** <what was found>
+- **Artifact Integrity Evidence:** <digest, signature, signing identity, provenance, SBOM, verification result, deployment reference>
 - **Remediation:** <specific fix>
+
+### Artifact Integrity Evidence
+
+| Artifact | Build Run | Digest | Signature | Signing Identity | Provenance | SBOM | Verification Command | Verification Result | Deployment Reference | Exception / Owner |
+|---|---|---|---|---|---|---|---|---|---|---|
+| <image/package> | <run id/link> | <sha256/OCI digest> | <signature/ref> | <identity> | <attestation> | <sbom ref> | <policy/command> | <Pass/Fail/Unknown> | <environment/manifest> | <N/A or owner/expiry> |
 
 ### Prioritized Remediation Plan
 
@@ -529,6 +579,16 @@ The final deliverable is a structured assessment report as shown in Step 4 above
 - If no CI/CD configuration files are found, report this as the primary finding and recommend establishing a pipeline configuration.
 - If configurations use a platform not covered by this skill (e.g., a niche CI system), document what was found and note which controls could not be fully evaluated.
 - If file access is denied, record the file path and note the control as "Not Evaluable -- Access Denied."
+
+---
+
+## Common Pitfalls
+
+1. **Treating generated attestations as enforced integrity.** A pipeline can produce signatures, SBOMs, and provenance while deployments still pull mutable tags without verification. CICD-SEC-9 should not pass unless release or deployment tooling verifies the artifact digest, signature, provenance, and policy before use.
+
+2. **Mixing evidence from different artifacts or build runs.** A signature for one digest, an SBOM from another build, and a deployment of a mutable tag do not prove integrity. Bind all evidence to the same artifact digest and build run.
+
+3. **Promoting by tag instead of digest.** A tag can point to one digest in dev and another in production. Record the digest used by each deployment target and verify that promotion keeps the same digest or produces new signed evidence.
 
 ---
 
