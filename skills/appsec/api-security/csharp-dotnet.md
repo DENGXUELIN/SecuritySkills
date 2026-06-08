@@ -869,6 +869,90 @@ builder.Services.AddHttpClient("PartnerApi", client =>
 
 ---
 
+## ASP.NET Core Inbound Webhook Receiver Evidence Gates
+
+Inbound webhooks are API endpoints that consume provider-controlled callbacks
+from Stripe, GitHub, GitLab, and internal partners. In ASP.NET Core, the most
+common failure is parsing or model-binding JSON before verifying the provider
+signature over the exact raw request body.
+
+### Minimal API -- Vulnerable
+
+```csharp
+// VULNERABLE: Parses JSON before verifying the signature over raw bytes.
+app.MapPost("/webhooks/stripe", async (HttpRequest request, AppDbContext db) =>
+{
+    var evt = await request.ReadFromJsonAsync<StripeEvent>();
+    if (!request.Headers.ContainsKey("Stripe-Signature"))
+        return Results.Unauthorized();
+
+    await ApplyStripeSideEffects(evt!, db);
+    return Results.Ok();
+});
+```
+
+### Minimal API -- Secure
+
+```csharp
+app.MapPost("/webhooks/stripe", async (HttpRequest request, IWebhookVerifier verifier, AppDbContext db) =>
+{
+    request.EnableBuffering();
+    using var reader = new StreamReader(request.Body, Encoding.UTF8, leaveOpen: true);
+    var rawBody = await reader.ReadToEndAsync();
+    request.Body.Position = 0;
+
+    var signature = request.Headers["Stripe-Signature"].ToString();
+    var verification = verifier.VerifyStripe(rawBody, signature, DateTimeOffset.UtcNow);
+    if (!verification.Success)
+        return Results.Unauthorized();
+
+    if (!await db.ProcessedWebhookEvents.TryInsertAsync(verification.EventId, verification.DeliveryId))
+        return Results.Ok(); // idempotent retry
+
+    var evt = JsonSerializer.Deserialize<StripeEvent>(rawBody);
+    if (!AllowedStripeEvents.Contains(evt!.Type))
+        return Results.BadRequest();
+
+    await ApplyStripeSideEffects(evt, db);
+    return Results.Ok();
+});
+```
+
+### Webhook Evidence Gates
+
+```
+DOTNET-WH-01: Handler parses JSON, model binds, or reads [FromBody] before raw-body signature verification
+DOTNET-WH-02: Provider signature header and timestamp are not validated with constant-time comparison and tolerance window
+DOTNET-WH-03: Delivery ID or event ID is not stored before side effects, making provider retries non-idempotent
+DOTNET-WH-04: Event allowlist is missing for provider event types or actions
+DOTNET-WH-05: Tenant, account, repository, project, or environment binding is not verified against local configuration
+DOTNET-WH-06: Webhook secret source and rotation window are not environment-scoped or bounded for old secrets
+DOTNET-WH-07: Provider retry behavior, duplicate deliveries, and out-of-order events are not tested
+DOTNET-WH-08: Review evidence omits raw-body capture method, header mapping, replay decision, side-effect boundary, and audit logging
+```
+
+### Provider Header Mapping
+
+| Provider | Authenticity Header | Replay / Idempotency Header | Binding Evidence |
+|---|---|---|---|
+| Stripe | `Stripe-Signature` | event `id`, timestamp in signature | account, livemode/testmode, event type allowlist |
+| GitHub | `X-Hub-Signature-256` | `X-GitHub-Delivery` | repository/org, event type, installation ID |
+| GitLab | `X-Gitlab-Token` or provider signature scheme | event UUID when available | project path/id, event type, protected branch/environment |
+| Custom partner | HMAC or asymmetric signature header | delivery ID/event ID/timestamp | tenant/account, shared secret version, allowed source |
+
+### Webhook Review Checklist -- .NET
+
+- [ ] Raw body is captured with `EnableBuffering()` or equivalent before any JSON parsing, model binding, or `[FromBody]` DTO binding.
+- [ ] Signature verification covers the exact raw request body and provider timestamp, with a bounded replay tolerance window.
+- [ ] HMAC or signature comparisons use constant-time comparison such as `CryptographicOperations.FixedTimeEquals`.
+- [ ] Delivery IDs or event IDs are inserted before side effects and enforce idempotency for provider retries.
+- [ ] Event types/actions are allowlisted and unknown events fail closed or are ignored safely.
+- [ ] Tenant/account/repository/project/environment binding is checked before applying side effects.
+- [ ] Webhook secrets are environment-scoped and old-secret acceptance is bounded during rotation.
+- [ ] Tests cover invalid signatures, stale timestamps, duplicate deliveries, wrong tenant/repository, disallowed event types, and retry-safe side effects.
+
+---
+
 ## ASP.NET Core Minimal API Security Patterns
 
 Minimal APIs (.NET 7+) have a different surface than controller-based APIs. Security-relevant patterns to review:
@@ -1223,6 +1307,22 @@ HttpClientHandler.*ServerCertificateCustomValidation.*true
 MapPost\(.*login.*\)(?![\s\S]*?RequireRateLimiting)
 MapPost\(.*register.*\)(?![\s\S]*?RequireRateLimiting)
 MapPost\(.*password.*\)(?![\s\S]*?RequireRateLimiting)
+```
+
+### Inbound Webhook Receiver Risks
+
+```
+# JSON/body parsing before signature verification
+ReadFromJsonAsync<
+\[FromBody\].*(Webhook|Stripe|GitHub|GitLab|Event)
+JsonSerializer\.Deserialize.*Request\.Body
+# Signature headers present without raw-body verification/idempotency review
+Stripe-Signature
+X-Hub-Signature-256
+X-GitHub-Delivery
+X-Gitlab-Token
+# Look for these without EnableBuffering, FixedTimeEquals, replay timestamp checks,
+# delivery/event-id storage, and tenant/repository/project binding.
 ```
 
 ---
