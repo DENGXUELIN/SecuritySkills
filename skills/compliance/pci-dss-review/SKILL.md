@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [PCI-DSS-v4.0]
 difficulty: advanced
 time_estimate: "90-180min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -76,6 +76,7 @@ Key changes in v4.0:
 - Security policies and operational procedures
 - Encryption key management documentation
 - Vendor and third-party service provider inventory (especially payment processors, gateways, hosting)
+- End-user messaging channel inventory for email, SMS, chat, support portals, ticketing, collaboration tools, archives, exports, and backups that may receive PAN
 
 ## Constraints
 
@@ -198,6 +199,23 @@ Key sub-requirements:
 - **4.2.1.1**: Trusted keys and certificates managed; inventory maintained
 - **4.2.1.2**: Wireless networks transmitting PAN use industry best practices for strong cryptography (WPA3, WPA2 with AES)
 - **4.2.2**: PAN secured with strong cryptography when sent via end-user messaging technologies (email, IM, SMS, chat)
+
+##### Requirement 4.2.2 End-User Messaging PAN Evidence Gate
+
+Do not mark Req 4.2.2 `In Place` or `Not Applicable` from policy text, transport TLS, or CDE diagrams alone. Validate whether customers, employees, bots, agents, or support staff can place PAN into end-user messaging technologies and whether every storage, archive, export, and backup path is protected or prevented.
+
+| Gate | Required Evidence | Failure Signal |
+|---|---|---|
+| PCI-PAN-MSG-01 | Complete channel inventory for email, SMS, chat, support portals, ticketing, collaboration tools, attachments, screenshots, archives, exports, and backups | Support or messaging platform omitted because it is "outside the CDE" |
+| PCI-PAN-MSG-02 | Business need and approved workflow for any channel that can receive PAN, including secure payment-link alternatives | No-PAN policy exists but users can still paste or attach PAN |
+| PCI-PAN-MSG-03 | DLP or input-control test evidence showing full PAN, spaced PAN, attachment, image/OCR, and copy/paste cases are blocked, encrypted, or routed safely | DLP is monitor-only, outbound-only, or does not inspect attachments/screenshots |
+| PCI-PAN-MSG-04 | Strong cryptography evidence for message content at rest and in transit when PAN is permitted, with key ownership and access review | Email transport TLS treated as message/content encryption |
+| PCI-PAN-MSG-05 | Raw transcript, ticket body, attachment, archive, search index, eDiscovery, analytics export, and backup handling evidence | UI masking/redaction hides PAN while raw storage or backups retain it |
+| PCI-PAN-MSG-06 | Scope impact decision tying each channel to CDE, connected-to, security-impacting, or out-of-scope status with assessor rationale | Channel marked out of scope without PAN sampling or control evidence |
+| PCI-PAN-MSG-07 | Sampling evidence across channels and time windows, including negative tests and any exception tickets | Single policy screenshot used as full Req 4.2.2 proof |
+| PCI-PAN-MSG-08 | Incident/remediation workflow for detected PAN in messaging, including deletion, retention override, customer handling, and retest | PAN detections stay in retained queues or archives with no cleanup proof |
+
+Record channels with missing, stale, or non-testable evidence as `Not Tested` or `Requirement Not in Place`, not as `In Place`. A token, masked value, or secure payment link can support a benign result only when its format, routing, and storage evidence prove no recoverable PAN is present in the messaging system.
 
 #### Requirement 5: Protect All Systems and Networks from Malicious Software
 
@@ -442,6 +460,12 @@ Note: Not all requirements support the Customized Approach. Requirements with "T
 |---------|--------|---------|----------|-------------|
 | [N.x.x] | [In Place/Not in Place] | [finding detail] | [evidence reviewed] | [action needed] |
 
+## End-User Messaging PAN Evidence
+
+| Channel | PAN Entry Paths Tested | Prevention / Encryption Evidence | Storage / Archive Handling | Scope Impact | Status |
+|---------|------------------------|----------------------------------|----------------------------|--------------|--------|
+| [email/chat/ticket/SMS/support portal] | [body, attachment, screenshot, copy/paste, bot prompt] | [DLP block, secure payment link, content encryption, key evidence] | [raw transcript, archive, search, export, backup, deletion] | [CDE / connected-to / out of scope with rationale] | [In Place / Not in Place / Not Tested / N/A] |
+
 ## New v4.0 Requirements Status
 [Assessment of all 64 new requirements, particularly those mandatory since March 31, 2025]
 
@@ -519,6 +543,8 @@ Maintain an Information Security Policy:                Requirement 12
 4. **Treating compensating controls as permanent solutions.** Compensating controls must be reassessed annually and are expected to be temporary measures while the organization works toward meeting the original requirement. Assessors scrutinize long-standing compensating controls and may reject those that have become routine without progress toward full compliance.
 
 5. **Failing to manage third-party service provider (TPSP) compliance.** Requirement 12.8 and 12.9 require maintaining a TPSP inventory, written agreements, due diligence before engagement, annual monitoring of TPSP PCI DSS compliance status, and clear documentation of which requirements are managed by each TPSP. The shared responsibility model must be explicitly documented.
+
+6. **Assuming no-PAN messaging policies remove PCI scope.** A policy, TLS mail transport, or CDE diagram does not prove Req 4.2.2 is in place. If support tickets, chat transcripts, email archives, SMS logs, screenshots, exports, or backups can contain recoverable PAN, assess prevention, strong cryptography, retention, deletion, and scope impact for those systems.
 
 ---
 
