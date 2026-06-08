@@ -115,6 +115,30 @@ For detailed CIS benchmark checklist items, NIST SP 800-190 countermeasure table
 
 ---
 
+### Step 6.5: Debug Container and Ephemeral Privilege Evidence Gate
+
+When a workload or policy allows privileged, root, host namespace, hostPath, `kubectl exec`, or ephemeral debug container access, determine whether the privilege is persistent application runtime or a controlled break-glass/debug path.
+
+Record evidence for each debug or ephemeral privilege path:
+
+| Evidence | Required check | Failure signal |
+|----------|----------------|----------------|
+| Workload persistence | Privilege appears only in `ephemeralContainers`, temporary debug pods, or approved troubleshooting overlays | Privilege is present in a Deployment, StatefulSet, DaemonSet, or base Helm values |
+| Time bound | TTL, active deadline, cleanup job, or ticket expiry limits the debug container lifetime | No expiry, no cleanup proof, or reusable privileged debug workload |
+| Namespace and target scope | Debug access is limited to named namespaces, workloads, and service accounts | Cluster-wide debug rights or wildcard namespaces |
+| RBAC and admission control | `pods/ephemeralcontainers`, `pods/exec`, and privileged pod creation are restricted to approved break-glass roles | Ordinary app teams or CI service accounts can create privileged/debug containers |
+| Audit trail | Kubernetes audit logs, cloud audit logs, or admission controller logs record who created the debug session and why | No audit log for debug/exec/ephemeral-container use |
+| Runtime constraints | Capabilities, host namespaces, hostPath mounts, and `allowPrivilegeEscalation` are minimized for the debug purpose | Debug image gets broad host access unrelated to the incident or ticket |
+
+Classification guidance:
+
+- Keep Critical/High when privileged settings are persistent in application workloads, base Helm values, DaemonSets, or CI-created manifests.
+- Keep High when break-glass debug access is not RBAC-limited, not time-bound, not audited, or can target arbitrary namespaces.
+- Downgrade to Medium/Observation only when the debug container is ephemeral, scoped, time-bound, audited, and tied to a specific incident/change ticket.
+- Do not suppress findings solely because a manifest name contains `debug`, `temporary`, or `breakglass`; require the evidence above.
+
+---
+
 ### Step 7: Compile Assessment Report
 
 
@@ -184,6 +208,12 @@ Produce the final report using the structure defined in the Output Format sectio
 |----------|-----------|-----------|------------|
 | deploy/app | production | Baseline (not Restricted) | runAsRoot, no seccomp |
 | deploy/worker | production | Privileged | privileged: true |
+
+### Debug and Ephemeral Privilege Evidence
+
+| Workload/Role | Privilege Path | Scope | TTL/Expiry | Audit Evidence | RBAC Gate | Decision |
+|---------------|----------------|-------|------------|----------------|-----------|----------|
+| <namespace/workload> | <ephemeralContainers / pods/exec / debug pod / privileged container> | <namespace/workload/service-account> | <duration/ticket expiry> | <audit event/ticket> | <role/admission policy> | <persistent risk / controlled debug / not evidenced> |
 
 ### Prioritized Remediation Plan
 
@@ -257,6 +287,7 @@ Produce the final report using the structure defined in the Output Format sectio
 5. **`readOnlyRootFilesystem` breaks many applications.** When recommending this control, also recommend adding writable `emptyDir` volume mounts for directories the application needs to write to (e.g., `/tmp`, `/var/cache`).
 6. **Network policies are additive, not subtractive.** A default-deny policy must be explicitly created. Without it, all pod-to-pod traffic is allowed regardless of other NetworkPolicy resources.
 7. **Distroless images have no shell.** While this is excellent for security, note that debugging requires ephemeral containers (`kubectl debug`). Flag this as a consideration, not a problem.
+8. **Debug labels are not evidence.** A privileged container named `debug` or `breakglass` is still persistent risk unless manifests, RBAC, admission policy, TTL, cleanup, and audit logs prove it is a scoped ephemeral debug path.
 
 ---
 
