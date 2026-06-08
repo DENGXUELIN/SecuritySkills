@@ -456,6 +456,33 @@ Suppression:         Enabled, 1 hour
 Entity mapping:      Account -> UserPrincipalName, IP -> IPAddress, Host -> Computer
 ```
 
+#### Production Query Equivalence and Dependency Freshness
+
+Before promoting a detection, prove that the query reviewed by an engineer is equivalent to the scheduled production rule. Sentinel parameters, Splunk macros, saved-search app context, lookup tables, watchlists, accelerated data models, summary indexes, runtime permissions, and suppression settings can all change alert behavior after review.
+
+**Required evidence:**
+
+| Gate | Evidence to Capture | Fail / Not Evaluable Condition |
+|------|---------------------|--------------------------------|
+| Expanded production query | Exported Sentinel analytics rule or Splunk saved search after macros, parameters, app context, inherited defaults, and deployment transforms are resolved | Reviewer approved source text only, or the expanded production query cannot be produced |
+| Lookup/watchlist freshness | Name, owner, last modified time, refresh cadence, deployment target, and change ticket for every lookup/watchlist | Allowlist, threat-intel data, or entity inventory is stale, manually edited outside change control, or missing from production |
+| Acceleration and summary freshness | Splunk CIM data-model acceleration state, summary range, latest build time, `tstats` lag, summary-index schedule, and last successful materialized-view run | Acceleration is disabled, lagging beyond the rule lookback, scoped to different indexes, or the summary job has no health evidence |
+| Runtime principal equivalence | Scheduled rule service account or managed identity, app/workspace context, and accessible indexes/tables compared with reviewer permissions | Reviewer tested with broader permissions than the scheduled production principal |
+| Suppression and incident settings | Event grouping mode, suppression duration, throttle key, alert threshold, incident creation setting, and entity mapping | Query returns distinct entities, but production settings collapse or suppress them without documented intent |
+
+Use these finding IDs when reporting production-equivalence gaps:
+
+```text
+SIEM-EQUIV-01: Reviewed query does not match the expanded production query or saved-search export
+SIEM-EQUIV-02: Lookup, watchlist, or allowlist freshness and deployment state are missing or stale
+SIEM-EQUIV-03: Data-model acceleration, summary index, or materialized-view freshness is missing or lagging
+SIEM-EQUIV-04: Scheduled rule principal has narrower index/table/app permissions than the reviewer
+SIEM-EQUIV-05: Suppression, grouping, throttling, threshold, or incident settings hide distinct entities
+SIEM-EQUIV-06: Production dependency evidence is unavailable, so the rule is incorrectly marked validated
+```
+
+Treat missing equivalence evidence as a deployment blocker for P1/P2 detections and as a required remediation item for lower-priority detections. Mark the gate Not Evaluable when the production artifact or dependency evidence is unavailable; do not silently count the rule as validated.
+
 ### Step 5: Detection Rule Lifecycle Management
 
 **Lifecycle stages:**
@@ -549,6 +576,16 @@ Produce SIEM rule deliverables in this structure:
 
 ### Validation
 - [How to test the rule produces a true positive]
+- [How the reviewed query matches the scheduled production query, including expanded macros, parameters, saved-search or analytics-rule export, lookup/watchlist versions, acceleration or summary freshness, runtime principal, and suppression/grouping settings]
+
+### Production Equivalence Evidence
+| Dependency | Production Value | Freshness / Scope | Owner | Evidence Source | Status |
+|------------|------------------|-------------------|-------|-----------------|--------|
+| Expanded query | [query hash/export ID] | [resolved timestamp] | [owner] | [saved search or rule export] | Pass/Fail/Not Evaluable |
+| Lookup/watchlist | [name/version] | [last modified/cadence] | [owner] | [deployment/change record] | Pass/Fail/Not Evaluable |
+| Acceleration/summary | [model/job/view] | [latest build/run/range] | [owner] | [health evidence] | Pass/Fail/Not Evaluable |
+| Runtime principal | [service account/context] | [indexes/tables/apps] | [owner] | [role export] | Pass/Fail/Not Evaluable |
+| Suppression/grouping | [settings] | [scope/key/duration] | [owner] | [rule export] | Pass/Fail/Not Evaluable |
 ```
 
 ---
@@ -631,6 +668,10 @@ Deploying a rule without confirming it fires on known-malicious activity is depl
 ### Pitfall 5: Failing to Suppress Duplicate Alerts
 
 A detection rule that fires every 5 minutes on the same ongoing activity (e.g., a brute force attack lasting 2 hours) floods the alert queue with duplicates. Configure alert suppression or deduplication to prevent the same incident from generating hundreds of identical alerts. Use suppression windows and entity-based grouping to consolidate related alerts.
+
+### Pitfall 6: Reviewing a Query That Is Not the Production Query
+
+An analyst console query can differ from the scheduled production rule because macros expand in another app context, lookups or watchlists are stale, accelerated summaries lag, runtime permissions are narrower, or suppression settings collapse distinct entities. Capture the expanded production artifact and dependency freshness before declaring a detection validated.
 
 ---
 
