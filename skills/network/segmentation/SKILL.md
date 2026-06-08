@@ -243,6 +243,48 @@ Document or verify the existence of a segmentation testing process:
 4. **Test VLAN hopping** via double-tagging from user VLANs. Expected result: traffic dropped.
 5. **Validate that segmentation controls survive failover** (HA firewall failover should not open transit paths).
 
+#### 6.1 Path Validation Evidence Gate
+
+Do not accept zone diagrams, route tables, firewall rules, or security-group intent as proof that segmentation works. Require per-path evidence showing whether tested or inferred communication paths behave as expected, including both representative denied paths and business-critical allowed paths.
+
+**Path validation findings:**
+
+```
+SEG-PATH-01: Source zone, source asset, destination zone, or destination asset is missing for a tested path
+SEG-PATH-02: Protocol, port, direction, or application flow is missing, making the path test non-repeatable
+SEG-PATH-03: Expected result and actual result are not both recorded
+SEG-PATH-04: Test method is missing or relies only on diagrams, route tables, or policy review without traffic evidence
+SEG-PATH-05: High-risk denied paths are not sampled, such as user-to-CDE, DMZ-to-data, workload-to-management, or cross-tenant paths
+SEG-PATH-06: Business-critical allowed paths are not tested, so remediation may break required flows unnoticed
+SEG-PATH-07: Evidence timestamp, tester, tool output, packet/log reference, or confidence level is missing or stale
+SEG-PATH-08: Failed, unexpected-allowed, or unexpected-denied paths lack owner, remediation action, and retest timestamp
+```
+
+**Path validation evidence record:**
+
+```
+SEGMENTATION PATH VALIDATION EVIDENCE
+=====================================
+Path ID:                 [unique ID]
+Source Zone / Asset:     [zone, host, IP, workload, namespace]
+Destination Zone / Asset:[zone, host, IP, service, namespace]
+Protocol / Port:         [tcp/443, udp/53, icmp, app protocol]
+Direction:               [ingress/egress/east-west]
+Expected Result:         [Allowed | Denied]
+Actual Result:           [Allowed | Denied | Partial | Not Tested]
+Test Method:             [nmap, curl, nc, packet capture, flow log, policy simulator]
+Evidence Reference:      [command output, flow log ID, packet capture, screenshot]
+Timestamp / Tester:      [UTC timestamp and tester]
+Confidence:              [High | Medium | Low, with reason]
+Owner / Retest:          [N/A or owner/date]
+```
+
+**False-positive boundaries:**
+
+- Do not require exhaustive all-to-all testing when a documented sampling plan covers every high-risk boundary and critical allowed flow with representative assets.
+- Do not flag policy-simulator evidence when it is paired with at least one traffic or flow-log validation per high-risk boundary.
+- Do not flag blocked ICMP if the business flow is TCP/UDP and the review records protocol-specific allowed/denied evidence.
+
 ---
 
 ## Findings Classification
@@ -283,6 +325,12 @@ Document or verify the existence of a segmentation testing process:
 | DMZ         | App       | Firewall    | Restricted | Pass |
 | App         | Data      | SG only     | Overly permissive | F-002 |
 | User        | Data      | None        | No control | F-001 |
+
+### Path Validation Evidence
+
+| Path ID | Source Zone / Asset | Destination Zone / Asset | Protocol / Port | Expected Result | Actual Result | Test Method | Evidence Reference | Timestamp / Tester | Confidence | Owner / Retest |
+|---|---|---|---|---|---|---|---|---|---|---|
+| [path] | [zone/asset] | [zone/asset] | [protocol/port] | [Allowed/Denied] | [Allowed/Denied/Partial/Not Tested] | [method] | [evidence] | [UTC/tester] | [High/Medium/Low] | [N/A or owner/date] |
 
 ### Findings
 
@@ -344,6 +392,8 @@ Document or verify the existence of a segmentation testing process:
 4. **Overlooking service mesh bypass paths.** Istio and Linkerd enforce policy on mesh-enrolled workloads only. Pods that bypass the sidecar proxy (hostNetwork: true, or init container misconfiguration) are not subject to mesh policy. Verify sidecar injection is enforced.
 
 5. **Assuming Kubernetes namespaces provide network isolation.** Namespaces are a logical organizational boundary. Without a NetworkPolicy or CNI-level enforcement (Calico, Cilium), all pods across all namespaces can communicate freely by default.
+
+6. **Accepting diagrams without path evidence.** A diagram can show intended segmentation while route tables, peering, transit gateways, security groups, or mesh bypasses still allow unexpected traffic. Preserve path-level evidence for representative denied paths and business-critical allowed flows before marking boundaries effective.
 
 ---
 
