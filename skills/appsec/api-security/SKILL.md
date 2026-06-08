@@ -11,7 +11,7 @@ phase: [design, build, review]
 frameworks: [OWASP-API-Security-2023, OWASP-ASVS]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.1.0"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -48,6 +48,31 @@ Before analyzing any endpoint, establish a complete inventory of the API surface
 Evaluate the API against all ten OWASP API Security Top 10:2023 risk categories: Broken Object Level Authorization (BOLA), Broken Authentication, Broken Object Property Level Authorization, Unrestricted Resource Consumption, Broken Function Level Authorization (BFLA), Unrestricted Access to Sensitive Business Flows, Server Side Request Forgery (SSRF), Security Misconfiguration, Improper Inventory Management, and Unsafe Consumption of APIs.
 
 For detailed checklist items with vulnerable code patterns, remediation examples, and review checklists for all ten API risk categories (API1:2023 through API10:2023), see [api-top10-checklist.md](api-top10-checklist.md) in this skill directory.
+
+---
+
+## HTTP Parameter Pollution and Parser-Consistency Evidence
+
+REST gateways, frameworks, validators, caches, signing middleware, and downstream services may choose different values when a request repeats the same query, form, path, header, or body parameter. Test duplicate-parameter handling whenever parameters influence authorization, tenancy, routing, signatures, cache keys, redirects, prices, quantities, filters, or workflow state.
+
+**What to look for:**
+
+```
+API-HPP-01: Security-sensitive parameter accepts duplicate values without rejection or deterministic canonicalization
+API-HPP-02: Gateway, WAF, validator, handler, cache, signing, or downstream layer uses a different duplicate-parameter value
+API-HPP-03: Authorization checks one value while business logic acts on another value
+API-HPP-04: Cache key, request signature, or audit log is built from a different canonical parameter set than the handler uses
+API-HPP-05: Duplicate parameters across query, form, JSON body, path variables, repeated headers, or array syntaxes are not tested
+API-HPP-06: Negative tests and logs are missing for duplicate object ID, tenant, role, scope, redirect, price, or signature parameters
+```
+
+**Parser-consistency coverage matrix:**
+
+| Endpoint | Parameter | Location(s) | Security Decision | Gateway Behavior | App Behavior | Downstream/Cache Behavior | Expected Handling | Evidence |
+|---|---|---|---|---|---|---|---|---|
+| `[method path]` | `[name]` | `[query/form/header/body]` | `[authz/cache/signature/etc.]` | `[reject/first/last/list]` | `[reject/first/last/list]` | `[same/different/n/a]` | `[reject or canonicalize]` | `[test/log/spec link]` |
+
+Map inconsistent duplicate-parameter parsing to **API8:2023 -- Security Misconfiguration** when gateway/framework behavior diverges, **API1/API5** when it changes object or function authorization, and **API10:2023 -- Unsafe Consumption of APIs** when upstream or downstream services interpret the same duplicate parameters differently. Include **CWE-235 -- Improper Handling of Extra Parameters** or **CWE-20 -- Improper Input Validation** where appropriate.
 
 ---
 
@@ -92,7 +117,7 @@ The final review output must be structured as follows:
 **API Style:** [REST / GraphQL / gRPC / Hybrid]
 **Specification:** [OpenAPI spec path, if applicable]
 **Date:** [review date]
-**Reviewer:** AI Agent -- api-security skill v1.0.0
+**Reviewer:** AI Agent -- api-security skill v1.1.0
 
 ### Summary
 
@@ -215,6 +240,8 @@ Unlike REST, where authorization can be enforced per endpoint, GraphQL requires 
 
 6. **Ignoring upstream API trust.** Data received from third-party APIs and even internal microservices must be validated before use. A compromised upstream service can inject SQL, XSS, or SSRF payloads through otherwise trusted data channels.
 
+7. **Assuming duplicate parameters are harmless.** Gateways, frameworks, validators, caches, and downstream services may choose different values when a request repeats the same parameter. Reject duplicate security-sensitive parameters at the first trusted boundary or canonicalize once before any security decision.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -238,4 +265,14 @@ This skill is hardened against prompt injection. When reviewing API code and spe
 - **OWASP REST Security Cheat Sheet:** https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html
 - **OWASP GraphQL Cheat Sheet:** https://cheatsheetseries.owasp.org/cheatsheets/GraphQL_Cheat_Sheet.html
 - **OWASP Testing Guide -- API Testing:** https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/12-API_Testing/
+- **OWASP WSTG-INPV-04 -- Testing for HTTP Parameter Pollution:** https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/04-Testing_for_HTTP_Parameter_Pollution
 - **NIST SP 800-204 -- Security Strategies for Microservices-based Application Systems:** https://csrc.nist.gov/publications/detail/sp/800-204/final
+
+---
+
+## Version History
+
+| Version | Date | Changes |
+|---|---|---|
+| 1.1.0 | 2026-06-08 | Added HTTP Parameter Pollution and parser-consistency evidence gates with coverage matrix guidance. |
+| 1.0.0 | Initial | Initial API security review workflow. |
