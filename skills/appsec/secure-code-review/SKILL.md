@@ -269,6 +269,38 @@ Remediation: Use `crypto.randomBytes(32).toString('hex')` (Node.js) or `crypto.g
 - [ ] Cryptographic keys are not hard-coded -- loaded from a key management system.
 - [ ] TLS certificates and configurations are not bypassed or weakened in code.
 
+### 5.4 Cryptographic Agility and Migration Readiness
+
+**Objective:** Verify that acceptable cryptography today can be migrated safely when algorithms, key sizes, libraries, or compliance requirements change.
+
+Point-in-time algorithm checks are not enough. Review whether ciphertexts, hashes, signatures, and tokens carry metadata that allows safe migration, whether legacy compatibility is time-bound, and whether migration code is tested before a forced rotation or deprecation event.
+
+**Required evidence:**
+
+| Gate | Evidence to Capture | Fail / Not Evaluable Condition |
+|------|---------------------|--------------------------------|
+| Artifact metadata | Algorithm ID, mode, key ID, key version, KDF parameters, token issuer, and format version on encrypted values, hashes, signatures, and tokens | Data format omits metadata needed to choose decrypt/verify/upgrade logic |
+| Central crypto policy | Versioned policy layer or wrapper defining approved algorithms, key sizes, modes, libraries, and deprecation dates | Algorithms, key IDs, or modes are scattered as hard-coded constants |
+| Migration path coverage | Tested re-encryption, re-signing, password-hash upgrade, token reissue, or certificate/key rotation path | Migration is manual, untested, or requires guessing legacy formats |
+| Legacy compatibility window | Expiry date, owner, telemetry threshold, and removal ticket for legacy decrypt/verify fallback | Legacy fallback has no end date or accepts retired algorithms indefinitely |
+| Fail-closed behavior | Tests for unknown algorithms, malformed envelopes, retired keys, downgrade attempts, and mixed-version data | Unknown or malformed crypto artifacts are accepted or silently downgraded |
+| Migration test fixtures | Old-format read, new-format write, mixed-version data, idempotent migration, rollback, and partial-failure tests | Only new-format happy path tests exist |
+| Legacy telemetry | Metrics showing count/percent of legacy artifacts, migration rate, failures, and fallback use before removal | Team cannot prove how much legacy data remains |
+
+Use these finding IDs when reporting gaps:
+
+```text
+SCR-CRYPTO-AGILITY-01: Crypto artifacts lack algorithm ID, key ID, version, or KDF metadata needed for migration
+SCR-CRYPTO-AGILITY-02: Crypto algorithms, modes, key IDs, or library choices are hard-coded outside a central policy layer
+SCR-CRYPTO-AGILITY-03: Re-encryption, re-signing, password-hash upgrade, token reissue, or key-rotation migration path is missing or untested
+SCR-CRYPTO-AGILITY-04: Legacy decrypt/verify fallback has no owner, expiration date, telemetry threshold, or removal ticket
+SCR-CRYPTO-AGILITY-05: Unknown algorithms, retired keys, malformed envelopes, or downgrade attempts do not fail closed
+SCR-CRYPTO-AGILITY-06: Migration fixtures do not cover old reads, new writes, mixed-version data, idempotency, rollback, and partial failures
+SCR-CRYPTO-AGILITY-07: Legacy artifact telemetry is missing, so fallback removal cannot be safely scheduled
+```
+
+**Finding classification:** Missing metadata that prevents safe decryption/verification migration for regulated or high-value data is **High**. Untested migration jobs, indefinite legacy fallback, or non-fail-closed downgrade behavior is **High**. Missing telemetry or incomplete fixture coverage is **Medium**.
+
 ---
 
 ## Step 6: Error Handling and Logging
@@ -477,6 +509,11 @@ The final review output must be structured as follows:
 | V2 Authentication | Yes/No | [count] | [result] |
 | V3 Session Management | Yes/No | [count] | [result] |
 | ... | ... | ... | ... |
+
+### Cryptographic Agility Evidence
+| Artifact Type | Metadata Present | Policy Source | Migration Path | Legacy Window | Fail-Closed Tests | Telemetry | Status |
+|---|---|---|---|---|---|---|---|
+| [ciphertext / password hash / signature / token / certificate] | [algorithm, key ID, version, KDF params] | [policy file/wrapper] | [job/test name] | [owner, expiry, removal ticket] | [unknown alg, retired key, malformed, downgrade] | [legacy count, fallback use] | [Pass/Fail/Not Evaluable] |
 ```
 
 ---
@@ -540,6 +577,8 @@ The final review output must be structured as follows:
 4. **Treating authentication as authorization.** Verifying that a user is logged in is not the same as verifying they are permitted to perform the requested action. Every endpoint must enforce both authentication and authorization, including ownership checks for resource-level access.
 
 5. **Overlooking secrets in non-obvious locations.** Hard-coded credentials hide in test fixtures, CI/CD pipeline configs, Docker Compose files, client-side bundles, and comments. Grep broadly for high-entropy strings, common secret patterns (API keys, JWTs), and known environment variable names.
+
+6. **Treating current crypto as migration-ready.** AES-GCM, Argon2id, Ed25519, or modern TLS settings can still be brittle if artifacts omit algorithm/key metadata, migration jobs are untested, legacy fallback never expires, or downgrade attempts do not fail closed. Review crypto agility before the next forced algorithm or key rotation.
 
 ---
 
