@@ -348,6 +348,51 @@ Determine the overall organizational Tier based on aggregated assessment across 
 
 ---
 
+### Step 4.5: Profile Evidence Confidence Gate
+
+**Objective:** Score current and target profiles using evidence quality, scope,
+freshness, and risk context. Do not let interview-only statements, stale
+artifacts, or target-state aspirations carry the same confidence as current
+implementation evidence.
+
+Apply these gates before finalizing subcategory scores:
+
+```
+CSF-CONF-01: Subcategory score lacks evidence source, artifact ID, owner, evidence date, and assessed scope
+CSF-CONF-02: Evidence type is not classified (automated telemetry, independent test, audit artifact, owner attestation, interview, or plan)
+CSF-CONF-03: Current profile evidence is mixed with target profile intent or planned improvements
+CSF-CONF-04: Evidence freshness is unknown or outside the subcategory's acceptable review window
+CSF-CONF-05: Evidence coverage is incomplete for the business unit, system, supplier, data class, or geography being scored
+CSF-CONF-06: Evidence confidence ignores inherent risk, control criticality, or compensating evidence
+CSF-CONF-07: Assumptions and validation-needed items are omitted from low or medium confidence scores
+CSF-CONF-08: Remediation priority is based only on score gap and does not consider confidence or evidence weakness
+```
+
+**Evidence confidence model:**
+
+| Evidence Type | Typical Confidence | Notes |
+|---|---|---|
+| Automated telemetry / continuous control | High when current, scoped, and mapped to the subcategory |
+| Independent test or audit artifact | High/Medium depending on recency, scope, and method |
+| Owner attestation with manager sign-off | Medium by default; can be High for low-risk scope with corroborating artifacts |
+| Interview or workshop statement | Low until backed by artifacts or testing |
+| Target-state plan or roadmap | Useful for target profile only; not current implementation evidence |
+
+**Minimum profile evidence fields:**
+
+| Field | Required Evidence |
+|---|---|
+| Subcategory | Official CSF 2.0 ID and description |
+| Profile side | Current profile, target profile, or gap-analysis assumption |
+| Source | Artifact/report/tool/export/interview, owner, evidence date, and collection method |
+| Scope | Business unit, system, supplier, data class, geography, and exclusions |
+| Evidence type | Telemetry, independent test, audit artifact, owner attestation, interview, plan |
+| Score rationale | Why the evidence supports the current score and target score separately |
+| Risk context | Inherent risk, criticality, compensating evidence, and dependency strength |
+| Confidence | High/medium/low with assumptions and validation needed |
+
+---
+
 ### Step 5: Organizational Profile Development
 
 #### 5.1 Current Profile
@@ -356,6 +401,12 @@ Document the current state for each function/category/subcategory:
 
 ```
 | Function | Category | Subcategory | Current Score | Evidence | Gaps |
+```
+
+For each current-profile score, add evidence metadata:
+
+```
+| Subcategory | Current Score | Evidence Type | Source / Owner / Date | Scope / Coverage | Confidence | Assumptions / Validation Needed |
 ```
 
 #### 5.2 Target Profile
@@ -368,6 +419,12 @@ Define the target state based on:
 
 ```
 | Function | Category | Subcategory | Current Score | Target Score | Gap | Priority |
+```
+
+Keep target-profile intent separate from current evidence:
+
+```
+| Subcategory | Target Score | Target Driver | Current Evidence Confidence | Planned Evidence Needed | Priority Impact |
 ```
 
 #### 5.3 Gap Analysis
@@ -458,6 +515,12 @@ Use the NIST CSF 2.0 Reference Tool for comprehensive mappings.
 |-------------|-------------|---------|--------|-----|----------|-----------------|
 | GV.OC-01 | Organizational mission informs CSRM | [0-4] | [0-4] | [delta] | [H/M/L] | [refs] |
 | ... | ... | ... | ... | ... | ... | ... |
+
+## Profile Evidence Confidence
+
+| Subcategory | Profile Side | Evidence Type | Source / Owner / Date | Scope / Coverage | Score Rationale | Risk Context | Confidence / Validation Needed |
+|-------------|--------------|---------------|-----------------------|------------------|-----------------|--------------|--------------------------------|
+| [CSF ID] | [current/target] | [type] | [artifact + owner + date] | [scope] | [why score is supported] | [risk/criticality] | [H/M/L + next validation] |
 
 ### IDENTIFY (ID)
 [same table format]
@@ -575,6 +638,8 @@ Tier 4 — Adaptive
 3. **Assessing subcategories in isolation without considering dependencies.** CSF functions are interdependent. Detection capabilities (DE) are meaningless without response capabilities (RS). Protection (PR) without asset identification (ID.AM) leaves gaps. The assessment must consider the maturity chain across functions, not just individual subcategory scores.
 
 4. **Failing to develop actionable organizational profiles.** The current and target profiles are the primary outputs of a CSF assessment. Many organizations conduct the assessment but do not formalize profiles into living documents that drive investment decisions, resource allocation, and progress tracking. Without profiles, the assessment becomes a one-time exercise rather than a continuous improvement tool.
+
+5. **Treating unverified statements as control evidence.** Interviews and self-attestations can support a CSF assessment, but they need owner/date/scope, confidence, assumptions, and validation-needed metadata. Target-state roadmaps should not raise current-profile scores.
 
 ---
 
