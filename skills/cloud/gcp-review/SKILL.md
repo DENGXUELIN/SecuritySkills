@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [CIS-GCP-v2.0.0]
 difficulty: intermediate
 time_estimate: "60-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -88,6 +88,31 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, gre
 
 ---
 
+### Step 8.1: IAM Conditions and Time-Bound Access Evidence
+
+For temporary, partner, contractor, emergency, and scoped access, verify the IAM binding itself enforces the boundary. Tickets, comments, expiration dates in a spreadsheet, or manual reminders are not sufficient if the deployed IAM policy is still permanent.
+
+Apply these gates before crediting a grant as time-bound or scoped:
+
+- **GCP-IAM-COND-01 -- Binding inventory:** enumerate project, folder, organization, service account, KMS, bucket, and BigQuery IAM bindings that grant elevated, external, emergency, or temporary access.
+- **GCP-IAM-COND-02 -- CEL condition evidence:** require a condition `title`, `description`, and CEL `expression` on the deployed binding, not only in a ticket or design note.
+- **GCP-IAM-COND-03 -- Enforceable expiry:** for temporary access, require `request.time < timestamp(...)` or an equivalent JIT mechanism with activation and expiry evidence.
+- **GCP-IAM-COND-04 -- Scoped condition:** for scoped access, verify resource name, resource type, tag, Access Context Manager, IP/device, or service-specific attributes are actually referenced by the CEL expression where supported.
+- **GCP-IAM-COND-05 -- Unsupported basic/public grants:** do not credit IAM Conditions for basic roles (`roles/owner`, `roles/editor`, `roles/viewer`) or public principals (`allUsers`, `allAuthenticatedUsers`) when the platform does not enforce the claimed conditional boundary.
+- **GCP-IAM-COND-06 -- Break-glass governance:** require activation reason, approver, ticket, monitoring, expiry, and post-use review evidence for emergency access.
+- **GCP-IAM-COND-07 -- Drift and expiry monitoring:** verify IAM policy exports, Cloud Asset Inventory, Policy Analyzer, or scheduled checks detect missing, expired, weakened, or removed conditions.
+- **GCP-IAM-COND-08 -- Evidence confidence:** mark grants **Not Evaluable** when the review only has comments, screenshots, or intended Terraform without a deployed IAM policy export or equivalent IaC evidence.
+
+Use this supplemental output table for IAM Conditions evidence:
+
+| Principal | Role | Resource Scope | Condition Title | Expiry / Scope Expression | Unsupported Basic/Public Grant | Evidence Source | Review Status |
+|-----------|------|----------------|-----------------|---------------------------|--------------------------------|-----------------|---------------|
+| `<principal>` | `<role>` | Project / Folder / Org / Resource | Present / Missing | `request.time < timestamp(...)` / scoped CEL / Missing | Yes / No | Terraform / IAM export / Cloud Asset / Policy Analyzer | Pass / Fail / Not Evaluable |
+
+Treat permanent external or emergency grants with privileged roles as **High** severity. Treat missing condition evidence for lower-privilege temporary access as **Medium**. Treat unsupported basic/public grants with claimed conditional safeguards as **High** when they expose broad project or organization access.
+
+---
+
 ### Step 9: Compile Assessment Report
 
 
@@ -137,6 +162,12 @@ Produce the final report using the structure defined in the Output Format sectio
 | 5 | Storage | X | Y | Z | nn% |
 | 6 | Cloud SQL | X | Y | Z | nn% |
 | 7 | BigQuery | X | Y | Z | nn% |
+
+### Supplemental IAM Conditions Evidence
+
+| Principal | Role | Resource Scope | Condition Title | Expiry / Scope Expression | Unsupported Basic/Public Grant | Evidence Source | Review Status |
+|-----------|------|----------------|-----------------|---------------------------|--------------------------------|-----------------|---------------|
+| <principal> | <role> | <scope> | Present / Missing | <expression> | Yes / No | <source> | Pass / Fail / Not Evaluable |
 
 ### Detailed Findings
 
@@ -194,6 +225,8 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **Cloud SQL authorized_networks vs. private IP.** CIS 6.5 flags `0.0.0.0/0` in authorized networks, but CIS 6.6 goes further and recommends disabling public IP entirely in favor of private networking.
 5. **BigQuery dataset-level vs. table-level CMEK.** CIS 7.2 checks table-level encryption, while CIS 7.3 checks the dataset default. Both should be evaluated independently.
 6. **Default compute service account identification.** The default SA follows the pattern `PROJECT_NUMBER-compute@developer.gserviceaccount.com`. Grep for this pattern, not just the string "default."
+7. **Temporary access comments are not IAM Conditions.** Do not credit manual reminders, ticket due dates, or comments as scoped access unless the IAM binding includes an enforceable CEL condition or the JIT system has activation/expiry evidence.
+8. **Basic and public principals cannot be treated as safely conditional by assertion.** Flag `roles/owner`, `roles/editor`, `roles/viewer`, `allUsers`, and `allAuthenticatedUsers` grants when the claimed IAM Condition is unsupported, absent, or not visible in the deployed policy export.
 
 ---
 
@@ -219,10 +252,14 @@ Produce the final report using the structure defined in the Output Format sectio
 - Google Cloud Audit Logs: https://cloud.google.com/logging/docs/audit
 - Google Cloud VPC Documentation: https://cloud.google.com/vpc/docs
 - Google Cloud SQL Security: https://cloud.google.com/sql/docs/mysql/configure-ssl-instance
+- Google Cloud IAM Conditions: https://cloud.google.com/iam/docs/conditions-overview
+- Configure temporary access with IAM Conditions: https://cloud.google.com/iam/docs/configuring-temporary-access
+- IAM Policy Analyzer: https://cloud.google.com/policy-intelligence/docs/analyze-iam-policies
 - Terraform Google Provider Documentation: https://registry.terraform.io/providers/hashicorp/google/latest/docs
 
 ---
 
 ## Changelog
 
+- **1.0.1** -- Adds IAM Conditions and time-bound access evidence gates, output fields, severity guidance, and validation expectations.
 - **1.0.0** -- Initial release. Full coverage of CIS Google Cloud Platform Foundation Benchmark v2.0.0 sections 1 through 7.

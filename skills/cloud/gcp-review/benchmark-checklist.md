@@ -146,6 +146,86 @@ resource "google_essential_contacts_contact" {
 }
 ```
 
+### Supplemental -- IAM Conditions and Time-Bound Access
+
+Review temporary, scoped, emergency, contractor, and partner access by inspecting the deployed IAM binding condition. Do not accept comments, ticket due dates, or intended access-review dates as evidence when the IAM policy grants permanent access.
+
+Required evidence:
+
+- IAM binding export for project, folder, organization, service account, KMS, Cloud Storage, or BigQuery resources.
+- Terraform `condition` block or IAM policy JSON with `title`, `description`, and CEL `expression`.
+- Expiry expression such as `request.time < timestamp("2026-07-01T00:00:00Z")` for temporary access.
+- Scope expression using supported CEL attributes, such as `resource.name`, `resource.type`, tags, Access Context Manager attributes, IP/device context, or service-specific attributes.
+- Explicit unsupported-status review for basic roles (`roles/owner`, `roles/editor`, `roles/viewer`) and public principals (`allUsers`, `allAuthenticatedUsers`).
+- Break-glass evidence with activation reason, approver, ticket, monitoring, expiry, and post-use review.
+- Drift monitoring through Cloud Asset Inventory, Policy Analyzer, scheduled IAM exports, or equivalent controls.
+
+Terraform conditional project grant example:
+
+```hcl
+resource "google_project_iam_member" "temporary_image_builder" {
+  project = var.project_id
+  role    = "roles/compute.imageUser"
+  member  = var.approved_builder_group_member
+
+  condition {
+    title       = "temporary_image_build_access"
+    description = "Expires after the approved image build window."
+    expression  = "request.time < timestamp(\"2026-07-01T00:00:00Z\")"
+  }
+}
+```
+
+Terraform scoped resource grant example:
+
+```hcl
+resource "google_service_account_iam_member" "scoped_deployer" {
+  service_account_id = google_service_account.deploy.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = var.deployer_group_member
+
+  condition {
+    title       = "deploy_only_prod_service_account"
+    description = "Restricts impersonation to the approved deployment service account."
+    expression  = "resource.name.endsWith(\"/serviceAccounts/prod-deploy\")"
+  }
+}
+```
+
+Unsupported basic/public grant example:
+
+```hcl
+resource "google_project_iam_binding" "viewer_public" {
+  project = var.project_id
+  role    = "roles/viewer"
+  members = ["allAuthenticatedUsers"]
+
+  condition {
+    title       = "claimed_temporary_public_viewer"
+    description = "This must not be credited as a safe conditional boundary."
+    expression  = "request.time < timestamp(\"2026-07-01T00:00:00Z\")"
+  }
+}
+```
+
+Evidence commands:
+
+```bash
+gcloud projects get-iam-policy <project-id> --format=json
+gcloud folders get-iam-policy <folder-id> --format=json
+gcloud organizations get-iam-policy <organization-id> --format=json
+gcloud asset search-all-iam-policies --scope=organizations/<org-id> --query='policy:condition'
+```
+
+Review checks:
+
+- Pass only when the deployed IAM policy or source IaC includes the expected CEL `condition` block.
+- Fail temporary grants without `request.time < timestamp(...)` or an equivalent JIT activation/expiry record.
+- Fail scoped grants whose CEL expression does not reference supported resource, tag, access-level, or service-specific attributes.
+- Fail unsupported conditional claims on basic roles or public principals unless platform documentation proves the exact grant is enforceable.
+- Mark Not Evaluable when only comments, screenshots, planned expiry dates, or reviewer notes are available.
+- Verify monitoring detects condition removal, condition weakening, expired access that remains active, and reintroduced permanent grants.
+
 ### CIS 1.17 -- Ensure that Dataproc Cluster Is Encrypted Using Customer-Managed Encryption Key
 
 Check Dataproc clusters for CMEK configuration.
