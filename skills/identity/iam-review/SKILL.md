@@ -176,6 +176,36 @@ IAM-PRIV-07: Cross-account access without external ID or condition keys
 IAM-PRIV-08: Resource-based policies granting public or overly broad access
 ```
 
+**Unused permission evidence gates:**
+
+Do not recommend permission removal or role downscoping from a single provider
+"last used" summary alone. Bind each unused-permission finding to the data
+source, observation window, permission/resource scope, business owner context,
+secondary telemetry, and rollback plan.
+
+```
+IAM-UPERM-01: Unused-permission finding lacks principal, policy/role, action, and resource scope
+IAM-UPERM-02: Usage data source is missing or too coarse for the claimed action/resource finding
+IAM-UPERM-03: Observation window is shorter than the business process, job schedule, or provider lookback limit
+IAM-UPERM-04: Last-used evidence is action-only and does not prove unused access at the resource scope
+IAM-UPERM-05: Secondary evidence is missing (CloudTrail/sign-in logs/app logs/job history/ticket history)
+IAM-UPERM-06: Business owner confirmation is missing for periodic, break-glass, migration, or audit permissions
+IAM-UPERM-07: Chained role assumption, permission boundary, SCP, or service-linked role behavior is not evaluated
+IAM-UPERM-08: Downscope confidence, staged rollout, monitoring, and rollback evidence are not documented
+```
+
+**Minimum unused permission evidence record:**
+
+| Field | Required Evidence |
+|---|---|
+| Principal | User, group, role, service account, workload identity, or chained role path |
+| Permission | Policy/role, action, resource scope, conditions, boundary/SCP context |
+| Usage source | Access Analyzer, IAM Recommender, Policy Analyzer, audit logs, app logs, job history |
+| Time basis | Last used timestamp, observation window, provider lookback/granularity limits |
+| Secondary evidence | Cloud/API logs, business process calendar, batch/job history, tickets, owner notes |
+| Risk context | Data/system criticality, service-linked role behavior, chained/effective permissions |
+| Decision | Keep/downscope/remove/monitor, owner approval, confidence, staged rollout, rollback plan |
+
 **Platform-specific checks:**
 
 | Platform | Check | What to look for |
@@ -380,6 +410,7 @@ For each finding, produce a row with:
 | **Framework Ref** | NIST SP 800-63B section, NIST SP 800-207 tenet, or CIS Control ID |
 | **Affected Scope** | Accounts, roles, policies, or platforms impacted |
 | **Evidence** | Specific configuration, policy, or data supporting the finding |
+| **Unused Permission Evidence** | Principal, action, resource scope, usage source/window, owner confirmation, confidence, and rollback plan |
 | **Remediation** | Prioritized fix with implementation guidance |
 | **Effort** | Low (< 1 day) / Medium (1-5 days) / High (> 5 days) |
 
@@ -413,6 +444,11 @@ For each finding, produce a row with:
 
 ### Detailed Findings
 [Findings table — see above]
+
+### Unused Permission Evidence
+| Principal | Policy / Role | Action / Resource Scope | Usage Source / Window | Secondary Evidence | Owner Confirmation | Decision / Confidence | Rollback |
+|---|---|---|---|---|---|---|---|
+| [identity or role path] | [policy/role] | [action + resource] | [data source + dates + granularity] | [logs/jobs/tickets] | [owner + date] | [keep/downscope/remove + confidence] | [rollback method + monitor] |
 
 ### Remediation Roadmap
 [Prioritized actions: immediate (0-7 days), short-term (30 days), medium-term (90 days)]
