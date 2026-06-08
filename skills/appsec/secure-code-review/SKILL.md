@@ -466,8 +466,27 @@ The final review output must be structured as follows:
   ```[language]
   [code snippet]
   ```
+- **Validation Evidence:** [entry point, attacker source, sink, trace, preconditions, and missing/bypassed controls]
+- **False-Positive Checks:** [framework protections, centralized validation, policy enforcement, unreachable code, and upstream sanitization reviewed]
 - **Remediation:** [specific fix with code example]
 - **Status:** Open
+
+#### Finding Validation Evidence Matrix
+
+For High and Critical findings, require:
+
+- `SCR-EXP-01` **Reachable entry point**: public route, API handler, CLI command, webhook, worker trigger, file parser, or trusted boundary crossing that reaches the flagged code.
+- `SCR-EXP-02` **Attacker-controlled source**: parameter, body field, header, cookie, uploaded file, message queue payload, environment variable, or external callback field.
+- `SCR-EXP-03` **Vulnerable sink**: database query, template renderer, command execution, deserializer, filesystem operation, redirect, SSRF fetch, authorization decision, or crypto operation.
+- `SCR-EXP-04` **Source-to-sink trace**: call chain, data transformations, validators, encoders, and sanitizers from source to sink.
+- `SCR-EXP-05` **Exploit preconditions**: role, authentication state, tenant/object ownership, feature flag, deployment mode, configuration, parser mode, or runtime environment.
+- `SCR-EXP-06` **Missing or bypassed control**: absent authorization, disabled framework protection, unsafe raw API escape hatch, missing allowlist, missing type validation, or policy bypass.
+- `SCR-EXP-07` **False-positive checks**: verify upstream validation, framework protections, centralized middleware, generated code behavior, dead/unreachable code, and test-only paths.
+- `SCR-EXP-08` **Proof and severity rationale**: safe exploit sketch, unit/security test reference, negative evidence, or rationale for downgrade/discard.
+
+| Finding | Entry Point | Attacker Source | Sink | Source-to-Sink Trace | Preconditions | Missing/Bypassed Control | FP Checks | Proof/Severity Rationale |
+|---------|-------------|-----------------|------|----------------------|---------------|--------------------------|-----------|--------------------------|
+| [id] | [entry] | [source] | [sink] | [trace] | [conditions] | [control] | [checks] | [proof/rationale] |
 
 [Repeat for each finding]
 
@@ -540,6 +559,8 @@ The final review output must be structured as follows:
 4. **Treating authentication as authorization.** Verifying that a user is logged in is not the same as verifying they are permitted to perform the requested action. Every endpoint must enforce both authentication and authorization, including ownership checks for resource-level access.
 
 5. **Overlooking secrets in non-obvious locations.** Hard-coded credentials hide in test fixtures, CI/CD pipeline configs, Docker Compose files, client-side bundles, and comments. Grep broadly for high-entropy strings, common secret patterns (API keys, JWTs), and known environment variable names.
+
+6. **Reporting severe pattern matches without reachability evidence.** High and Critical findings need more than a dangerous API call. Require a reachable entry point, attacker-controlled source, vulnerable sink, source-to-sink trace, exploit preconditions, missing or bypassed control, false-positive checks, and severity rationale before reporting high confidence.
 
 ---
 
