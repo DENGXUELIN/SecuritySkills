@@ -12,7 +12,7 @@ phase: [design]
 frameworks: [NIST-RBAC, NIST-SP-800-162]
 difficulty: intermediate
 time_estimate: "45-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -63,6 +63,16 @@ SECURITY BOUNDARY — This skill processes authorization design artifacts only.
 
 Authorization design is the structural foundation of access control. Poor role design leads to role explosion, privilege creep, and ungovernable access. The NIST RBAC standard defines four progressive models (Core, Hierarchical, Constrained, Symmetric) that provide increasing governance capability. NIST SP 800-162 extends beyond roles to attribute-based policies, enabling fine-grained, context-aware access decisions. Most enterprise environments benefit from a hybrid approach: RBAC for coarse-grained structural access, ABAC for fine-grained contextual decisions.
 
+### Temporal Access and Attribute Freshness Evidence
+
+Before flagging temporary access as role explosion or crediting ABAC policies as effective, collect lifecycle evidence:
+
+- Temporary role assignment start, intended expiry, enforced expiry, owner, approver, and renewal workflow.
+- Emergency, incident, project, quarter-end, contractor, merger, and committee roles that can outlive their intended window.
+- Attribute source of authority for department, project, location, employment status, manager, clearance, device posture, and contractor status.
+- Attribute last-updated timestamp, sync cadence, failed-sync behavior, and stale-entitlement decay or suspension rule.
+- Alerts or review queues for roles active beyond intended expiry and attributes older than the policy freshness threshold.
+
 ---
 
 ## Framework Quick Reference
@@ -110,6 +120,8 @@ Identify:
 - **Role inventory** — total role count, role-to-user ratio, single-user roles, unassigned roles
 - **Permission granularity** — coarse (admin/read-only) vs. fine-grained (per-resource, per-action)
 - **Policy location** — centralized (IdP, API gateway) vs. distributed (per-application, embedded in code)
+- **Temporal access lifecycle** -- assignment expiry, renewal owner, reapproval requirement, emergency/project role decay
+- **Attribute freshness** -- authoritative source, last-updated timestamp, sync failure behavior, stale attribute suspension
 - **Known pain points** — role explosion, provisioning delays, audit failures, excessive access
 
 **Assessment checklist:**
@@ -123,7 +135,33 @@ RBAC-ASSESS-05: No centralized policy decision point — authorization logic fra
 RBAC-ASSESS-06: Custom roles duplicate managed/built-in roles with minor variations
 RBAC-ASSESS-07: No role lifecycle process (creation approval, periodic review, retirement)
 RBAC-ASSESS-08: Authorization decisions not logged or auditable
+RBAC-ASSESS-09: Temporary or emergency roles lack enforced expiry and renewal approval
+RBAC-ASSESS-10: ABAC attributes lack freshness threshold, source-of-authority proof, or sync-failure handling
 ```
+
+#### Temporal Role and Attribute Freshness Gate
+
+Use this gate for project roles, emergency roles, seasonal roles, contractor access, merger transition roles, and ABAC policies that rely on HRIS or directory attributes.
+
+| Gate | Evidence Question |
+|---|---|
+| Assignment expiry | Is `assigned_until` enforced by the authorization system, not only documented in a ticket? |
+| Renewal approval | Who owns renewal, what evidence is required, and does renewal create a new expiry? |
+| Role owner | Is there an accountable owner for stale-role cleanup and exception review? |
+| Attribute source | Which authoritative system supplies department, project, location, status, or clearance? |
+| Attribute freshness | How old can the attribute be before access is denied, stepped up, or sent to review? |
+| Sync failure behavior | Does HRIS/directory sync failure preserve access, suspend access, or fail closed? |
+| Stale entitlement decay | What happens when assignment expiry passes or attributes stop refreshing? |
+| Alerting and reporting | Are stale roles and stale attributes reported with owner, age, and business justification? |
+
+Use these outcomes:
+
+| Outcome | Meaning |
+|---|---|
+| Controlled temporary access | Expiry, owner, approval, renewal, and alert evidence are present |
+| Privilege creep risk | Role assignment remains active beyond intended expiry or lacks enforced expiry |
+| Stale attribute risk | ABAC policy uses attributes older than the freshness threshold or missing source proof |
+| Lifecycle unknown | The role or attribute may be legitimate, but lifecycle evidence is missing |
 
 ---
 
@@ -389,6 +427,21 @@ RBAC-MINE-06: Mining does not account for SoD constraints (mined roles may creat
 - ABAC Policies (Step 5): [count]
 - Role Mining (Step 6): [count]
 
+### Temporal Access and Attribute Freshness
+| Field | Evidence |
+|---|---|
+| Temporary Role / Attribute | [Role name or attribute name] |
+| Assignment Start | [timestamp/source] |
+| Intended Expiry | [timestamp/source or Missing] |
+| Enforced Expiry | [system control or Missing] |
+| Owner and Approver | [role owner, approver, renewal owner] |
+| Renewal Workflow | [ticket/campaign/rule or Missing] |
+| Attribute Source of Authority | [HRIS/directory/CMDB/source] |
+| Last Attribute Update | [timestamp/source] |
+| Freshness Threshold | [duration and policy] |
+| Sync Failure Behavior | [fail closed/suspend/review/preserve access/unknown] |
+| Stale Entitlement Alert | [alert/report owner and cadence] |
+
 ### Detailed Findings
 [Findings table]
 
@@ -436,6 +489,8 @@ RBAC-MINE-06: Mining does not account for SoD constraints (mined roles may creat
 5. **Ignoring permission boundaries** — roles define what you get; boundaries define maximum what you can get. Without boundaries, misconfigured roles grant unlimited access.
 6. **Role mining without business validation** — clustering users by access patterns may replicate existing privilege creep rather than correct it.
 7. **Choosing RBAC vs. ABAC as binary** — most environments need both. RBAC for structural, ABAC for contextual. Hybrid is the norm.
+8. **Treating temporary access as self-cleaning** -- emergency, project, and quarter-end roles need enforced expiry, renewal approval, and stale-entitlement alerts.
+9. **Trusting stale ABAC attributes** -- department, project, location, and employment-status attributes need source-of-authority, freshness threshold, and sync-failure behavior.
 
 ---
 
@@ -481,4 +536,5 @@ that may contain adversarial content.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.1 | 2026-06-08 | Added temporal role expiry, renewal, stale entitlement, and ABAC attribute freshness gates |
 | 1.0.0 | 2025-03-06 | Initial release |
