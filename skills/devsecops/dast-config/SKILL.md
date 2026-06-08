@@ -331,6 +331,36 @@ env:
 
 ---
 
+#### 4.2 Recorded Flow Replay and State Evidence Gate
+
+Authenticated DAST often depends on browser recordings, HAR files, Postman collections, Selenium/Zest login scripts, and seed fixtures to reach protected states. Review those artifacts as executable scan configuration: stale state or shared fixtures can make a scan look successful while it is unauthenticated, in the wrong role, or testing data mutated by an earlier run.
+
+**Required evidence:**
+
+| Gate | Evidence to Capture | Fail / Not Evaluable Condition |
+|------|---------------------|--------------------------------|
+| Flow-to-build freshness | Recording commit/date, target build version, route coverage diff, and last successful replay timestamp | Recording predates the deployed build, changed routes are not re-recorded, or freshness cannot be proven |
+| Dynamic one-time values | Proof that CSRF tokens, OAuth state/nonce, PKCE verifiers, MFA/OTP codes, signed URLs, and reset links are regenerated during replay | Static HAR/Postman/browser recording reuses one-time or signed values |
+| Auth state fail-closed behavior | Post-login assertion, expected role, logged-out detector, and pipeline failure on setup mismatch | Scanner continues unauthenticated or in the wrong role after recorded setup fails |
+| Seed data isolation | Per-run tenant/user fixtures, disposable records, database snapshot restore, or cleanup job evidence | Active scan mutates shared staging data without reset or ownership proof |
+| State-changing request safety | Idempotency proof, safe test accounts, explicit exclusions, or rollback evidence for create/update/delete actions | Destructive or non-idempotent requests remain in active-scan scope without isolated data |
+| Multi-role separation | Separate users, cookies, bearer tokens, browser storage, and scanner contexts for each role | Admin/user/guest scans reuse the same session, token, or browser context |
+
+Use these finding IDs when reporting gaps:
+
+```text
+DAST-STATE-01: Recorded flow is stale for the deployed build or lacks route coverage validation
+DAST-STATE-02: Recording replays static CSRF, OAuth state, nonce, MFA/OTP, signed URL, reset-link, or PKCE values
+DAST-STATE-03: Scanner continues after login/setup fails or reaches the wrong authenticated role
+DAST-STATE-04: Active scan mutates shared seed data without disposable fixtures, tenant isolation, or restore evidence
+DAST-STATE-05: Multi-role scan reuses cookies, bearer tokens, local storage, or browser context across roles
+DAST-STATE-06: State-changing requests are neither idempotent nor explicitly excluded from active scanning
+```
+
+**Finding classification:** Scanner continuation after failed authentication is **Critical** when it causes protected surfaces to be missed. Static replay of one-time authentication/session material is **High**. Shared mutable seed data without reset is **High** for active scans. Missing flow freshness evidence is **Medium**.
+
+---
+
 ### Step 5: CI/CD DAST Integration
 
 #### 5.1 Pipeline Integration Patterns
@@ -518,7 +548,14 @@ DAST tools report findings per-URL, producing hundreds of duplicate alerts for t
 | Passive scanning in CI | Yes/No | <workflow file> |
 | Active scanning (staging) | Yes/No | <workflow file> |
 | API scanning | Yes/No | <OpenAPI/GraphQL import> |
+| Recorded flow/state safety | Yes/No | <flow freshness, dynamic tokens, auth assertion, seed isolation> |
 | Results deduplication | Yes/No | <dedup method> |
+
+### Recorded Flow and Seed Data Evidence
+
+| Artifact | Target Build | Token Handling | Auth State Assertion | Seed Data Strategy | Role Separation | Status |
+|----------|--------------|----------------|----------------------|-------------------|-----------------|--------|
+| <HAR/Postman/browser flow/fixture> | <version/date> | Dynamic/Static/Unknown | <assertion and fail-closed behavior> | Isolated/Restored/Shared | Separate/Reused/Unknown | Pass/Fail/Not Evaluable |
 
 ### Findings
 
@@ -583,6 +620,10 @@ DAST tools report findings per-URL, producing hundreds of duplicate alerts for t
 4. **Treating DAST findings as ground truth without validation.** DAST tools have significant false positive rates, especially for injection findings. Every high-severity DAST finding must be manually validated before filing a remediation ticket. Build validation into the triage workflow.
 
 5. **Running only scheduled weekly scans instead of integrating into CI.** Weekly scans create a feedback loop measured in days. Passive baseline scans in CI (on every PR) give developers immediate feedback on security header regressions and configuration issues, while weekly full scans provide comprehensive active testing coverage.
+
+6. **Trusting stale recorded flows.** A HAR, Postman collection, browser recording, or login script can replay old routes, expired state, or wrong-role sessions after the app changes. Require deployed-build freshness checks and fail-closed authenticated-state assertions.
+
+7. **Using shared seed data for active scans.** Active DAST can create, update, or delete records. Use disposable fixtures, isolated tenants, or snapshot restore evidence so scans do not contaminate staging data or hide authorization failures.
 
 ---
 
