@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [CIS-GCP-v2.0.0]
 difficulty: intermediate
 time_estimate: "60-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -78,6 +78,25 @@ Use Glob to locate all GCP-related infrastructure definitions.
 
 Record all discovered files. If no GCP configurations are found, report that finding and halt.
 
+Before scoring any CIS control, build a GCP evidence freshness inventory:
+
+```
+| Evidence ID | Basis | Source / Query | Collected By | Collection Date | Org / Folder / Project Scope | Region / Service Scope | Controls Supported | Limitations | Confidence |
+|-------------|-------|----------------|--------------|-----------------|------------------------------|------------------------|--------------------|-------------|------------|
+| GCP-EVID-01 | IaC intent / live-exported / partial / missing | <Terraform, Deployment Manager, gcloud, Cloud Asset Inventory, SCC, Policy Analyzer> | <owner/tool> | <date> | <org/folders/projects> | <regions/services> | <CIS IDs> | <coverage gaps/drift risk> | High / Medium / Low |
+```
+
+Apply these evidence gates before assigning Pass or Fail:
+
+- **GCP-EVID-01 Evidence basis:** classify each artifact as IaC intent, current live/exported state, partial evidence, or missing evidence. IaC alone is intended state and cannot prove deployed state when drift is in scope.
+- **GCP-EVID-02 Source provenance:** identify the exact source or query, such as `gcloud`, Cloud Asset Inventory, Security Command Center, Policy Analyzer, org policy export, IAM policy export, or console export.
+- **GCP-EVID-03 Date and freshness:** record the collection date and compare it to the control's change velocity. Fast-changing IAM, firewall, and service-account-key evidence needs fresher support than stable inherited org policy.
+- **GCP-EVID-04 Scope coverage:** map evidence to the assessed organization, folder, project, region, and service set. Partial project or regional exports cannot support full-environment Pass results.
+- **GCP-EVID-05 Inherited authority:** when parent organization or folder policy evidence covers child projects, document the hierarchy, inheritance path, excluded descendants, and policy assignment scope.
+- **GCP-EVID-06 Limitations and conflicts:** record stale exports, missing services, unreviewed folders, conflicting IaC/live state, or sources that only observe a subset of resources.
+- **GCP-EVID-07 Drift and change controls:** check recent IAM, org policy, firewall, key, SCC, and project change logs where available. A stale artifact with no change-control evidence should be lower-confidence or Not Evaluable.
+- **GCP-EVID-08 Result confidence:** set High only when source, date, scope, inheritance, limitations, and drift checks support the conclusion. Use Medium/Low or Not Evaluable when evidence is stale, partial, or IaC-only.
+
 ---
 
 ### Step 2 through Step 8: CIS Benchmark Evaluation (Sections 1-7)
@@ -92,6 +111,12 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, gre
 
 
 Produce the final report using the structure defined in the Output Format section.
+
+Before finalizing, ensure every Passed or Failed control references at least one
+inventory row and includes evidence basis, source, date, coverage, limitations,
+and confidence. If deployed-state drift matters and current live/exported
+evidence is unavailable, mark the control Not Evaluable or lower confidence
+instead of treating IaC intent as proof of the active GCP environment.
 
 ---
 
@@ -117,6 +142,16 @@ Produce the final report using the structure defined in the Output Format sectio
 - Date: <assessment date>
 - Framework: CIS Google Cloud Platform Foundation Benchmark v2.0.0
 - Files reviewed: <list of IaC files>
+- Evidence basis: <IaC intent / live-exported / partial / missing / mixed>
+- Evidence freshness: <collection dates, git commits, and change-window rationale>
+- Org/Folder/Project/Region coverage: <scope assessed and gaps>
+- Evidence limitations: <stale exports, missing services, inherited-scope gaps, live-state gaps>
+
+### Evidence Freshness Inventory
+
+| Evidence ID | Basis | Source / Query | Date | Scope | Controls Supported | Limitations | Confidence |
+|-------------|-------|----------------|------|-------|--------------------|-------------|------------|
+| GCP-EVID-01 | <basis> | <artifact/query> | <date> | <org/folder/project/region/service> | <CIS IDs> | <gaps> | High / Medium / Low |
 
 ### Executive Summary
 - Total CIS recommendations evaluated: <N>
@@ -148,6 +183,12 @@ Produce the final report using the structure defined in the Output Format sectio
 - **Line(s):** <line numbers if applicable>
 - **Description:** <what was found>
 - **Evidence:** <specific configuration or code snippet>
+- **Evidence ID(s):** <GCP-EVID-## rows used>
+- **Evidence Source:** <IaC file / gcloud export / Cloud Asset Inventory / SCC / Policy Analyzer / live observation>
+- **Evidence Date:** <timestamp, commit, or observation date>
+- **Coverage:** <org, folder, project, region, service, and inherited scope>
+- **Limitations:** <missing projects/services, stale exports, drift risk, or source constraints>
+- **Confidence:** High / Medium / Low
 - **Remediation:** <specific fix with code example>
 
 ### Prioritized Remediation Plan
@@ -194,6 +235,7 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **Cloud SQL authorized_networks vs. private IP.** CIS 6.5 flags `0.0.0.0/0` in authorized networks, but CIS 6.6 goes further and recommends disabling public IP entirely in favor of private networking.
 5. **BigQuery dataset-level vs. table-level CMEK.** CIS 7.2 checks table-level encryption, while CIS 7.3 checks the dataset default. Both should be evaluated independently.
 6. **Default compute service account identification.** The default SA follows the pattern `PROJECT_NUMBER-compute@developer.gserviceaccount.com`. Grep for this pattern, not just the string "default."
+7. **Treating IaC as live deployed evidence.** Terraform, Deployment Manager, and policy files show intended state, not necessarily active GCP state. For controls affected by console changes, inherited org/folder policies, regional services, or recent IAM/firewall/key changes, require fresh live/exported evidence or mark the conclusion lower-confidence or Not Evaluable.
 
 ---
 
@@ -225,4 +267,5 @@ Produce the final report using the structure defined in the Output Format sectio
 
 ## Changelog
 
+- **1.0.1** -- Added GCP evidence freshness, coverage, inherited-scope, drift, and confidence gates plus report fields.
 - **1.0.0** -- Initial release. Full coverage of CIS Google Cloud Platform Foundation Benchmark v2.0.0 sections 1 through 7.
