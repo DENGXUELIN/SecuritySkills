@@ -45,7 +45,7 @@ Before examining any code, establish the review boundary.
 ## Step 2: Input Validation and Injection Review
 
 **ASVS Reference:** V5 -- Validation, Sanitization and Encoding
-**CWE Coverage:** CWE-79 (XSS), CWE-89 (SQL Injection), CWE-78 (OS Command Injection), CWE-22 (Path Traversal), CWE-77 (Command Injection), CWE-20 (Improper Input Validation)
+**CWE Coverage:** CWE-79 (XSS), CWE-89 (SQL Injection), CWE-78 (OS Command Injection), CWE-22 (Path Traversal), CWE-77 (Command Injection), CWE-20 (Improper Input Validation), CWE-1336 (Template Engine Injection)
 
 ### 2.1 Controls to Verify
 
@@ -107,9 +107,51 @@ Remediation: Canonicalize the resolved path and verify it remains within the exp
 - [ ] Every point where user input enters the system is identified.
 - [ ] All SQL queries use parameterized statements or a query builder -- no string concatenation.
 - [ ] HTML output is encoded contextually (HTML body, attribute, JavaScript, URL).
+- [ ] Server-side template rendering separates template source control from rendered data and documents sandbox, loader, global, and autoescape evidence.
+- [ ] Raw/safe template overrides (`mark_safe`, `|safe`, triple-stash, `Html.Raw`, `SafeString`) are allowed only with context-specific sanitizer evidence.
 - [ ] OS commands, if unavoidable, use allowlisted arguments and avoid shell interpretation.
 - [ ] File path operations validate and canonicalize against a base directory.
 - [ ] Regular expressions used for validation are anchored (`^...$`) and tested for ReDoS.
+
+### 2.4 Template Sandbox and Context-Escaping Evidence Gate
+
+Use this gate whenever the reviewed code renders server-side templates, tenant-editable templates, email HTML, rich-text fields, or framework helpers that can bypass normal escaping. Split server-side template injection (template source control and sandbox posture) from XSS (context-specific output encoding).
+
+| Check ID | Evidence to collect | Failure condition |
+|---|---|---|
+| `SCR-TPL-01` | Template source and selection path for every render call, including fixed template name, allowlisted template ID, or user-controlled template string | User input is compiled or interpreted as template source through APIs such as `from_string`, `Template(...)`, inline render helpers, or tenant template editing without approval evidence |
+| `SCR-TPL-02` | Sandbox or restricted-environment status for engines that support untrusted or tenant-editable templates | Untrusted templates run in the default unrestricted engine or can access inheritance, imports, filesystem loaders, or object introspection without constraints |
+| `SCR-TPL-03` | Exposed globals, filters, functions, loaders, and implicit context objects | Dangerous objects such as app config, request/session objects, environment variables, filesystem loaders, class/object helpers, or process execution helpers are exposed to templates |
+| `SCR-TPL-04` | Autoescape status by engine, extension, and template type, including HTML pages and HTML email | Autoescape is disabled, extension-based autoescape misses the rendered template, or the review assumes framework defaults without configuration evidence |
+| `SCR-TPL-05` | Output sink context for each rendered value: HTML body, HTML attribute, URL, JavaScript string, CSS, text email, or HTML email | The same sanitizer or escaping claim is reused across incompatible contexts, or no context-specific encoder is evidenced |
+| `SCR-TPL-06` | Raw/safe override inventory, including `mark_safe`, `|safe`, triple-stash, `Html.Raw`, `SafeString`, and equivalent helpers | User-controlled data is marked safe before a documented sanitizer allowlist and sink-specific regression test |
+| `SCR-TPL-07` | Sanitizer configuration, allowed tags/attributes/protocols, and provenance of rich-text fields | Review accepts a generic "sanitized" label without the sanitizer policy, input source, and output verification |
+| `SCR-TPL-08` | Regression evidence with a known-bad SSTI payload, XSS payloads per sink context, and a benign allowed-rich-text case | Template rendering is approved from checklist language only, with no fixture or runtime evidence for the dangerous and benign paths |
+
+**Template evidence output fields:**
+
+| Field | Value |
+|---|---|
+| Template engine and source control | [Jinja / Django / Twig / Handlebars / Liquid / ERB / Razor; fixed, allowlisted, tenant-editable, or user-controlled source] |
+| Sandbox and loader posture | [sandboxed / restricted / unrestricted; loader paths and inheritance/import constraints] |
+| Exposed globals and helpers | [safe minimal context / dangerous globals present / unknown] |
+| Autoescape and output contexts | [enabled contexts, disabled contexts, and sink-specific encoders] |
+| Raw/safe override status | [none / justified with sanitizer evidence / unsafe override] |
+| Sanitizer policy | [library, allowed tags, attributes, protocols, strip behavior, and test evidence] |
+| Regression coverage | [SSTI payload, XSS payloads by context, benign rich-text case] |
+| Template review confidence | [High / Medium / Low plus missing evidence] |
+
+**Template-focused grep patterns:**
+
+| Engine / framework | Pattern to inspect |
+|---|---|
+| Jinja / Flask | `from_string\|render_template_string\|Environment\(\|autoescape\s*=\s*False\|mark_safe\|\|safe` |
+| Django | `mark_safe\|SafeString\|format_html\|Template\(\|autoescape\s+off` |
+| Twig / Symfony | `createTemplate\|render\(\|raw\|autoescape\s+false` |
+| Handlebars / Mustache | `\{\{\{\|SafeString\|noEscape\|compile\(` |
+| Liquid / Shopify-style | `parse\(\|render\(\|raw` |
+| ERB / Rails | `html_safe\|raw\(\|ERB\.new` |
+| ASP.NET / Razor | `Html\.Raw\|IHtmlContent\|MarkupString` |
 
 ---
 
