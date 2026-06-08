@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [CIS-Azure-v2.1.0]
 difficulty: intermediate
 time_estimate: "60-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -91,7 +91,39 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, Bic
 
 ---
 
-### Step 11: Compile Assessment Report
+### Step 11: Qualify Evidence Scope and Confidence
+
+Before compiling findings, qualify the evidence source and Azure scope for each evaluated control. Azure CIS evidence can span tenant-level Entra ID settings, management-group policy assignments, subscription-scoped Defender plans, resource-scoped diagnostic/private-network settings, and sampled exports. Do not claim tenant-wide, management-group-wide, or subscription-wide compliance from a single Terraform module, report-only policy, or one resource export unless the denominator and effective scope are proven.
+
+**Evidence confidence levels:**
+
+| Level | Meaning | Example |
+|-------|---------|---------|
+| `iac-only` | Repository configuration shows intended state, but live effective state is not proven | Terraform defines one Conditional Access policy |
+| `live-export` | Azure CLI, Microsoft Graph, Defender for Cloud, Policy, Resource Graph, or service export confirms deployed state | Graph export shows Conditional Access policy state and assignments |
+| `policy-assignment` | Azure Policy assignment or initiative evidence proves enforcement at a management group, subscription, or resource scope | Management-group initiative with effect and exemption export |
+| `defender-export` | Defender for Cloud export confirms plan and coverage state for the supplied subscriptions/resource types | Defender plans enabled for Servers, Storage, Key Vault, and SQL across listed subscriptions |
+| `sampled` | Evidence covers selected tenants, subscriptions, resource groups, or resources only | Two subscriptions sampled from an enterprise landing zone |
+| `unknown` | No supplied evidence proves the control | Break-glass exclusion details or tenant setting export is absent |
+
+**Azure evidence-scope gates:**
+
+| Gate | Requirement |
+|------|-------------|
+| `AZ-SCOPE-01` | Record evidence source, capture date, confidence level, and reviewed tenant/management-group/subscription/resource scope for every detailed finding. |
+| `AZ-SCOPE-02` | Record the scope denominator: tenant ID, management groups, subscriptions, resource groups, resources, and exclusions when available. |
+| `AZ-SCOPE-03` | For Conditional Access and Security Defaults, record policy state, report-only versus enabled mode, included/excluded users or roles, break-glass accounts, named locations, and equivalent-control rationale. |
+| `AZ-SCOPE-04` | For Azure Policy evidence, record assignment scope, initiative/control mapping, effect, compliance state, exemption owner, expiry, and inherited management-group coverage. |
+| `AZ-SCOPE-05` | For Defender for Cloud, record each subscription/resource-type plan, tier, auto-provisioning state, and whether evidence is IaC intent or live Defender export. |
+| `AZ-SCOPE-06` | For diagnostic, private endpoint, and network controls, record target resource/subscription scope and whether evidence proves category/sink/private-link effectiveness or only resource presence. |
+| `AZ-SCOPE-07` | Mark controls as Not Evaluable with a reason code when evidence is missing: `tenant-live-only`, `missing-management-group-export`, `missing-subscription-export`, `missing-resource-export`, `report-only-policy`, `sample-only`, `paid-plan-not-enabled`, or `not-in-scope`. |
+| `AZ-SCOPE-08` | Surface evidence age, sampled coverage, policy exemptions, Defender paid-plan limits, owner, expiry, and retest trigger before assigning full Pass. |
+
+**Classification guidance:** Claiming tenant-wide or enterprise subscription Pass from `iac-only`, `sampled`, report-only Conditional Access, or one subscription export is at least **Medium** for report integrity. For release-blocking identity, Defender, diagnostic, Key Vault, storage, or public-network controls, missing tenant/management-group/subscription denominator evidence can be **High**. Paid Defender plan observations should be reported from available evidence; do not enable paid plans or change subscription settings without explicit approval.
+
+---
+
+### Step 12: Compile Assessment Report
 
 Produce the final report using the structure defined in the Output Format section.
 
@@ -148,6 +180,10 @@ Produce the final report using the structure defined in the Output Format sectio
 - **Status:** Pass / Fail / Not Evaluable
 - **Severity:** Critical / High / Medium / Low
 - **CIS Profile:** Level 1 / Level 2
+- **Evidence Source:** iac-only / live-export / policy-assignment / defender-export / sampled / unknown
+- **Evidence Captured:** <date/time or export identifier>
+- **Scope Coverage:** <tenant, management group, subscription, resource group, resource, or sample scope>
+- **Not Evaluable Reason:** <reason code if applicable>
 - **File:** <path to relevant config>
 - **Line(s):** <line numbers if applicable>
 - **Description:** <what was found>
@@ -200,6 +236,10 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **NSG rules using service tags.** A rule with `source_address_prefix = "Internet"` is equivalent to `0.0.0.0/0`. Both must be flagged for CIS 6.1 and 6.2.
 5. **Key Vault purge protection is irreversible.** CIS 8.5 requires `purge_protection_enabled = true`. Note this cannot be disabled once enabled -- flag this for awareness during remediation.
 6. **App Service TLS version on both Linux and Windows.** Check `azurerm_linux_web_app` and `azurerm_windows_web_app` resources separately.
+7. **Treating report-only Conditional Access as enforcement.** A policy in report-only mode is evidence of intent, not an enforced tenant control. Record state, assignments, exclusions, and break-glass handling.
+8. **Inferring enterprise coverage from one subscription.** Defender plans, diagnostics, Key Vault, storage, networking, and App Service controls need subscription/resource denominators or inherited policy evidence.
+9. **Ignoring policy exemptions and inheritance.** Management-group policy assignments can enforce many subscriptions, but exemptions, disabled effects, and lower-scope overrides change the effective result.
+10. **Treating Defender plan IaC as live subscription state.** `azurerm_security_center_subscription_pricing` shows intended configuration for one resource type; live Defender exports are needed before broad coverage claims.
 
 ---
 
@@ -222,6 +262,8 @@ Produce the final report using the structure defined in the Output Format sectio
 - CIS Microsoft Azure Foundations Benchmark v2.1.0: https://www.cisecurity.org/benchmark/azure
 - Microsoft Defender for Cloud Documentation: https://learn.microsoft.com/en-us/azure/defender-for-cloud/
 - Microsoft Entra ID Security: https://learn.microsoft.com/en-us/entra/identity/
+- Microsoft Entra Conditional Access: https://learn.microsoft.com/en-us/entra/identity/conditional-access/overview
+- Azure Policy Assignment Structure: https://learn.microsoft.com/en-us/azure/governance/policy/concepts/assignment-structure
 - Azure Storage Security: https://learn.microsoft.com/en-us/azure/storage/common/storage-security-guide
 - Azure Key Vault Best Practices: https://learn.microsoft.com/en-us/azure/key-vault/general/best-practices
 - Azure App Service Security: https://learn.microsoft.com/en-us/azure/app-service/overview-security
@@ -231,4 +273,5 @@ Produce the final report using the structure defined in the Output Format sectio
 
 ## Changelog
 
+- **1.0.1** -- Added evidence confidence, tenant/management-group/subscription/resource scope gates, Conditional Access state handling, Azure Policy/Defender scope guidance, and Not Evaluable reason codes.
 - **1.0.0** -- Initial release. Full coverage of CIS Microsoft Azure Foundations Benchmark v2.1.0 sections 1 through 9.

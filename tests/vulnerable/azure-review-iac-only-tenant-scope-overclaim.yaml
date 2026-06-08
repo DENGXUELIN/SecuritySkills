@@ -1,0 +1,80 @@
+id: azure-review-iac-only-tenant-scope-overclaim
+skill: azure-review
+expected: vulnerable
+description: >
+  IaC-only Conditional Access and one subscription Defender resource are
+  overclaimed as tenant-wide and enterprise subscription compliance.
+scenario:
+  review_scope:
+    claimed_scope: "tenant-wide Entra ID and all landing-zone subscriptions"
+    supplied_evidence:
+      - path: terraform/identity/conditional-access.tf
+        source_type: iac-only
+        scope: "tenant module only"
+        captured: "2026-06-01"
+      - path: terraform/subscriptions/prod-a/defender.tf
+        source_type: iac-only
+        scope: "subscription prod-a only"
+        captured: "2026-06-01"
+      - path: terraform/policies/diagnostics.bicep
+        source_type: iac-only
+        scope: "one management group assignment"
+        captured: "2026-06-01"
+    missing_evidence:
+      - tenant_id_and_directory_settings_export
+      - conditional_access_state_export
+      - included_excluded_users_roles_and_groups
+      - break_glass_exception_evidence
+      - management_group_subscription_denominator
+      - azure_policy_compliance_and_exemption_export
+      - defender_plan_live_export_all_subscriptions
+      - resource_graph_target_resource_denominator
+  terraform:
+    conditional_access_policy:
+      resource_type: azuread_conditional_access_policy
+      display_name: Require MFA for administrators
+      state: reportOnly
+      conditions:
+        users:
+          included_roles:
+            - Global Administrator
+          excluded_groups:
+            - break-glass-accounts
+      grant_controls:
+        built_in_controls:
+          - mfa
+    defender_plan:
+      resource_type: azurerm_security_center_subscription_pricing
+      subscription: prod-a
+      resource_type_name: VirtualMachines
+      tier: Standard
+  reported_findings:
+    - cis_id: "1.1.2"
+      title: "Ensure MFA is enabled for all privileged users"
+      status: Pass
+      evidence_source: iac-only
+      scope_coverage: "tenant-wide"
+      problem: "Report-only CA policy and missing assignment/export evidence are treated as enforced tenant coverage."
+    - cis_id: "2.1"
+      title: "Microsoft Defender for Cloud plans"
+      status: Pass
+      evidence_source: iac-only
+      scope_coverage: "all subscriptions and resource types"
+      problem: "One subscription/resource-type pricing resource is treated as all Defender plan coverage."
+    - cis_id: "5.1.1"
+      title: "Ensure that a Diagnostic Setting exists"
+      status: Pass
+      evidence_source: policy-assignment
+      scope_coverage: "all subscriptions"
+      problem: "Policy assignment exists, but compliance state, exemptions, and subscription denominator are absent."
+should_trigger:
+  - AZ-SCOPE-01
+  - AZ-SCOPE-02
+  - AZ-SCOPE-03
+  - AZ-SCOPE-04
+  - AZ-SCOPE-05
+  - AZ-SCOPE-07
+expected_result: >
+  The skill should flag the report as overconfident and require live tenant,
+  management-group, subscription, policy-compliance, and Defender evidence before
+  tenant-wide or enterprise subscription Pass results are assigned.

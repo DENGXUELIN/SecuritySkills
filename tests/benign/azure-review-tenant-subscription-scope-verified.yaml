@@ -1,0 +1,63 @@
+id: azure-review-tenant-subscription-scope-verified
+skill: azure-review
+expected: benign
+description: >
+  Azure review preserves tenant, management-group, subscription, resource, and
+  Not Evaluable boundaries before assigning scoped Pass results.
+scenario:
+  review_scope:
+    claimed_scope: "tenant contoso, management groups platform/prod, 14 active subscriptions"
+    evidence_inventory:
+      - name: tenant_conditional_access_export
+        source_type: live-export
+        captured: "2026-06-01T09:00:00Z"
+        coverage: "tenant-wide CA policies, enabled state, included roles, excluded break-glass accounts"
+      - name: management_group_subscription_denominator
+        source_type: live-export
+        captured: "2026-06-01T09:10:00Z"
+        coverage: "14 active subscriptions, 2 decommissioned subscriptions excluded"
+      - name: policy_assignment_compliance_export
+        source_type: policy-assignment
+        captured: "2026-06-01T09:20:00Z"
+        coverage: "platform/prod management groups, effects, exemptions, noncompliant resources"
+      - name: defender_plan_export
+        source_type: defender-export
+        captured: "2026-06-01T09:35:00Z"
+        coverage: "14 subscriptions and required resource-type plans"
+      - name: resource_graph_private_endpoint_export
+        source_type: live-export
+        captured: "2026-06-01T09:50:00Z"
+        coverage: "storage, Key Vault, SQL, and App Service resource denominators"
+  reported_findings:
+    - cis_id: "1.1.2"
+      title: "Ensure MFA is enabled for all privileged users"
+      status: Pass
+      evidence_source: live-export
+      evidence_captured: tenant_conditional_access_export
+      scope_coverage: "tenant-wide enabled CA policy; privileged roles included; break-glass exceptions documented"
+      notes:
+        - "Report-only policies are excluded from Pass evidence."
+        - "Break-glass accounts have owner, monitoring, and review date."
+    - cis_id: "2.1"
+      title: "Microsoft Defender for Cloud plans"
+      status: Pass
+      evidence_source: defender-export
+      evidence_captured: defender_plan_export
+      scope_coverage: "14 active subscriptions and required resource types"
+      notes:
+        - "Paid plan state is observed, not changed by the reviewer."
+    - cis_id: "1.2.5"
+      title: "Ensure SSPR methods required is set to two"
+      status: Not Evaluable
+      severity: Informational
+      evidence_source: unknown
+      not_evaluable_reason: tenant-live-only
+      scope_coverage: "SSPR settings export was not supplied"
+should_not_trigger:
+  - "tenant-wide pass from iac-only Conditional Access"
+  - "all-subscription Defender pass from one pricing resource"
+  - "policy assignment treated as compliance without exemption export"
+expected_result: >
+  The skill should accept scoped Pass findings where live tenant, management
+  group, subscription, policy, Defender, and resource evidence are supplied, and
+  preserve Not Evaluable reason codes for missing tenant-only evidence.
