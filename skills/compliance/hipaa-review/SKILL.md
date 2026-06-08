@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [HIPAA-Security-Rule, 45-CFR-164-Subpart-C]
 difficulty: intermediate
 time_estimate: "60-120min"
-version: "1.0.1"
+version: "1.0.2"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -399,6 +399,43 @@ Assess:
 
 ---
 
+### Step 8: Safeguard Evidence Matrix and Confidence
+
+Before assigning compliance status, create a safeguard evidence matrix for every in-scope Security Rule standard or implementation specification. Do not treat a policy, verbal claim, or stale vendor document as implementation evidence unless the evidence type, owner, freshness, and scope are documented.
+
+| Field | Required Evidence |
+|---|---|
+| CFR citation | Real Security Rule citation from 164.308, 164.310, 164.312, 164.314, or 164.316 |
+| Specification type | Required, Addressable, Standard-only, Organizational, or Documentation |
+| Decision type | Implemented, Alternative Measure, Not Reasonable and Appropriate, Not Evidenced, or Not Evaluable |
+| Evidence source | Policy/procedure, system export, audit log, ticket, training record, BAA, SOC report, bridge letter, diagram, risk analysis, test record, or admin screenshot |
+| Evidence owner | Workforce owner, security official, system owner, contract owner, BA owner, or vendor contact role |
+| Freshness | Evidence date, covered period, expiration/renewal date, review cadence, and last update after material changes |
+| ePHI scope | In-scope systems, data flows, BAs/subcontractors, backups, support exports, analytics, devices, and exclusions |
+| Confidence | `implemented-evidence`, `alternative-documented`, `policy-only`, `stale`, `scope-gap`, or `unknown` |
+| Not Evaluable reason | `missing-ephi-inventory`, `missing-risk-analysis-scope`, `missing-implementation-evidence`, `missing-baa-subcontractor-evidence`, `stale-evidence`, `missing-addressable-rationale`, or `unknown-owner` |
+
+**Evidence reason codes:**
+
+```
+HIPAA-EVID-01: Addressable specification lacks decision type, rationale, or equivalent alternative measure
+HIPAA-EVID-02: Policy exists but implementation evidence, training record, system export, or sample is missing
+HIPAA-EVID-03: BAA evidence lacks contract owner, effective date, subcontractor assurance, or freshness
+HIPAA-EVID-04: Risk analysis scope omits ePHI systems, backups, analytics, devices, support exports, or BA systems
+HIPAA-EVID-05: Evidence is stale, expired, or not updated after a material environmental or operational change
+HIPAA-EVID-06: Vendor or cloud-provider evidence is accepted without BAA/SOC/bridge-letter scope mapping
+HIPAA-EVID-07: Hybrid entity or healthcare component scope is not documented
+HIPAA-EVID-08: Finding lacks confidence level or Not Evaluable reason for missing safeguard evidence
+```
+
+**False-positive guardrails:**
+
+- An addressable specification may be compliant through an equivalent alternative measure when the assessment, rationale, evidence owner, and scope are documented.
+- A managed SaaS or cloud-provider control can support compliance only when BAA coverage, evidence scope, date, and inherited/shared-responsibility boundaries are documented.
+- Missing implementation evidence should lower confidence or become `Not Evaluable`; do not convert policy-only artifacts into compliance.
+
+---
+
 ## Findings Classification
 
 | Classification | Definition | Regulatory Risk |
@@ -407,6 +444,7 @@ Assess:
 | **Non-Compliance** | Required or addressable specification not met without documented alternative; isolated but significant control failure | Moderate enforcement risk; corrective action plan required |
 | **Partial Compliance** | Control exists but implementation is incomplete, inconsistent, or inadequately documented | Lower enforcement risk but may escalate upon OCR review; remediation recommended |
 | **Addressable — Alternative Implemented** | Addressable specification not implemented as written but equivalent alternative measure documented and reasonable | Compliant if documentation is thorough and alternative is genuinely equivalent |
+| **Not Evaluable** | Evidence is missing, stale, out of scope, ownerless, or insufficient to determine Security Rule status | Cannot be counted as compliant until evidence is produced and reviewed |
 | **Compliant** | Specification fully implemented, documented, and operational | Meets Security Rule requirements |
 
 ---
@@ -432,13 +470,19 @@ Assess:
 
 ## Safeguard Assessment
 
+### Safeguard Evidence Matrix
+
+| CFR Citation | R/A | Decision Type | Evidence Source | Evidence Owner | Freshness | ePHI Scope | Confidence | Not Evaluable Reason |
+|-------------|-----|---------------|-----------------|----------------|-----------|------------|------------|----------------------|
+| [citation] | [R/A] | [Implemented / Alternative Measure / Not Evidenced / Not Evaluable] | [artifact] | [owner] | [date/period] | [systems/data flows] | [confidence] | [reason] |
+
 ### Administrative Safeguards (164.308)
 
-| CFR Citation | Standard / Specification | R/A | Status | Finding | Priority |
-|-------------|-------------------------|-----|--------|---------|----------|
-| 164.308(a)(1)(ii)(A) | Risk Analysis | R | [status] | [finding] | [H/M/L] |
-| 164.308(a)(1)(ii)(B) | Risk Management | R | [status] | [finding] | [H/M/L] |
-| ... | ... | ... | ... | ... | ... |
+| CFR Citation | Standard / Specification | R/A | Decision Type | Status | Evidence Confidence | Not Evaluable Reason | Finding | Priority |
+|-------------|-------------------------|-----|---------------|--------|---------------------|----------------------|---------|----------|
+| 164.308(a)(1)(ii)(A) | Risk Analysis | R | [decision] | [status] | [confidence] | [reason] | [finding] | [H/M/L] |
+| 164.308(a)(1)(ii)(B) | Risk Management | R | [decision] | [status] | [confidence] | [reason] | [finding] | [H/M/L] |
+| ... | ... | ... | ... | ... | ... | ... | ... | ... |
 
 ### Physical Safeguards (164.310)
 [same table format]
@@ -570,6 +614,8 @@ Policies, Procedures, and Documentation — 164.316
 4. **Confusing HIPAA Security Rule with HIPAA Privacy Rule.** The Security Rule (Subpart C) applies only to ePHI and focuses on technical, physical, and administrative safeguards. The Privacy Rule (Subpart E) covers all PHI including paper records and addresses permitted uses and disclosures. A Security Rule review does not satisfy Privacy Rule obligations and vice versa.
 
 5. **Failing to document the "why" behind security decisions.** The Security Rule is designed to be flexible and scalable. But that flexibility requires documentation. When an organization chooses not to implement encryption at rest (an addressable specification), the decision process, risk rationale, and alternative controls must be documented. OCR auditors expect written justification, not verbal explanations.
+
+6. **Counting policy-only or stale vendor evidence as implementation.** A written policy, old SOC report, unsigned BAA draft, or cloud security whitepaper is not enough unless the report maps it to the ePHI system, owner, period covered, shared-responsibility boundary, and implementation evidence.
 
 ---
 
