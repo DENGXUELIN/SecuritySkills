@@ -190,6 +190,49 @@ Rules with zero hit counts over an extended period (30+ days) indicate stale pol
 - Rules referencing decommissioned IP addresses, subnets, or services.
 - Rules with comments referencing past projects or temporary access.
 
+#### 2.4.1 Unused Rule Evidence Gate
+
+Do not recommend rule removal, downgrade, or disablement from a zero hit count alone. Before classifying a rule as unused, record the counter baseline, observation window, last-hit data, secondary evidence, owner validation, and removal confidence.
+
+**Unused rule findings:**
+
+```
+FW-UNUSED-01: Rule ID, device/policy, source, destination, service, or direction is missing
+FW-UNUSED-02: Hit counter source, counter baseline, reset time, uptime, or failover history is missing
+FW-UNUSED-03: Observation window is too short, unknown, or not aligned to periodic business flows
+FW-UNUSED-04: Last-hit timestamp is missing or unavailable without documenting platform limitation
+FW-UNUSED-05: Secondary evidence is missing, such as SIEM logs, flow logs, change tickets, asset inventory, or owner confirmation
+FW-UNUSED-06: Business-critical, scheduled, disaster-recovery, or low-frequency flow lacks owner-approved staged disable or monitoring window
+FW-UNUSED-07: Removal confidence is not documented as High, Medium, or Low with rationale
+FW-UNUSED-08: Proposed removal lacks change ticket, rollback plan, owner, and retest/monitoring date
+```
+
+**Unused rule evidence record:**
+
+```
+FIREWALL UNUSED RULE EVIDENCE
+=============================
+Rule ID / Device:       [rule number, policy, firewall/device]
+Direction:              [inbound/outbound/east-west]
+Source:                 [object, CIDR, zone, asset]
+Destination:            [object, CIDR, zone, asset]
+Service / Port:         [protocol/port/application]
+Hit Count / Source:     [counter value and source]
+Counter Baseline:       [last reset, uptime, failover, policy install time]
+Last Hit:               [timestamp, never, or unavailable with reason]
+Observation Window:     [duration and business-cycle coverage]
+Secondary Evidence:     [flow logs, SIEM, CMDB, ticket, owner attestation]
+Business Criticality:   [critical/scheduled/DR/vendor/low-frequency/none]
+Removal Confidence:     [High | Medium | Low, with rationale]
+Change / Rollback:      [ticket, staged disable, rollback, retest date]
+```
+
+**False-positive boundaries:**
+
+- Do not require 90 days of counters when firewall uptime is shorter if independent flow logs cover the required business cycle.
+- Do not flag rules as removable when they support quarterly, disaster-recovery, vendor-support, incident-response, or scheduled maintenance flows without owner-approved validation.
+- Do not treat platform lack of last-hit timestamps as a failure when counter baseline, flow logs, and owner attestation provide equivalent evidence.
+
 **Finding classification:** Unused rules present for 90+ days are **Medium**. Rules referencing decommissioned resources are **High** (may indicate orphaned access paths).
 
 ---
@@ -298,6 +341,7 @@ Produce the final report using the following structure.
 - **Rule(s):** <rule number(s) or line(s)>
 - **Description:** <what was found>
 - **Evidence:** <specific rule text or configuration snippet>
+- **Unused Rule Evidence:** <counter baseline, observation window, last hit, secondary evidence, owner validation, confidence>
 - **Remediation:** <concrete fix with example>
 
 ### Default Deny Status
@@ -309,6 +353,11 @@ Produce the final report using the following structure.
 ### Shadowed Rules Summary
 | Shadowed Rule | Position | Shadowing Rule | Position | Impact |
 |---------------|----------|----------------|----------|--------|
+
+### Unused Rule Evidence
+| Rule ID / Device | Direction | Source | Destination | Service / Port | Hit Count / Source | Counter Baseline | Last Hit | Observation Window | Secondary Evidence | Business Criticality | Removal Confidence | Change / Rollback |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| <rule/device> | <direction> | <source> | <destination> | <service> | <count/source> | <reset/uptime/failover> | <timestamp/never> | <duration> | <logs/ticket/owner> | <criticality> | <High/Medium/Low> | <ticket/rollback/retest> |
 
 ### Egress Filtering Status
 | Protocol/Port | Restricted | Authorized Destinations |
@@ -360,6 +409,8 @@ Produce the final report using the following structure.
 4. **Assuming hit count of zero means the rule is unused.** Hit counters reset on firewall reload or failover. Verify the counter baseline timestamp before recommending rule removal. Cross-reference with SIEM/flow data where available.
 
 5. **Conflating network ACLs with security groups in cloud environments.** In AWS, NACLs are stateless and operate at the subnet level; security groups are stateful and operate at the instance level. Both must be audited. A permissive NACL can undermine restrictive security group rules for responses.
+
+6. **Removing rules from short or unknown observation windows.** A zero hit counter after failover or a short quiet period can miss month-end jobs, quarterly transfers, disaster-recovery tests, vendor support, and maintenance windows. Verify counter baseline and secondary evidence before removing rules.
 
 ---
 
