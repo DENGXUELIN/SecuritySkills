@@ -53,6 +53,7 @@ Before beginning, gather or confirm:
 
 - [ ] **Target ATT&CK technique(s):** The specific technique or sub-technique IDs to detect (e.g., T1059.001 -- PowerShell).
 - [ ] **Available log sources:** What telemetry is collected? (Windows Event Logs, Sysmon, EDR, cloud audit logs, proxy logs, DNS logs, firewall logs).
+- [ ] **Data-source health:** Last successful ingestion time, expected event volume, parser/schema version, required field coverage, and replay/canary status for each log source used by the detection.
 - [ ] **SIEM platform(s):** Target SIEM for rule deployment (Microsoft Sentinel, Splunk, Elastic, Chronicle, QRadar) -- determines Sigma backend conversion target.
 - [ ] **Environment context:** Operating systems, domain structure, cloud providers, key applications in the environment.
 - [ ] **Existing detection coverage:** Current rules, known gaps, previous false positive history for similar detections.
@@ -85,6 +86,28 @@ ATT&CK Technique Analysis:
 - Sub-techniques:     [.001 PowerShell, .002 AppleScript, .003 Windows Command Shell, ...]
 - Detection Scope:    [Sub-technique specific | Parent technique broad]
 ```
+
+### Step 1.5: Data Source Health and Telemetry Drift Gate
+
+Before treating a detection as operational, verify that each required log source is currently producing the fields the rule depends on. A good Sigma rule still provides only theoretical coverage when the collector is stale, the parser changed, or the expected event volume collapsed to zero.
+
+Record evidence for each required data source:
+
+| Evidence | Required check | Failure signal |
+|----------|----------------|----------------|
+| Last successful ingestion | Most recent event timestamp and pipeline ingestion timestamp are within the environment's freshness threshold | Last event or last pipeline success is stale |
+| Expected event volume | Baseline count for the same source, host group, and time window is non-zero and plausible | Sudden zero-match or sharp drop without an approved maintenance window |
+| Parser/schema version | Parser, field mapping, or data model version is known and compatible with the Sigma fields | Required fields renamed, missing, or mapped to a different type |
+| Required field coverage | Sample events contain the fields used by selections, filters, and output context | Rule depends on absent fields such as `CommandLine`, `Image`, `User`, or `EventID` |
+| Collector/forwarder health | Agent, forwarder, API connector, or cloud integration shows healthy status | Health monitor disabled, stale heartbeat, or failed connector job |
+| Replay/canary proof | Recent replay, atomic test, or synthetic event confirms the rule can match current telemetry | No replay proof after parser, sensor, or pipeline changes |
+
+Classification guidance:
+
+- Escalate to P2/High when a required data source is stale, has zero expected volume without explanation, or has parser drift for a technique with relevant threat intelligence.
+- Keep as P3/Medium when health evidence is incomplete but the data source appears present and a replay test is scheduled.
+- Downgrade to P4/Low only when independent health monitoring, fresh ingestion, schema compatibility, and replay/canary evidence prove that the apparent gap is operationally covered.
+- Mark coverage as `Theoretical` rather than `Operational` when source health, parser version, or field coverage evidence is missing.
 
 ### Step 2: Detection Logic Design
 
@@ -389,6 +412,11 @@ Produce detection engineering deliverables in this structure:
 | Target Coverage | [Operational / Robust] |
 | Validation Method | [Atomic Red Team test ID / manual test procedure] |
 
+### Data Source Health and Drift Evidence
+| Data Source | Expected Volume Window | Last Ingestion | Parser/Schema Version | Required Fields Present | Replay/Canary Result | Health Decision |
+|-------------|------------------------|----------------|-----------------------|-------------------------|----------------------|-----------------|
+| [Sysmon process_creation] | [baseline count / window] | [timestamp] | [version/hash] | [yes/no/list gaps] | [passed/failed/not run] | [current/stale/drifted/theoretical] |
+
 ### Deployment Notes
 - **Target SIEM:** [Platform]
 - **Converted Query:** [KQL/SPL/EQL equivalent if requested]
@@ -493,6 +521,10 @@ Detection rules are not write-once artifacts. Log sources change, environments e
 ### Pitfall 5: Mapping Detections to ATT&CK Techniques Incorrectly
 
 Overly broad or incorrect ATT&CK mappings undermine coverage analysis. A rule that detects a specific PowerShell obfuscation technique should map to T1059.001 (PowerShell) and potentially T1027 (Obfuscated Files or Information), not to the parent T1059 alone. Use sub-technique IDs when the detection is specific to a sub-technique. Validate mappings against the ATT&CK technique definition and procedure examples.
+
+### Pitfall 6: Treating Zero Matches as Coverage
+
+A rule that returns zero matches is not automatically clean coverage. It may mean the required data source is missing, the parser renamed a field, the collector stopped forwarding events, or the rule was converted to a backend query with incompatible field names. Always pair zero-match results with ingestion freshness, expected event volume, parser/schema version, and replay evidence before marking coverage as operational.
 
 ---
 
