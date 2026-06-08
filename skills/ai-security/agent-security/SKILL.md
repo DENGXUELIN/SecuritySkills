@@ -395,6 +395,50 @@ Grep: "draft|staging|preview|dry_run|dry.run|simulate|sandbox_mode" in **/*.{py,
 | Rollback mechanisms exist but are not tested or lack operator documentation | Medium |
 | No classification of agent actions by reversibility | Medium |
 
+#### Step 6.1 -- Emergency Stop and Rollback Drill Evidence
+
+Do not treat a kill switch, feature flag, platform rollback button, or compensation function as sufficient recovery evidence by itself. Agent systems need measured drills proving that operators can stop unsafe workflows, contain queued or delegated tool calls, preserve state, and recover completed side effects within an acceptable window.
+
+**Emergency stop and rollback findings:**
+
+```
+AGENT-STOP-01: No documented emergency stop trigger exists for unsafe agent workflows
+AGENT-STOP-02: Stop scope is unclear or only disables the UI while background workers, queues, or delegated agents continue
+AGENT-STOP-03: Queued, retrying, scheduled, or delegated tool calls are not cancelled, drained, or blocked after the stop condition
+AGENT-STOP-04: State needed for recovery is missing, such as action ledger, snapshot, transaction ID, deployment version, or pre-action artifact
+AGENT-STOP-05: Rollback or compensation is documented but not executed in a measured drill for the relevant action category
+AGENT-STOP-06: Time-to-stop, time-to-recover, recovery objective, or maximum tolerated loss is missing
+AGENT-STOP-07: Operator runbook omits owner, command/API location, escalation path, approval requirements, or communications plan
+AGENT-STOP-08: Drill failures and partial recoveries are not tracked to remediation owners and due dates
+```
+
+**Drill evidence record:**
+
+```
+EMERGENCY STOP AND ROLLBACK DRILL
+=================================
+Scenario:                 [prompt injection | runaway loop | bad deploy | bad data write | message/payment]
+Agent / Workflow:         [name]
+Stop Trigger:             [operator action, API, circuit breaker, feature flag, policy rule]
+Stop Scope:               [session | tenant | tool class | worker pool | delegated agents | global]
+Queued Calls Contained:   [Yes/No/Partial -- evidence]
+State Capture Evidence:   [snapshot/action ledger/transaction/deployment version/pre-action artifact]
+Recovery Method:          [rollback | compensation | manual repair | not possible]
+Time to Stop:             [duration]
+Time to Recover:          [duration]
+Recovery Objective:       [target duration/data loss/action count]
+Operator Runbook:         [path/link/version]
+Approvals / Escalation:   [approver roles and escalation path]
+Drill Result:             [Pass | Partial | Fail | Not Tested]
+Follow-up Owner / Due:    [owner/date for gaps]
+```
+
+**False-positive boundaries:**
+
+- Do not flag missing automatic rollback for truly irreversible communications when the design uses draft mode, HITL approval, suppression/correction procedures, and tested stakeholder notification.
+- Do not require one global kill switch when scoped stops are safer, provided each scope maps to an explicit workflow, tool class, queue, worker pool, and delegated-agent boundary.
+- Do not mark a tabletop-only exercise as sufficient for high-impact tool calls unless a technical drill is unsafe and the residual risk owner explicitly accepts the limitation.
+
 ---
 
 ### Step 7 -- Multi-Agent Trust Boundaries
@@ -521,6 +565,12 @@ Glob: **/security_architecture*
 | Rollback Capability | [rating] | [one-line summary] | [priority] |
 | Multi-Agent Trust Boundaries | [rating] | [one-line summary] | [priority] |
 
+## Emergency Stop and Rollback Drill Evidence
+
+| Scenario | Agent / Workflow | Stop Trigger | Stop Scope | Queued Calls Contained | State Evidence | Recovery Method | Time to Stop | Time to Recover | Recovery Objective | Runbook | Result | Follow-up Owner / Due |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| [scenario] | [agent/workflow] | [trigger] | [scope] | [Yes/No/Partial] | [snapshot/ledger/version] | [rollback/compensation/manual/not possible] | [duration] | [duration] | [objective] | [path/link] | [Pass/Partial/Fail/Not Tested] | [owner/date] |
+
 ## Recommendations
 [Prioritized list of architectural improvements]
 
@@ -568,6 +618,8 @@ Glob: **/security_architecture*
 4. **Building audit trails that log actions but not context.** An audit log that records "Agent-A called write_file at 14:32:01" is useful for timeline reconstruction but insufficient for root cause analysis. Without logging what the agent was told (the prompt or task), what it reasoned (the chain of thought), and what it received from other agents or tools (the inputs), investigators cannot determine whether the action was legitimate, hallucinated, or injected. Log the full decision context for every consequential action.
 
 5. **Assuming rollback is someone else's problem.** Agent developers frequently rely on downstream systems (databases, deployment platforms, email providers) to handle rollback without verifying that rollback mechanisms actually exist and work. A database transaction can be rolled back, but only if the agent's actions are wrapped in a transaction. An email cannot be recalled. A deployed binary cannot be un-deployed if the deployment pipeline has no rollback. For every tool an agent can invoke, the architecture must document the rollback mechanism and test it.
+
+6. **Mistaking stop controls for recovery controls.** Turning off an agent does not undo queued tool calls, delegated worker activity, external messages, data writes, or deployments already completed. Emergency readiness requires stop evidence, containment evidence, recovery evidence, elapsed-time measurements, and remediation tracking from drills.
 
 ---
 
