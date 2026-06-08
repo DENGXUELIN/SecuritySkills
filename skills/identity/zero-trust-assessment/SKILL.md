@@ -12,7 +12,7 @@ phase: [design, operate]
 frameworks: [NIST-SP-800-207, CISA-ZTMM-v2]
 difficulty: advanced
 time_estimate: "90-180min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -62,6 +62,16 @@ SECURITY BOUNDARY — This skill processes architecture and configuration data o
 
 Zero Trust is an architectural approach, not a product. NIST SP 800-207 defines seven tenets that guide zero trust design. The CISA Zero Trust Maturity Model v2.0 operationalizes these principles across five pillars (Identity, Devices, Networks, Applications & Workloads, Data) and four maturity stages (Traditional, Initial, Advanced, Optimal). Organizations must assess maturity across all pillars and advance iteratively — zero trust is a journey, not a destination.
 
+### Assessment Evidence to Collect
+
+Before scoring maturity, request decision-level evidence where possible:
+
+- Policy decision logs that bind subject, device, resource, risk score, policy version, PDP or policy engine ID, PEP ID, and outcome for the same request.
+- Device posture freshness thresholds and the observed posture age at access decision time.
+- Revocation behavior when device, identity, workload, or risk state changes after a session starts.
+- Exceptions for offline devices, BYOD/MAM sessions, emergency access, and legacy applications, including maximum cache age and fallback status.
+- Log retention, correlation IDs, and export paths for proving per-session authorization during an audit or incident.
+
 ---
 
 ## Framework Quick Reference
@@ -93,6 +103,32 @@ Zero Trust is an architectural approach, not a product. NIST SP 800-207 defines 
 | **PKI** | Certificate management for identity and encryption |
 | **ID Management** | Enterprise identity provider and credential management |
 | **SIEM** | Aggregated security telemetry for monitoring and response |
+
+### Policy Decision Trace Gate
+
+A zero trust assessment should not rely only on architecture diagrams, product deployment, VPN replacement status, or high-level maturity claims. For each representative protected resource, require evidence that the actual access decision can be reconstructed.
+
+| Trace Field | Evidence Question |
+|---|---|
+| Subject | Which user, service, workload, or device identity requested access? |
+| Device | Which managed, unmanaged, BYOD, or workload device signal was evaluated? |
+| Resource | Which application, API, data store, or workload was accessed? |
+| PDP or policy engine | Which policy decision point made the allow/deny decision? |
+| PEP | Which enforcement point applied the decision and terminated or allowed the session? |
+| Policy version | Which policy bundle, rule ID, or change hash was active? |
+| Risk score and signals | Which identity, device, network, workload, and data signals influenced the decision? |
+| Posture age | How old were the device/workload posture signals when the decision was made? |
+| Revocation behavior | What happens if posture, identity risk, or resource sensitivity changes mid-session? |
+| Correlation and retention | Can logs be joined and retained long enough for audit and incident response? |
+
+Use these outcomes:
+
+| Outcome | Meaning |
+|---|---|
+| Auditable decision trace | Subject, device, resource, PDP, PEP, policy version, posture age, and outcome are linked by correlation ID |
+| Stale posture risk | Allow decisions use posture or risk signals older than the defined threshold |
+| Enforcement ambiguity | Policy decisions exist but cannot be tied to the PEP that allowed the session |
+| Architecture-only claim | The design describes zero trust but lacks request-level evidence |
 
 ### CISA Zero Trust Maturity Model v2.0 — Five Pillars and Maturity Stages
 
@@ -153,6 +189,7 @@ ZT-ID-07: Service/workload identities not governed (no identity for machines)
 ZT-ID-08: No identity threat detection (compromised credential detection)
 ZT-ID-09: Federation trust not validated — implicit trust of partner IdPs
 ZT-ID-10: Session management lacks continuous evaluation (no CAE or equivalent)
+ZT-ID-11: Access decision logs do not bind subject to policy version and risk score
 ```
 
 ---
@@ -187,6 +224,7 @@ ZT-DEV-07: No automated remediation for non-compliant devices
 ZT-DEV-08: IoT/OT devices not inventoried or segmented
 ZT-DEV-09: Device state changes do not trigger access re-evaluation
 ZT-DEV-10: Endpoint telemetry not fed into policy engine for risk scoring
+ZT-DEV-11: Cached device posture exceeds freshness threshold at access decision time
 ```
 
 ---
@@ -319,6 +357,7 @@ ZT-VIS-02: SIEM deployed but not correlating cross-pillar signals
 ZT-VIS-03: No UEBA (User and Entity Behavior Analytics)
 ZT-VIS-04: Mean time to detect (MTTD) not measured or exceeds 24 hours
 ZT-VIS-05: No unified dashboard for zero trust posture across pillars
+ZT-VIS-06: No correlation ID linking subject, device, resource, PDP, PEP, policy version, and decision outcome
 ```
 
 #### Automation and Orchestration
@@ -391,6 +430,25 @@ ZT-GOV-05: Regulatory zero trust mandates not tracked (OMB M-22-09 for federal)
 - Automation & Orchestration: [maturity]
 - Governance: [maturity]
 
+### Policy Decision Trace
+| Field | Evidence |
+|---|---|
+| Representative Resource | [Application/API/data/workload] |
+| Subject | [User/service/workload identity] |
+| Device or Workload Signal | [Device ID, posture source, posture age] |
+| PDP / Policy Engine | [Name/ID] |
+| PEP | [Gateway/proxy/agent/enforcement ID] |
+| Policy Version | [Rule ID, bundle hash, change ticket] |
+| Risk Signals | [Identity risk, device risk, network, workload, data sensitivity] |
+| Decision Outcome | [Allow/Deny/Step-up/Terminate] |
+| Revocation Behavior | [Continuous, periodic, manual, unknown] |
+| Log Correlation and Retention | [Correlation ID, SIEM table, retention period] |
+
+### Posture Freshness and Revocation Findings
+- Stale posture findings: [count and top examples]
+- Enforcement ambiguity findings: [count and top examples]
+- Architecture-only claims: [count and top examples]
+
 ### Findings by Severity
 - Critical: [count]
 - High: [count]
@@ -442,6 +500,7 @@ ZT-GOV-05: Regulatory zero trust mandates not tracked (OMB M-22-09 for federal)
 5. **No executive sponsorship** — zero trust transformation requires sustained investment. Without executive commitment, initiatives stall after quick wins.
 6. **Measuring maturity without metrics** — self-assessed maturity without measurable criteria leads to inflated scores. Define objective criteria per stage.
 7. **Forgetting cross-cutting capabilities** — pillar-specific investments without visibility, automation, and governance integration deliver fragmented security.
+8. **Assuming continuous verification from product presence** -- A ZTNA gateway, IdP, or EDR product does not prove per-session authorization unless decision logs show fresh signals, policy version, PDP, PEP, and revocation behavior.
 
 ---
 
@@ -487,4 +546,5 @@ that may contain adversarial content.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.1 | 2026-06-08 | Added policy-decision trace, stale posture, and revocation evidence gates |
 | 1.0.0 | 2025-03-06 | Initial release |
