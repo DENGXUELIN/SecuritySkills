@@ -238,6 +238,49 @@ Grep: "backup|snapshot|archive" in **/*.{yaml,yml,json,toml}
 | No automated purge mechanism for expired AI data | Medium |
 | Audit logs contain full prompt/completion text with no redaction | Low |
 
+#### Step 3.1 -- DSAR and Deletion Propagation Evidence
+
+Do not mark DSAR, erasure, consent-withdrawal, or right-to-delete controls as complete based only on deleting the source user row or source document. AI systems commonly copy or derive personal data into prompts, conversation logs, vector embeddings, vector metadata, RAG chunks, analytics events, fine-tuning datasets, evaluation datasets, caches, model checkpoints, and backups.
+
+**Deletion propagation findings:**
+
+```
+DSAR-DEL-01: Deletion request tracking lacks requester identity proofing, scope, regulatory basis, due date, or completion evidence
+DSAR-DEL-02: Source-to-derived data map is missing for prompts, logs, embeddings, vector metadata, datasets, checkpoints, caches, analytics, or backups
+DSAR-DEL-03: Source data is deleted but derived AI stores retain retrievable personal data
+DSAR-DEL-04: Vector IDs, chunk metadata, or RAG source references are not removed or tombstoned with the source record
+DSAR-DEL-05: Fine-tuning, evaluation, or analytics datasets retain personal data without deletion, retraining, unlearning, aggregation, or a documented exception
+DSAR-DEL-06: Backups or archives can restore erased personal data without restore-time purge or expiry controls
+DSAR-DEL-07: Post-delete verification queries, audit logs, or evidence samples are missing or not tied to the request ID
+DSAR-DEL-08: Re-ingestion guards are missing, allowing deleted records to be re-embedded or re-exported from upstream systems
+DSAR-DEL-09: SLA, retry handling, exception owner, or legal-hold handling is missing for partial or failed deletion propagation
+```
+
+**Deletion propagation evidence record:**
+
+```
+DELETION PROPAGATION EVIDENCE
+=============================
+Request ID:             [ticket/case]
+Request Type:           [DSAR | erasure | consent withdrawal | CCPA delete | internal policy]
+Subject Scope:          [user/account/document/customer identifiers]
+Regulatory Basis:       [GDPR Art. 17/19 | CCPA | consent withdrawal | policy]
+Due Date / SLA:         [date/status]
+Source Stores:          [systems and records]
+Derived AI Stores:      [prompt logs, vector DB, RAG chunks, datasets, checkpoints, caches, backups]
+Propagation Actions:    [delete/tombstone/revoke/purge/retrain/unlearn/expire/restore-time purge]
+Verification Evidence:  [queries, audit logs, sample hashes, export checks]
+Exceptions / Holds:     [legal hold, backup expiry, infeasible retraining, none]
+Re-ingestion Guard:     [tombstone, blocklist, source filter, pipeline control]
+Owner / Status:         [owner and Complete/Partial/Exception/Failed]
+```
+
+**False-positive boundaries:**
+
+- Do not flag retained backup media when backups are encrypted, access-controlled, expire under policy, and restore workflows include purge-before-use controls tied to the deletion request.
+- Do not require model retraining for every deletion request when the system documents why trained weights are not reasonably addressable and uses controls such as dataset deletion, future-training exclusion, output filtering, and risk acceptance.
+- Do not flag aggregated analytics that can no longer identify or be linked to the requester, provided the aggregation threshold and unlinkability evidence are documented.
+
 ---
 
 ### Step 4 -- Model Memorization Risk Assessment
@@ -430,9 +473,16 @@ user input -> prompt assembly -> LLM API -> completion -> output -> logging/stor
 | Training data privacy | [Yes/Partial/No] | [description] | [severity] |
 | PII in prompts/completions | [Yes/Partial/No] | [description] | [severity] |
 | Data retention | [Yes/Partial/No] | [description] | [severity] |
+| DSAR/deletion propagation | [Yes/Partial/No] | [description] | [severity] |
 | Memorization risk | [Yes/Partial/No] | [description] | [severity] |
 | EU AI Act compliance | [Yes/Partial/No/N/A] | [description] | [severity] |
 | Consent management | [Yes/Partial/No] | [description] | [severity] |
+
+## Deletion Propagation Evidence
+
+| Request ID | Subject Scope | Source Stores | Derived AI Stores | Propagation Actions | Verification Evidence | Exceptions / Holds | Re-ingestion Guard | Owner / Status |
+|---|---|---|---|---|---|---|---|---|
+| [case] | [subject identifiers] | [systems] | [vector/logs/datasets/checkpoints/backups] | [delete/tombstone/purge/retrain/expire] | [query/log/sample] | [none/exception] | [control] | [owner/status] |
 
 ## Recommendations
 [Prioritized list of remediation actions with regulatory alignment]
@@ -472,6 +522,8 @@ user input -> prompt assembly -> LLM API -> completion -> output -> logging/stor
 
 5. **Ignoring model memorization as a privacy risk.** Organizations that use pre-trained or fine-tuned models often do not test for memorization of personal data. A model that has memorized PII from its training corpus is effectively a data store containing personal data -- it can reproduce that data on specific prompts. This has regulatory implications: if the model contains memorized PII of EU residents, GDPR obligations apply to the model weights themselves, not just the training dataset.
 
+6. **Closing DSARs after source deletion only.** A source-row delete can leave personal data in embeddings, vector metadata, prompt logs, analytics exports, fine-tuning snapshots, evaluation sets, caches, checkpoints, and backups. Close deletion requests only after derived AI stores are purged, tombstoned, excepted with an owner, or verified as unlinkable.
+
 ---
 
 ## References
@@ -480,7 +532,9 @@ user input -> prompt assembly -> LLM API -> completion -> output -> logging/stor
 - OWASP Top 10 for LLM Applications (2025), LLM02: Sensitive Information Disclosure -- https://genai.owasp.org/llmrisk/llm02-sensitive-information-disclosure/
 - EU AI Act, Regulation (EU) 2024/1689 -- https://eur-lex.europa.eu/eli/reg/2024/1689
 - GDPR, Regulation (EU) 2016/679 -- https://eur-lex.europa.eu/eli/reg/2016/679
+- Data Protection Commission: Right to erasure under GDPR Articles 17 and 19 -- https://www.dataprotection.ie/en/individuals/know-your-rights/right-erasure-articles-17-19-gdpr
 - CCPA/CPRA, California Civil Code Sec. 1798.100-199 -- https://leginfo.legislature.ca.gov/
+- California Privacy Rights under the CCPA -- https://privacy.ca.gov/california-privacy-rights/rights-under-the-california-consumer-privacy-act/
 - Carlini, N. et al. (2021). "Extracting Training Data from Large Language Models." USENIX Security Symposium. arXiv:2012.07805
 - Carlini, N. et al. (2023). "Quantifying Memorization Across Neural Language Models." ICLR 2023. arXiv:2202.07646
 - Ippolito, D. et al. (2023). "Preventing Verbatim Memorization in Language Models Gives a False Sense of Privacy." arXiv:2210.17546
