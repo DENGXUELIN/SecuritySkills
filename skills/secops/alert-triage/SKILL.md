@@ -13,7 +13,7 @@ phase: [operate, respond]
 frameworks: [MITRE-ATT&CK-v16, NIST-SP-800-61-Rev2]
 difficulty: beginner
 time_estimate: "10-20min per alert"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -55,6 +55,7 @@ Before beginning triage, gather or confirm:
 - [ ] **ATT&CK mapping:** If the alert rule maps to a MITRE ATT&CK technique, note the technique ID.
 - [ ] **Asset context:** What is the affected asset? (Server, workstation, cloud instance, network device.) What is its business criticality? (Revenue-generating, customer-facing, development, test.)
 - [ ] **User context:** Who is the associated user? (Role, department, normal working hours, recent activity patterns.)
+- [ ] **Entity resolution context:** How were raw IPs, hostnames, UPNs, SIDs, EDR device IDs, cloud instance IDs, NAT/VPN records, and service accounts mapped to the affected user or asset at the alert timestamp?
 - [ ] **Historical context:** Has this alert fired before? What was the previous disposition? Has this user or host generated related alerts recently?
 - [ ] **Threat intelligence:** Do any indicators in the alert (IPs, domains, hashes) appear in threat intelligence feeds?
 
@@ -75,12 +76,36 @@ Gather all data associated with the alert. Do not make a disposition decision un
 | **Alert payload** | Full alert details, raw events, matched rule logic | SIEM (Sentinel, Splunk, QRadar) |
 | **Asset inventory** | Hostname, IP, OS, owner, business unit, criticality tier | CMDB, asset management |
 | **User directory** | Username, role, department, manager, account status | Active Directory, Azure AD, HR system |
+| **Entity resolution sources** | Time-aligned DHCP/VPN/NAT leases, EDR device IDs, cloud instance IDs, IdP aliases/SIDs, service-account ownership, CMDB record timestamps | DHCP, VPN, firewall, EDR, IdP, HR, cloud asset inventory, CMDB |
 | **EDR telemetry** | Process tree, file activity, network connections from the endpoint | CrowdStrike, Defender for Endpoint, SentinelOne |
 | **Network telemetry** | NetFlow, DNS queries, proxy logs for the source/destination | Firewall, proxy, DNS logs |
 | **Threat intelligence** | IOC lookups for IPs, domains, hashes, URLs | VirusTotal, OTX, MISP, TI platform |
 | **Previous alerts** | Historical alerts for same user, host, or IOC | SIEM, case management |
 
 **NIST SP 800-61 alignment:** This phase corresponds to Section 3.2 "Detection and Analysis" -- specifically the initial analysis and validation of the alert before classification.
+
+#### Entity Resolution and Mapping-Confidence Gate
+
+Before disposition, priority, owner routing, or containment recommendations,
+resolve alert entities using records valid at the alert timestamp. Raw alert
+fields are not enough when identifiers are unstable, shared, or recycled.
+
+Apply these gates:
+
+- **ALERT-ENTITY-01 Identifier inventory:** list every raw identifier in the alert payload, including IP, hostname, FQDN, MAC, EDR device ID, cloud instance ID, container ID, username, UPN, email alias, SID, service account, process user, NAT address, and VPN session ID.
+- **ALERT-ENTITY-02 Time alignment:** map identifiers using DHCP leases, VPN sessions, NAT/firewall logs, IdP sign-ins, EDR inventory, cloud asset snapshots, HR/directory data, and CMDB records valid at the alert timestamp, not only current-state lookups.
+- **ALERT-ENTITY-03 Cross-source corroboration:** require at least two relevant sources when the mapping can affect disposition or priority. Examples: SIEM raw event plus EDR device ID, DHCP lease plus VPN session, cloud instance ID plus cloud inventory, SID plus IdP sign-in log.
+- **ALERT-ENTITY-04 Ambiguity handling:** flag NAT gateways, VDI pools, jump hosts, shared service accounts, recycled hostnames, stale CMDB records, cloud auto-scaling instances, and renamed users as ambiguous until corroborated.
+- **ALERT-ENTITY-05 Owner and asset context binding:** do not use owner, business criticality, or user privilege for downgrading until the resolved entity is tied to the correct owner or asset at the alert time.
+- **ALERT-ENTITY-06 Confidence assignment:** label each mapping High, Medium, Low, or Unknown and record why. Low/Unknown mapping should block false-positive closure when impact could be material.
+- **ALERT-ENTITY-07 Disposition impact:** document whether entity confidence changes TP/BTP/FP, P1-P4 priority, escalation target, containment target, or tuning recommendation.
+- **ALERT-ENTITY-08 Escalation guardrail:** do not downgrade a high-impact alert based on asset/user context when mapping confidence is Low or Unknown; escalate or continue investigation until mapping is resolved.
+
+Use this matrix in the triage report whenever entity ambiguity could affect the decision:
+
+| Resolution ID | Raw Identifier | Candidate Entity | Mapping Source | Source Timestamp | Corroboration | Owner / Asset Context | Confidence | Disposition Impact | Ambiguity / Gap |
+|---------------|----------------|------------------|----------------|------------------|---------------|-----------------------|------------|--------------------|-----------------|
+| ALERT-ENTITY-01 | <IP/host/user/etc.> | <asset/user/account> | <DHCP/EDR/CMDB/IdP/etc.> | <time> | <supporting source> | <owner/context> | High / Medium / Low / Unknown | <priority/disposition effect> | <NAT/stale/shared/etc.> |
 
 ### Phase 2: Correlate
 
@@ -209,11 +234,16 @@ Produce the triage decision as a structured report:
 | ATT&CK Tactic | [Execution (TA0002) or N/A] |
 
 ### Affected Entities
-| Entity | Value | Context |
-|--------|-------|---------|
-| Host | [hostname / IP] | [Asset criticality: Critical/High/Medium/Low] |
-| User | [username] | [Role, privilege level] |
-| Process | [process name] | [Expected / Unexpected for this host/user] |
+| Entity | Value | Context | Mapping Confidence |
+|--------|-------|---------|--------------------|
+| Host | [hostname / IP / device ID] | [Asset criticality: Critical/High/Medium/Low] | [High/Medium/Low/Unknown] |
+| User | [username / UPN / SID] | [Role, privilege level] | [High/Medium/Low/Unknown] |
+| Process | [process name] | [Expected / Unexpected for this host/user] | [High/Medium/Low/Unknown or N/A] |
+
+### Entity Resolution
+| Resolution ID | Raw Identifier | Candidate Entity | Mapping Source | Source Timestamp | Corroboration | Owner / Asset Context | Confidence | Disposition Impact | Ambiguity / Gap |
+|---------------|----------------|------------------|----------------|------------------|---------------|-----------------------|------------|--------------------|-----------------|
+| [ALERT-ENTITY-##] | [IP/host/user/etc.] | [asset/user/account] | [DHCP/EDR/CMDB/IdP/etc.] | [time] | [supporting source] | [owner/context] | [High/Medium/Low/Unknown] | [priority/disposition effect] | [NAT/stale/shared/etc.] |
 
 ### Triage Decision
 | Field | Value |
@@ -307,6 +337,10 @@ Classifying an alert as a false positive based solely on the alert payload witho
 
 SIEM-assigned alert severity (Critical/High/Medium/Low) reflects the detection rule author's general assessment, not the specific risk to your environment. A "Medium" severity alert on a domain controller is more urgent than a "High" severity alert on an isolated test server. Always factor in asset criticality, user privilege, and business context when assigning priority.
 
+### Pitfall 2a: Trusting Raw Alert Entities Without Time-Aligned Resolution
+
+An IP, hostname, username, or device name in an alert may not identify the affected entity at the alert timestamp. DHCP leases, VPN concentrators, NAT gateways, VDI pools, cloud auto-scaling, renamed accounts, recycled hostnames, and shared service accounts can point to the wrong owner or priority. Resolve entities with time-aligned sources and record mapping confidence before using asset or user context to close, downgrade, contain, or tune an alert.
+
 ### Pitfall 3: Closing Alerts Without Documenting the Disposition Rationale
 
 Marking an alert as "False Positive" or "Benign" without recording why leads to repeated investigation of the same alert pattern and prevents detection engineering from tuning the rule. Every closed alert should include the specific reason for the disposition, enabling trend analysis and rule improvement.
@@ -344,3 +378,10 @@ This skill processes user-supplied content that may include alert payloads, log 
 7. **Microsoft Sentinel Incident Triage** -- https://learn.microsoft.com/en-us/azure/sentinel/investigate-incidents
 8. **Splunk Enterprise Security Notable Event Triage** -- https://docs.splunk.com/Documentation/ES/latest/User/TriageNotableEvents
 9. **NIST Cybersecurity Framework (CSF) 2.0 -- Detect Function** -- https://www.nist.gov/cyberframework
+
+---
+
+## Changelog
+
+- **1.0.1** -- Added alert entity resolution, time-aligned mapping, confidence, and disposition-impact gates plus report fields.
+- **1.0.0** -- Initial alert triage workflow with collect, correlate, classify, and escalate phases.
