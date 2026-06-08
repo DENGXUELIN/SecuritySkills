@@ -170,6 +170,45 @@ PAM-TOOL-10: PAM tool not integrated with IdP for identity verification
 
 ---
 
+### Step 2.5: Privileged MFA Assurance
+
+**Objective:** Verify that MFA on privileged access is strong enough for the administrative action and enforced at each sensitive PAM chokepoint, not only at initial sign-in.
+
+**NIST SP 800-53 Reference:** IA-2, IA-5, AC-6, AC-17
+**CIS Controls v8 Reference:** Control 6.5 -- Require MFA for Administrative Access
+
+Generic MFA presence is not enough for PAM assurance. SMS, voice, email OTP, unnumbered push, remembered devices, weak helpdesk reset, weak external-tenant trust, and unbound break-glass exceptions can satisfy a checkbox while leaving vault checkout, JIT activation, session launch, recovery, and vendor administration exposed.
+
+**Required evidence:**
+
+| Gate | Evidence to Capture | Fail / Not Evaluable Condition |
+|------|---------------------|--------------------------------|
+| Method strength by admin path | Required and observed authenticator for PAM console, vault checkout, JIT activation, session launch, vendor admin, recovery, and break-glass | High-risk paths permit SMS, voice, email OTP, or simple push without phishing-resistant MFA or approved compensating controls |
+| Step-up enforcement point | Policy logs showing MFA or step-up at login, credential checkout, JIT activation, privileged session launch, recovery, and break-glass use | MFA is checked only at IdP/PAM login and not at the sensitive action boundary |
+| Push fatigue resistance | Number matching, request context, rate limits, device binding, and fatigue/anomaly controls for any push method allowed on admin paths | Push approval can be blindly accepted or spammed without controls |
+| Authenticator and device binding | Hardware-backed or phishing-resistant factor ID, managed-device binding, certificate/PIV/FIDO2/WebAuthn evidence, or risk-accepted alternative | Privileged authenticators are portable, unbound, or indistinguishable from standard-user MFA |
+| Recovery and re-enrollment assurance | Helpdesk reset, lost-device, factor replacement, remembered-device, and emergency recovery workflow evidence | Recovery can downgrade privileged MFA or replace factors without approval and method-level audit |
+| External and vendor parity | MSP/vendor/delegated administrator MFA method, enforcement point, tenant trust, and audit evidence | External admin sessions rely only on weaker home-tenant claims or lack PAM step-up |
+| Break-glass exception control | Dual control, scoped permissions, immediate alerting, session recording, post-use rotation, and follow-up review | Break-glass accounts have no MFA or lack compensating controls and post-use rotation |
+| Method-level audit proof | IdP/PAM logs showing actual method, device/credential ID, challenge type, enforcement point, session, and outcome | Logs show only "MFA satisfied" without proving which factor protected the privileged action |
+
+Use these finding IDs when reporting gaps:
+
+```text
+PAM-MFA-01: Privileged path permits SMS, voice, email OTP, or simple push without phishing-resistant MFA or approved compensating controls
+PAM-MFA-02: MFA is enforced only at login, not at vault checkout, JIT activation, session launch, recovery, or break-glass use
+PAM-MFA-03: Push-based MFA lacks number matching, request context, rate limiting, device binding, or fatigue detection
+PAM-MFA-04: Recovery, re-enrollment, remembered-device, or helpdesk reset can downgrade privileged MFA assurance
+PAM-MFA-05: Vendor, MSP, delegated, or external administrator access lacks equivalent MFA strength and PAM step-up
+PAM-MFA-06: Break-glass MFA exception lacks dual control, immediate alerting, session recording, post-use rotation, or follow-up review
+PAM-MFA-07: Audit logs do not record the authenticator method, device, challenge, enforcement point, and session for privileged actions
+PAM-MFA-08: Phishing-resistant authenticators are available but not required for highest-risk privileged roles
+```
+
+**Finding classification:** No MFA on privileged access paths is **Critical**. Weak or bypassable MFA on administrative paths is **High**. Missing method-level audit evidence or incomplete privileged MFA rollout is **Medium**.
+
+---
+
 ### Step 3: Just-In-Time (JIT) Access Patterns
 
 **Objective:** Evaluate whether privileged access is time-bounded, approval-gated, and automatically revoked.
@@ -388,6 +427,7 @@ PAM-VAULT-12: No secrets scanning in code repositories to detect credential leak
 |---|---|---|
 | Credential Vaulting | [Not Present/Basic/Mature/Advanced] | [Target] |
 | Session Management | [Not Present/Basic/Mature/Advanced] | [Target] |
+| Privileged MFA Assurance | [Weak/Partial/Phishing-resistant/Adaptive] | [Target] |
 | JIT Access | [Not Present/Basic/Mature/Advanced] | [Target] |
 | Break-Glass | [Not Present/Basic/Mature/Advanced] | [Target] |
 | Analytics | [Not Present/Basic/Mature/Advanced] | [Target] |
@@ -401,6 +441,7 @@ PAM-VAULT-12: No secrets scanning in code repositories to detect credential leak
 ### Findings by Category
 - Privileged Account Inventory (Step 1): [count]
 - PAM Tool Assessment (Step 2): [count]
+- Privileged MFA Assurance (Step 2.5): [count]
 - JIT Access (Step 3): [count]
 - Break-Glass Procedures (Step 4): [count]
 - Session Recording (Step 5): [count]
@@ -417,6 +458,11 @@ PAM-VAULT-12: No secrets scanning in code repositories to detect credential leak
 
 ### Framework Compliance Mapping
 [Map each finding to NIST SP 800-53 AC-6 enhancements and CIS Controls v8]
+
+### Privileged MFA Assurance Evidence
+| Admin Path | Required Strength | Observed Method | Step-Up Point | Recovery/External/Break-Glass Control | Method-Level Audit | Status |
+|---|---|---|---|---|---|---|
+| [PAM login / vault checkout / JIT activation / session launch / vendor admin / recovery / break-glass] | [phishing-resistant / compensated / weak] | [FIDO2/WebAuthn / PIV / certificate / push / OTP / none] | [login / checkout / activation / launch / recovery / break-glass] | [approval, dual control, vendor parity, rotation, exception expiry] | [method, device, challenge, session, outcome] | [Pass/Fail/Not Evaluable] |
 ```
 
 ---
@@ -457,6 +503,7 @@ PAM-VAULT-12: No secrets scanning in code repositories to detect credential leak
 6. **Session recording without review** — recording sessions without monitoring or alerting provides forensic value but not prevention. Add real-time alerting.
 7. **Ignoring service account privilege** — PAM programs often focus on human admin accounts and neglect service accounts with equally powerful permissions.
 8. **No PAM HA/DR** — if the PAM tool is a single point of failure, its outage creates either a lockout or a break-glass event. Architect for resilience.
+9. **Equating any MFA with privileged MFA assurance** -- SMS, voice, email OTP, and simple push may satisfy a generic MFA checkbox while leaving vault checkout, JIT activation, recovery, vendor administration, and break-glass paths vulnerable. Require method-level evidence and step-up enforcement at the actual privileged action.
 
 ---
 
