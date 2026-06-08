@@ -250,6 +250,34 @@ Egress filtering prevents compromised internal hosts from establishing unrestric
 - Uncommon outbound protocols (SSH 22, RDP 3389, ICMP) are restricted or denied by default.
 - Outbound connections to known anonymization services (Tor exit nodes) are blocked.
 
+#### Effective Egress and Temporary-Rule Evidence Gate
+
+For cloud and hybrid firewalls, declared policy is not enough. Validate the effective rule path and exception lifecycle before treating broad egress as controlled.
+
+| Check ID | Evidence to collect | Failure condition |
+|----------|---------------------|-------------------|
+| `FW-EGRESS-01` | Effective rules from the cloud provider, host firewall, NACL/NSG, and security group for the reviewed workload | IaC or policy documents claim restriction but effective rules still allow broad egress |
+| `FW-EGRESS-02` | Route table, NAT gateway, internet gateway, peering, transit gateway, proxy, and service-endpoint path for outbound traffic | Workload can bypass the approved proxy or egress firewall through a parallel route |
+| `FW-EGRESS-03` | Destination allowlist with FQDN/IP, port, protocol, owner, and business purpose | Rule allows `0.0.0.0/0`, `::/0`, `any`, or arbitrary TCP/UDP without destination inventory |
+| `FW-EGRESS-04` | Evidence distinguishing stateful return traffic from outbound initiation | "Stateful return" is used to justify rules that permit new outbound sessions |
+| `FW-EGRESS-05` | Temporary-rule ticket, owner, approver, expiry, compensating monitor, and removal evidence | Temporary egress rule has no expiry, no owner, or remains active after the approved window |
+| `FW-EGRESS-06` | Cloud effective-rule export timestamp and coverage for every account, region, subnet, and workload in scope | Evidence is stale, partial, or limited to a single account/region while findings are generalized |
+| `FW-EGRESS-07` | Flow-log, proxy-log, DNS-log, or firewall-log evidence showing actual outbound destinations during the review window | Review accepts rule intent without checking runtime egress behavior |
+| `FW-EGRESS-08` | Exception risk decision and follow-up date for approved broad egress | Broad egress is accepted permanently without risk acceptance, review cadence, or removal plan |
+
+**Effective egress output fields:**
+
+| Field | Value |
+|-------|-------|
+| Effective-rule source | [cloud export / firewall manager / host firewall / mixed] |
+| Route and NAT path | [proxy / egress firewall / NAT gateway / internet gateway / bypass found] |
+| Destination allowlist status | [complete / partial / missing] |
+| Temporary-rule lifecycle | [none / active with expiry / active without expiry / expired still active] |
+| Runtime egress evidence | [flow logs / proxy logs / DNS logs / unavailable] |
+| Review coverage | [accounts, regions, subnets, workloads, timestamp] |
+| Exception owner and next review | [owner, ticket, expiry, follow-up date] |
+| Egress confidence | [High / Medium / Low plus missing evidence] |
+
 **Finding classification:** Unrestricted outbound egress (allow all) is **High**. Missing DNS egress restriction is **Medium**.
 
 ---
@@ -317,6 +345,18 @@ Produce the final report using the following structure.
 | SMTP (25)     | Yes/No    | <mail server IPs>      |
 | HTTPS (443)   | Yes/No    | <proxy or direct>      |
 
+### Effective Egress and Temporary Rules
+| Field | Value |
+|-------|-------|
+| Effective Rule Source | <cloud export / firewall manager / host firewall / mixed> |
+| Route and NAT Path | <proxy / egress firewall / NAT gateway / internet gateway / bypass found> |
+| Destination Allowlist Status | <complete / partial / missing> |
+| Temporary Rule Lifecycle | <none / active with expiry / active without expiry / expired still active> |
+| Runtime Egress Evidence | <flow logs / proxy logs / DNS logs / unavailable> |
+| Review Coverage | <accounts, regions, subnets, workloads, timestamp> |
+| Exception Owner and Next Review | <owner, ticket, expiry, follow-up date> |
+| Egress Confidence | <High / Medium / Low plus missing evidence> |
+
 ### Prioritized Remediation Plan
 1. **[Critical]** <action item with control reference>
 2. **[High]** <action item with control reference>
@@ -360,6 +400,8 @@ Produce the final report using the following structure.
 4. **Assuming hit count of zero means the rule is unused.** Hit counters reset on firewall reload or failover. Verify the counter baseline timestamp before recommending rule removal. Cross-reference with SIEM/flow data where available.
 
 5. **Conflating network ACLs with security groups in cloud environments.** In AWS, NACLs are stateless and operate at the subnet level; security groups are stateful and operate at the instance level. Both must be audited. A permissive NACL can undermine restrictive security group rules for responses.
+
+6. **Accepting declared proxy-only egress without effective-path evidence.** A policy may say HTTPS goes through an approved proxy, while the subnet route table, NAT gateway, or default cloud security group still permits direct internet egress. Confirm effective rules and runtime flow evidence before downgrading broad egress.
 
 ---
 
