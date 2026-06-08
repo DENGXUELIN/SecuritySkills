@@ -149,6 +149,36 @@ AR-CERT-07: No SLA for certification completion (recommended: 14 business days)
 AR-CERT-08: Delegated reviews without accountability (certifier delegates but is not tracked)
 ```
 
+**Certification attestation evidence gates:**
+
+Do not treat a completed campaign as proof of meaningful review unless the
+decision-level attestation evidence binds each entitlement to a qualified
+reviewer, a visible permission meaning, and an enforced outcome.
+
+```
+AR-ATTEST-01: Campaign evidence does not identify campaign ID, review period, system, and source export
+AR-ATTEST-02: Attestation record omits identity, entitlement, resource scope, or permission meaning
+AR-ATTEST-03: Certifier authority is not proven (manager, resource owner, SoD owner, or approved delegate)
+AR-ATTEST-04: Decision evidence is missing approve/revoke/modify/uncertain status and timestamp
+AR-ATTEST-05: Batch size or decision duration indicates rubber-stamping and lacks sampling follow-up
+AR-ATTEST-06: Revoke/modify decisions are not linked to enforcement ticket, execution timestamp, and reconciliation
+AR-ATTEST-07: Role transfer, promotion, emergency access, or material permission change did not trigger re-attestation
+AR-ATTEST-08: Attestation confidence is unknown because evidence source, freshness, or reviewer context is incomplete
+```
+
+**Minimum attestation record fields:**
+
+| Field | Required Evidence |
+|---|---|
+| Campaign | Campaign ID, review period, system, source export or IGA report |
+| Identity | User/service account ID, owner, status, department or workload |
+| Entitlement | Group/role/permission, resource scope, criticality, permission meaning |
+| Certifier | Certifier identity, relationship to access, authority source, delegation chain if any |
+| Decision | Approve/revoke/modify/exception/uncertain, timestamp, rationale, confidence |
+| Review quality | Batch size, decision duration, reviewer comments, sample/audit result when high risk |
+| Enforcement | Ticket/change ID, execution timestamp, post-change access state, reconciliation result |
+| Change triggers | Transfer/promotion/emergency grant/material permission change and re-attestation status |
+
 **Rubber-stamp detection criteria:**
 
 | Indicator | Threshold | Action |
@@ -321,6 +351,7 @@ AR-ENF-08: No metrics or reporting on review completion rates and outcomes
 | **Framework Ref** | NIST SP 800-53 control ID and/or CIS Controls v8 sub-control |
 | **Affected Scope** | Accounts, roles, systems, or platforms impacted |
 | **Evidence** | Specific data supporting the finding (counts, examples, screenshots) |
+| **Attestation Evidence** | Campaign, certifier, entitlement meaning, decision, timestamp, confidence, and enforcement linkage |
 | **Remediation** | Prioritized fix with implementation guidance |
 | **Effort** | Low (< 1 day) / Medium (1-5 days) / High (> 5 days) |
 
@@ -354,6 +385,11 @@ AR-ENF-08: No metrics or reporting on review completion rates and outcomes
 
 ### Detailed Findings
 [Findings table]
+
+### Certification Attestation Evidence
+| Campaign | Identity | Entitlement | Permission Meaning | Certifier / Authority | Decision / Timestamp | Batch / Duration | Enforcement / Reconciliation | Confidence |
+|---|---|---|---|---|---|---|---|---|
+| [campaign ID + period] | [identity] | [entitlement/resource] | [plain-language access meaning] | [manager/resource owner/delegate authority] | [approve/revoke/modify/uncertain + time] | [batch size + decision time] | [ticket/change ID + post-state] | [high/medium/low + reason] |
 
 ### Remediation Roadmap
 - Immediate (0-7 days): [critical findings]
@@ -401,6 +437,7 @@ See the mapping table in the Framework Quick Reference section above for sub-con
 5. **Role explosion masking risk** — When roles proliferate, reviewers cannot meaningfully assess what permissions a role grants. Pair reviews with role rationalization.
 6. **SoD analysis done manually** — Manual SoD checks do not scale and miss cross-system conflicts. Implement conflict rules in IGA tooling.
 7. **Evidence not retained** — Reviews happen but evidence is not preserved for the audit window. Configure IGA tools to retain decisions and timestamps.
+8. **Campaign completion treated as attestation** - A 100% complete access-review campaign is not sufficient unless each decision has certifier authority, entitlement meaning, timestamp, rationale, quality signals, and enforcement evidence.
 
 ---
 
