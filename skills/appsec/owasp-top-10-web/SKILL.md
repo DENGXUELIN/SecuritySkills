@@ -635,8 +635,28 @@ Present findings in this structure:
 - **Location:** [file:line or file:function]
 - **Description:** [Clear explanation of the vulnerability, including how it could be exploited]
 - **Evidence:** [Code snippet or configuration excerpt]
+- **Exploitability Evidence:** [entry point, source-to-sink trace, exploit preconditions, and missing/bypassed controls]
+- **Compensating Controls Checked:** [framework controls, middleware, WAF, validation, authorization, rate limits, CSP, or other controls reviewed]
+- **False-Positive Rationale:** [why the finding is not a false positive, or why it was downgraded/discarded]
 - **Remediation:** [Specific, actionable fix with code example where applicable]
 - **Verification:** [How to confirm the fix is effective]
+
+### Exploitability Evidence Matrix
+
+For High and Critical findings, require:
+
+- `OWASP-EXP-01` **Reachable entry point**: record the public route, controller/action, handler, RPC, webhook, job trigger, or browser-exposed flow that reaches the vulnerable code.
+- `OWASP-EXP-02` **Attacker-controlled source**: identify the parameter, header, body field, cookie, file upload, path segment, or third-party callback field controlled by an attacker.
+- `OWASP-EXP-03` **Vulnerable sink**: identify the SQL, template, command, filesystem, redirect, SSRF fetch, authz decision, crypto operation, or browser sink affected.
+- `OWASP-EXP-04` **Source-to-sink trace**: document the call chain and transformations from source to sink, including sanitizers or validators that do or do not apply.
+- `OWASP-EXP-05` **Exploit preconditions**: capture role, auth state, tenant/object ownership, feature flag, deployment mode, configuration, and environmental assumptions.
+- `OWASP-EXP-06` **Compensating controls checked**: review framework protections, centralized middleware, WAF/CRS rules, CSP, rate limits, CSRF defenses, encoder behavior, allowlists, and policy enforcement.
+- `OWASP-EXP-07` **Severity calibration**: downgrade or discard findings where controls fully block exploitation, the code is unreachable, or only non-security data is affected.
+- `OWASP-EXP-08` **Proof and negative evidence**: include a safe exploit sketch, test reference, log/WAF evidence, or negative test where feasible.
+
+| Finding | Entry Point | Attacker Source | Sink | Source-to-Sink Trace | Preconditions | Controls Checked | FP/Severity Rationale | Proof/Negative Evidence |
+|---------|-------------|-----------------|------|----------------------|---------------|------------------|-----------------------|-------------------------|
+| [id] | [route/handler] | [field] | [sink] | [trace] | [conditions] | [controls] | [rationale] | [test/evidence] |
 
 ---
 
@@ -686,6 +706,8 @@ Present findings in this structure:
 4. **Reporting deprecated algorithms without context.** MD5 used for non-security checksums (e.g., cache busting, ETags) is not a cryptographic failure. Only flag weak algorithms when they protect sensitive data, passwords, or integrity-critical operations. State the security impact clearly.
 
 5. **Ignoring transitive dependencies.** A project may have zero direct vulnerable dependencies but inherit critical CVEs through transitive dependencies. Always analyze the full dependency tree, not just top-level declarations.
+
+6. **Omitting exploitability evidence from severe findings.** High and Critical findings should not rely on a code snippet alone. If the report lacks a reachable entry point, attacker-controlled source, vulnerable sink, preconditions, compensating-control review, and false-positive rationale, downgrade the confidence or mark the finding for validation.
 
 ## Prompt Injection Safety Notice
 
