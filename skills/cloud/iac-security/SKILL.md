@@ -29,6 +29,8 @@ This skill performs a structured security review of Infrastructure as Code (IaC)
 
 The review covers eight security domains: secrets management, public exposure, encryption, IAM and access control, logging, network security, supply chain integrity, and resource hardening. Each finding is mapped to a specific policy rule equivalent from Checkov, tfsec, or KICS.
 
+For supply chain integrity, remote module trust is part of the review surface. A module call is not safe merely because it resolves successfully, and it is not unsafe merely because it uses a public registry. Evaluate immutability, publisher ownership, registry control, checksum/lock evidence, and whether the reviewed plan used the same module source that apply will use.
+
 ---
 
 ## When to Use
@@ -95,6 +97,22 @@ Classify the IaC stack(s) in use. Record the total file count and frameworks det
 Evaluate all IaC configurations across eight security domains: Hardcoded Secrets Detection, Public Exposure Analysis, Encryption Gap Analysis, IAM and Access Control Review, Logging and Monitoring Gaps, Network Security Review, Supply Chain Integrity (SLSA Alignment), and Resource Hardening.
 
 For detailed tool-specific rule sets, detection patterns, vulnerable code examples, and remediation guidance for Checkov, tfsec, and KICS equivalents across all eight domains, see [tool-rules.md](tool-rules.md) in this skill directory.
+
+**Remote Module Trust Gate:**
+
+For each Terraform, Pulumi, CloudFormation nested-stack, or Bicep module/template dependency fetched from outside the repository, record a module trust row before marking supply chain integrity as passing:
+
+| Evidence Field | Required Check |
+|----------------|----------------|
+| Module source | Identify registry address, Git URL, local mirror, object storage URL, or private registry hostname. |
+| Immutability | Require a pinned registry version, commit SHA, immutable release tag with protected-tag evidence, or checksum-verified mirror artifact. |
+| Registry namespace ownership | Verify the namespace or private registry is owned by the expected organization and not a newly transferred or lookalike namespace. |
+| Lock/checksum evidence | Confirm committed lock files, checksums, provenance attestations, or artifact digests cover the provider/module actually used. |
+| Mirror provenance | For internal mirrors, record upstream source, sync job owner, artifact digest, and update approval path. |
+| Plan/apply source parity | Confirm the plan reviewed in CI used the same module source, version, and digest that production apply will consume. |
+| Drift signal | Flag DNS, registry backend, branch, or tag changes between last known-good deployment and current review. |
+
+Flag floating Git branches, mutable tags without protection evidence, unverified vanity/private registries, missing lock/checksum evidence, or plan/apply source drift as supply chain findings. Suppress false positives for public registry modules when namespace ownership, explicit version pinning, committed provider lock files, and module provenance evidence are present.
 
 ---
 
@@ -169,6 +187,10 @@ Produce the final report using the structure defined in the Output Format sectio
 - State encryption: <encrypted / unencrypted>
 - State locking: <enabled / disabled>
 - Lock file committed: <yes / no>
+- Remote module trust: <verified / partial / unverified>
+- Registry namespace ownership: <verified / unknown / changed>
+- Module checksum or provenance evidence: <present / missing / not applicable>
+- Plan/apply source parity: <matched / drift detected / not verified>
 
 ### Prioritized Remediation Plan
 
@@ -200,6 +222,7 @@ Produce the final report using the structure defined in the Output Format sectio
 | Build integrity | IaC plans generated in CI, not applied manually |
 | Provenance | State files track who applied what changes |
 | Dependencies | Provider and module versions locked, lock file committed |
+| Registry trust | Module registry namespaces, private registry domains, and mirrors remain controlled by the expected owner |
 
 ### Checkov / tfsec / KICS Rule Equivalents
 
@@ -230,6 +253,8 @@ This skill applies checks equivalent to the following high-impact rules:
 5. **Confusing `aws_s3_bucket_acl` with `aws_s3_bucket_public_access_block`.** The public access block overrides ACLs. Check both, but the access block is the stronger control.
 6. **Terraform state file secrets.** Even when variables are marked `sensitive`, they may appear in plaintext in the state file. Verify state encryption and access controls.
 7. **Provider-specific encryption defaults.** Some providers encrypt by default (e.g., AWS S3 since January 2023). Know the defaults before flagging missing explicit encryption configuration.
+8. **Treating every public registry module as risky.** A verified namespace with explicit version pinning, committed lock files, and provenance evidence is a lower-risk dependency than an unpinned Git branch or unverified private mirror.
+9. **Missing plan/apply drift.** A secure plan review is weak if production apply can resolve a different branch, tag, registry backend, or mirror artifact after approval.
 
 ---
 
