@@ -1,0 +1,66 @@
+case: sbom-analysis-mixed-stage-runtime-misclassified
+skill: sbom-analysis
+expected_risk: Elevated Risk
+description: >
+  A source/build SBOM is used as if it were the deployed runtime SBOM. Dev,
+  test, build-only, excluded, and unknown-scope components are merged with
+  runtime dependencies before CVE and license severity decisions.
+sbom:
+  format: CycloneDX
+  spec_version: "1.5"
+  artifact_stage: source_tree
+  final_image_digest: missing
+  runtime_sbom: missing
+components:
+  - name: eslint-plugin-internal
+    version: 4.2.0
+    scope: excluded
+    stage: dev_test
+    license: GPL-3.0-only
+    cves: []
+  - name: vulnerable-test-fixture
+    version: 1.0.0
+    scope: excluded
+    stage: test_fixture
+    cves:
+      - CVE-2026-44001
+  - name: native-build-toolchain
+    version: 12.1.0
+    scope: required
+    stage: build_only
+    cves:
+      - CVE-2026-44002
+  - name: openssl
+    version: 3.0.8
+    scope: unknown
+    stage: unknown
+    cves:
+      - CVE-2026-44003
+analysis_decision:
+  product_classification: Critical Supply Chain Risk
+  reason: all_source_tree_components_treated_as_runtime
+  runtime_evidence_used: none
+expected_findings:
+  - id: SBOM-SCOPE-01
+    status: fail
+    reason: source-tree SBOM is treated as deployed runtime evidence
+  - id: SBOM-SCOPE-02
+    status: fail
+    reason: dev, test, build-only, excluded, and runtime scopes are merged
+  - id: SBOM-SCOPE-03
+    status: fail
+    reason: CVE SLA is driven by excluded and build-only components
+  - id: SBOM-SCOPE-04
+    status: fail
+    reason: lint-only GPL dependency is treated as a shipped distribution blocker
+  - id: SBOM-SCOPE-05
+    status: fail
+    reason: no final-image or runtime SBOM reconciliation is present
+  - id: SBOM-SCOPE-06
+    status: fail
+    reason: unknown-scope openssl is escalated without scope evidence
+expected_output:
+  artifact_stage_and_component_scope: Failed
+  runtime_artifact_evidence: Not Evaluable
+  production_vulnerability_sla_allowed: false
+  final_classification: Elevated Risk

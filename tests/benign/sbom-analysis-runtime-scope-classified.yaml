@@ -1,0 +1,74 @@
+case: sbom-analysis-runtime-scope-classified
+skill: sbom-analysis
+expected_risk: Acceptable
+description: >
+  Source, build, and final runtime SBOM evidence is reconciled before assigning
+  vulnerability SLA or license severity. Dev/test and build-only findings remain
+  tracked but do not drive production runtime risk.
+sbom:
+  format: CycloneDX
+  spec_version: "1.5"
+  artifact_stage: final_image
+  final_image_digest: sha256:final-runtime-image-digest
+  runtime_sbom: present
+  source_sbom: present
+components:
+  - name: eslint-plugin-internal
+    version: 4.2.0
+    scope: excluded
+    stage: dev_test
+    license: GPL-3.0-only
+    shipped_in_final_image: false
+    risk_treatment: development_hygiene_and_legal_record_only
+  - name: native-build-toolchain
+    version: 12.1.0
+    scope: required
+    stage: build_only
+    shipped_in_final_image: false
+    cves:
+      - CVE-2026-44002
+    risk_treatment: build_environment_hygiene
+  - name: openssl
+    version: 3.0.8-r4
+    scope: required
+    stage: runtime
+    shipped_in_final_image: true
+    vendor_fixed_status: patched_backport
+    cves:
+      - CVE-2026-44003
+  - name: app-server
+    version: 2.8.1
+    scope: required
+    stage: runtime
+    shipped_in_final_image: true
+analysis_decision:
+  product_classification: Acceptable
+  reason: runtime risk is based on final-image and deployed-service evidence
+  runtime_evidence_used:
+    - final_image_digest
+    - runtime_filesystem_sbom
+    - deployment_inventory
+expected_findings:
+  - id: SBOM-SCOPE-01
+    status: pass
+    reason: artifact stage is final image with digest evidence
+  - id: SBOM-SCOPE-02
+    status: pass
+    reason: components are bucketed by runtime, dev/test, build-only, and excluded scope
+  - id: SBOM-SCOPE-03
+    status: pass
+    reason: production SLA is based only on shipped runtime components
+  - id: SBOM-SCOPE-04
+    status: pass
+    reason: GPL dev dependency is tracked separately and not shipped
+  - id: SBOM-SCOPE-05
+    status: pass
+    reason: source/build evidence is reconciled against final runtime SBOM
+  - id: SBOM-SCOPE-06
+    status: pass
+    reason: no unknown-scope components remain in production risk decisions
+expected_output:
+  artifact_stage_and_component_scope: Pass
+  runtime_artifact_evidence: Verified
+  production_vulnerability_sla_allowed: true
+  final_classification: Acceptable

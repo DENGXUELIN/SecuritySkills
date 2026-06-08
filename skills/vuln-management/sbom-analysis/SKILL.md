@@ -13,7 +13,7 @@ phase: [build, operate]
 frameworks: [CycloneDX-1.5, SPDX-2.3, VEX-CSAF, NTIA-SBOM-Minimum-Elements]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -48,6 +48,7 @@ Before starting, collect or confirm:
 - [ ] **SBOM format and version:** CycloneDX 1.5, SPDX 2.3, or other (identify version explicitly)
 - [ ] **VEX document(s):** Associated VEX statements, if available (CSAF 2.0 format, CycloneDX VEX, or OpenVEX)
 - [ ] **Software identity:** Name, version, and vendor of the software the SBOM describes
+- [ ] **Artifact stage:** Whether the SBOM represents the source tree, lockfile, build image, final container image, runtime filesystem, deployed service, or another stage
 - [ ] **Intended use context:** Is this SBOM for procurement evaluation, compliance audit, incident response, or continuous monitoring?
 - [ ] **Compliance requirements:** Applicable mandates (EO 14028 for US federal suppliers, EU Cyber Resilience Act, FDA premarket guidance for medical devices)
 - [ ] **License policy:** Organization's approved/prohibited license list, if applicable
@@ -84,6 +85,7 @@ SBOM Format Assessment:
 - Format:              [CycloneDX | SPDX | Unknown]
 - Version:             [1.5 | 2.3 | Other]
 - Serialization:       [JSON | XML | RDF | Tag-Value]
+- Artifact Stage:      [Source | Lockfile | Build Image | Final Image | Runtime Filesystem | Deployed Service | Unknown]
 - Valid Structure:     [Yes | No -- list structural errors]
 - Component Count:     [N direct + N transitive = N total]
 - File Size:           [Size]
@@ -176,6 +178,21 @@ Analyze the dependency tree to identify risk concentration in transitive (indire
 
 **Framework mapping:** CycloneDX 1.5 `dependencies` array, SPDX 2.3 `Relationship` types
 
+#### 4.0 Artifact Stage and Component Scope Gates
+
+Before assigning vulnerability SLA, license conflict severity, or supply-chain risk, classify the SBOM artifact stage and component scope. A source-tree or build-stage SBOM should not be treated as the final deployed runtime without corroborating evidence.
+
+| Gate | Requirement | Fail / Escalate When |
+|------|-------------|----------------------|
+| SBOM-SCOPE-01 | The SBOM declares or can be tied to an artifact stage: source, lockfile, build image, final image, runtime filesystem, or deployed service. | Artifact stage is unknown but findings are assigned production/runtime severity. |
+| SBOM-SCOPE-02 | Components are bucketed by scope: required/runtime, optional runtime, dev/test, build-only, excluded, or unknown. | Dev/test/build-only and runtime components are merged into one severity bucket. |
+| SBOM-SCOPE-03 | Runtime vulnerability priority is based on required/optional runtime components in the final image, runtime filesystem, or deployed service. | CVE SLA is driven by an excluded, test-only, or build-only component without evidence it ships or runs. |
+| SBOM-SCOPE-04 | Strong-copyleft and AGPL findings include distribution/SaaS context and runtime/shipped scope. | A lint-only or excluded dev dependency is treated as an immediate distribution/SaaS blocker without scope evidence. |
+| SBOM-SCOPE-05 | Source/build SBOMs are reconciled against final-image or runtime SBOMs for containerized applications. | Build-stage packages are assumed present in a distroless/final image, or final image base packages are omitted. |
+| SBOM-SCOPE-06 | Unknown-scope components remain Not Evaluable or require follow-up evidence before downgrade or urgent escalation. | Unknown-scope components are silently treated as benign or production-critical. |
+
+Use scope data from CycloneDX `scope`, `properties`, `formulation`, purl package manager groups, lockfile dev/prod flags, SPDX package purpose, image-layer SBOMs, or deployment inventory evidence. When evidence conflicts, report the conflict and prefer the SBOM tied to the deployed artifact for production risk decisions.
+
 1. **Build the dependency graph:** Parse the dependency relationships to construct a directed graph from the top-level component to all transitive dependencies
 2. **Identify depth:** Calculate the maximum dependency depth (layers of transitive dependencies)
 3. **Identify orphan components:** Components listed but not connected to any dependency relationship (may indicate incomplete SBOM)
@@ -250,6 +267,8 @@ Classify the overall SBOM analysis into one of the following states:
 | **Acceptable** | SBOM meets minimum requirements with minor gaps | NTIA completeness >= 90%, no critical/high CVEs in dependencies, minor license issues documented |
 | **Strong** | SBOM is comprehensive and low-risk | NTIA 100% complete, all VEX statuses resolved, no critical dependency risks, clean license posture |
 
+**Scope guardrail:** Do not classify a product as Critical solely because a dev/test/build-only or excluded component has a CVE or strong-copyleft license. Preserve the finding, but separate production/runtime risk from development hygiene or legal review unless evidence shows the component is shipped, loaded, reachable, or exposed through the deployed service.
+
 ---
 
 ## Output Format
@@ -273,6 +292,7 @@ conflicts), and overall classification.]
 |---|---|
 | Software Name | [Name] |
 | Software Version | [Version] |
+| Artifact Stage | [Source / Lockfile / Build Image / Final Image / Runtime Filesystem / Deployed Service / Unknown] |
 | SBOM Format | [CycloneDX 1.5 / SPDX 2.3] |
 | Serialization | [JSON / XML / Other] |
 | Total Components | [N] (direct: [N], transitive: [N]) |
@@ -292,6 +312,19 @@ conflicts), and overall classification.]
 | Timestamp | [Pass/Fail] | Document-level | [Notes] |
 
 **NTIA Completeness Rating:** [Complete / Substantially Complete / Partial / Incomplete]
+
+### Artifact Stage and Component Scope
+
+| Scope Bucket | Count | Examples | Risk Treatment |
+|---|---:|---|---|
+| Required / Runtime | [N] | [components] | Drives production vulnerability SLA and shipped license analysis |
+| Optional Runtime | [N] | [components] | Assess by feature reachability and deployment configuration |
+| Dev / Test | [N] | [components] | Track hygiene and license review separately unless shipped |
+| Build-Only | [N] | [components] | Reconcile against final artifact before production escalation |
+| Excluded | [N] | [components] | Do not drive runtime SLA unless evidence contradicts exclusion |
+| Unknown Scope | [N] | [components] | Not Evaluable until scope evidence is collected |
+
+**Runtime artifact evidence:** [final image digest, runtime filesystem SBOM, deployment inventory, or Not Evaluable]
 
 ### VEX Status Summary
 [If VEX documents are provided]
@@ -381,6 +414,10 @@ Published by NTIA in July 2021 as part of Executive Order 14028 implementation. 
 
 5. **Failing to track SBOM freshness.** An SBOM is a point-in-time snapshot. Software composition changes with every dependency update, build, or deployment. SBOMs older than the most recent build/release are potentially inaccurate. Check the SBOM timestamp against the software's actual release date and flag stale SBOMs.
 
+6. **Merging source/build/test dependencies with production runtime dependencies.** A source-tree SBOM can include linters, test fixtures, build tools, and packages absent from the final deployed artifact. Conversely, a final image can contain base-image packages absent from the application lockfile. Classify artifact stage and component scope before assigning vulnerability SLA or license-conflict severity.
+
+7. **Treating excluded scope as automatic clearance.** `scope: excluded` or a dev/test flag is useful evidence, not a guarantee. If deployment evidence shows the component is shipped, loaded, or reachable, override the scope claim and document the contradiction.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -408,3 +445,10 @@ Published by NTIA in July 2021 as part of Executive Order 14028 implementation. 
 - EU Cyber Resilience Act: https://digital-strategy.ec.europa.eu/en/policies/cyber-resilience-act
 - OSV (Open Source Vulnerability Database): https://osv.dev/
 - GitHub Advisory Database: https://github.com/advisories
+
+---
+
+## Changelog
+
+- **1.0.1** -- Added artifact-stage and component-scope gates so source, build, dev/test, excluded, final-image, runtime, and deployed-service SBOM evidence is separated before vulnerability and license severity decisions.
+- **1.0.0** -- Initial release. Full coverage of CycloneDX 1.5, SPDX 2.3, VEX interpretation, NTIA minimum elements, transitive dependency risk, and license conflict analysis.
