@@ -12,7 +12,7 @@ phase: [operate]
 frameworks: [MITRE-ATT&CK-v16]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -57,6 +57,7 @@ Before beginning, gather or confirm:
 - [ ] **Alert priority and response:** Desired severity level and expected analyst response procedure.
 - [ ] **Performance constraints:** Query time window, maximum execution time, and scheduled frequency.
 - [ ] **Existing rules:** Any current rules covering similar detections that may overlap or conflict.
+- [ ] **Schema and data-model version:** Source schema, normalized schema, connector version, field mapping, sample counts, and fixture coverage for every production query.
 
 ---
 
@@ -79,6 +80,36 @@ Select the appropriate detection logic pattern based on the threat being detecte
 | **Impossible travel** | Geographically implausible authentication | High |
 
 ### Step 2: Write the Detection Query
+
+Before treating a query as production-ready, verify that the fields and normalized data model used by the query still match the current SIEM platform and telemetry connector.
+
+#### 2.1 Schema Drift and Data-Model Evidence Gate
+
+For each KQL, SPL, or converted Sigma rule, record:
+
+| Field | Required evidence |
+|-------|-------------------|
+| Rule name | Detection or correlation rule identifier. |
+| Platform | Microsoft Sentinel, Splunk, or other SIEM target. |
+| Source schema | Raw table, index, sourcetype, connector, or event schema used by the query. |
+| Normalized schema | Sentinel ASIM, Splunk CIM, Sigma field map, or custom normalized model. |
+| Mapping version | Version or date of the field map, connector, data model, parser, macro, or lookup. |
+| Query field | Field referenced by the query. |
+| Mapped field | Actual field present in production telemetry or normalized model. |
+| Sample event count | Count of representative events observed in the last validation window. |
+| Fixture or unit test | Test fixture, saved search validation, query unit test, or sample replay used. |
+| Zero-result decision | Expected quiet rule, broken mapping, missing telemetry, or needs tuning. |
+| Last verified | Date and reviewer who confirmed the mapping. |
+
+**Pass conditions:**
+
+- Every query field maps to a current raw or normalized telemetry field.
+- Representative sample events or fixtures cover the mapped fields.
+- Enabled production rules that return zero events after connector, parser, or data model changes have a documented reason.
+- Sentinel ASIM, Splunk CIM, Sigma converter, parser, macro, and lookup versions are recorded when they affect fields.
+- Fallback fields are documented during schema migrations.
+
+**Finding classification:** Enabled detections that silently return zero results because of stale fields, missing sourcetypes, or broken normalized mappings are **High** when they cover active high-risk techniques. Missing mapping evidence with available telemetry is **Medium**. Benign schema migrations with current fixtures and sample counts are informational.
 
 #### KQL (Microsoft Sentinel) Syntax Reference
 
@@ -479,6 +510,8 @@ Entity mapping:      Account -> UserPrincipalName, IP -> IPAddress, Host -> Comp
 | Last triggered date | Within 90 days | > 180 days (rule may be stale or ineffective) |
 | Query execution time | < 30 seconds | > 2 minutes (performance issue) |
 | Exclusion count | < 10 | > 20 (rule may need fundamental redesign) |
+| Field mapping freshness | Current connector or data-model version | Rule still references old fields after schema or parser change |
+| Sample event count | Representative recent events or fixtures exist | Enabled rule returns zero events after telemetry migration |
 
 **Quarterly review checklist:**
 
@@ -540,6 +573,11 @@ Produce SIEM rule deliverables in this structure:
 | Account | [UserPrincipalName / TargetUserName] |
 | IP | [IPAddress / IpAddress] |
 | Host | [Computer / ComputerName] |
+
+### Schema and Data-Model Evidence
+| Query Field | Source Schema | Normalized Schema | Mapping Version | Mapped Field | Sample Count | Fixture/Test | Zero-Result Decision | Last Verified |
+|-------------|---------------|-------------------|-----------------|--------------|--------------|--------------|----------------------|---------------|
+| CommandLine | MDE DeviceProcessEvents | ASIM Process | 2026-06 | ProcessCommandLine | 18422 | pass | N/A | YYYY-MM-DD |
 
 ### Known False Positives
 - [List specific FP sources]
@@ -632,6 +670,10 @@ Deploying a rule without confirming it fires on known-malicious activity is depl
 
 A detection rule that fires every 5 minutes on the same ongoing activity (e.g., a brute force attack lasting 2 hours) floods the alert queue with duplicates. Configure alert suppression or deduplication to prevent the same incident from generating hundreds of identical alerts. Use suppression windows and entity-based grouping to consolidate related alerts.
 
+### Pitfall 6: Treating Query Syntax as Schema Validation
+
+A KQL or SPL query can parse successfully while still referencing a stale field, sourcetype, macro, ASIM model, CIM model, or Sigma conversion map. Require field-level mapping evidence, recent sample counts, and fixtures before calling a rule production-ready.
+
 ---
 
 ## 8. Prompt Injection Safety Notice
@@ -658,3 +700,10 @@ This skill processes user-supplied content that may include SIEM query drafts, l
 8. **MITRE ATT&CK Data Sources** -- https://attack.mitre.org/datasources/
 9. **Sentinel Entity Mapping** -- https://learn.microsoft.com/en-us/azure/sentinel/map-data-fields-to-entities
 10. **Splunk CIM (Common Information Model)** -- https://docs.splunk.com/Documentation/CIM/latest/User/Overview
+
+---
+
+## 10. Changelog
+
+- **1.0.1** -- Added schema drift, data-model version, field mapping, sample-count, zero-result, and fixture validation evidence gates.
+- **1.0.0** -- Initial release. Production-ready KQL/SPL detection rules with MITRE ATT&CK v16 mapping, threshold tuning, and lifecycle guidance.
