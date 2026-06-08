@@ -160,6 +160,40 @@ When a VEX status is "Not Affected," the document must include one of these just
 | **vulnerable_code_cannot_be_controlled_by_adversary** | The vulnerable code is present and reachable but attacker-controlled input cannot reach it | Requires threat model or data-flow analysis |
 | **inline_mitigations_already_exist** | Built-in mitigations (ASLR, sandboxing, etc.) prevent exploitation | Verify mitigations are active and effective |
 
+#### VEX Evidence Validation Gate
+
+Validate VEX statements before using them to reduce risk or downgrade remediation priority. A signed or vendor-published VEX document is not sufficient unless it applies to the exact product, release, component, vulnerability, and deployment context under review.
+
+**VEX validation findings:**
+
+```
+SBOM-VEX-01: VEX product name, supplier, version, CPE, purl, SWID, or release identifier does not match the assessed software
+SBOM-VEX-02: VEX component identifier cannot be mapped to an SBOM component bom-ref, purl, CPE, package URL, SPDX package, or dependency node
+SBOM-VEX-03: VEX vulnerability ID does not match the assessed CVE, GHSA, OSV, or vendor advisory alias set
+SBOM-VEX-04: VEX status is inferred from narrative text instead of an explicit `not_affected`, `affected`, `fixed`, or `under_investigation` value
+SBOM-VEX-05: `not_affected` lacks a CSAF/OpenVEX justification or relies on unsupported reasoning
+SBOM-VEX-06: VEX timestamp predates the SBOM build, software release, affected component upgrade, or deployment profile change without a refreshed statement
+SBOM-VEX-07: VEX source authenticity is untrusted, unsigned, unverifiable, or not traceable to the product supplier, component supplier, or trusted coordinator
+SBOM-VEX-08: Status rationale lacks code-path, configuration, runtime, mitigation, or vendor-attestation evidence needed for the risk tier
+SBOM-VEX-09: A priority downgrade is applied even though one or more required VEX validation checks failed
+```
+
+**Validation procedure:**
+
+1. Match product identity using product name, version, supplier, release identifier, CPE, purl, SWID, or equivalent product identifiers.
+2. Match component identity against SBOM identifiers such as `bom-ref`, purl, CPE, SPDX package ID, component name/version/supplier, and dependency relationships.
+3. Normalize vulnerability aliases across CVE, GHSA, OSV, vendor advisory, and CSAF tracking IDs before declaring a match or mismatch.
+4. Confirm the VEX status is explicit and capture the justification category for every `not_affected` statement.
+5. Compare VEX `document.tracking.current_release_date`, statement timestamp, or OpenVEX `timestamp` against SBOM creation time, build time, product release time, and deployed component version.
+6. Verify source authenticity with vendor domain, signature, checksum, release channel, advisory feed, or trusted coordinator provenance.
+7. Require supporting evidence before downgrading: component absence proof, code-path analysis, disabled feature configuration, runtime reachability test, mitigation evidence, or supplier attestation appropriate to severity.
+
+**False-positive boundaries:**
+
+- Do not flag missing CPE when purl, SWID, package URL, or another stable identifier creates an exact product and component match.
+- Do not reject a VEX statement only because the SBOM uses a different vulnerability alias when the alias mapping is authoritative and documented.
+- Do not require public exploitability details for sensitive products when the vendor provides a signed attestation and enough status, justification, freshness, and product/component identity evidence.
+
 ```
 VEX Assessment:
 - VEX Format:          [CSAF 2.0 | CycloneDX VEX | OpenVEX]
@@ -168,6 +202,19 @@ VEX Assessment:
 - Affected:            [N] (require remediation)
 - Fixed:               [N] (verify deployment)
 - Under Investigation: [N] (monitor for updates)
+```
+
+```
+VEX Evidence Validation:
+- Product Identity Match:     [Pass/Fail/Partial -- identifiers checked]
+- Component Identity Match:   [Pass/Fail/Partial -- SBOM references checked]
+- Vulnerability ID Match:     [Pass/Fail -- aliases checked]
+- Explicit Status:            [Pass/Fail -- no inferred status]
+- Justification Evidence:     [Pass/Fail/N/A -- required for Not Affected]
+- Freshness:                  [Fresh/Stale/Unknown -- compare to SBOM/release/deployment]
+- Source Authenticity:        [Trusted/Untrusted/Unknown]
+- Supporting Evidence:        [Sufficient/Insufficient/Needs human review]
+- Priority Downgrade Allowed: [Yes/No -- No unless required checks pass]
 ```
 
 ### Step 4: Transitive Dependency Analysis
@@ -300,6 +347,13 @@ conflicts), and overall classification.]
 |---|---|---|---|---|
 | [CVE-ID] | [component] | [Not Affected/Affected/Fixed/Under Investigation] | [justification if Not Affected] | [action] |
 
+### VEX Evidence Validation
+[If VEX documents are provided]
+
+| CVE ID | Product Match | Component Match | Vulnerability Match | Explicit Status | Justification | Freshness | Source Authenticity | Supporting Evidence | Downgrade Allowed |
+|---|---|---|---|---|---|---|---|---|---|
+| [CVE-ID] | [Pass/Fail/Partial] | [Pass/Fail/Partial] | [Pass/Fail] | [Pass/Fail] | [Pass/Fail/N/A] | [Fresh/Stale/Unknown] | [Trusted/Untrusted/Unknown] | [Sufficient/Insufficient/Review] | [Yes/No] |
+
 ### Transitive Dependency Risk
 
 | Risk Indicator | Count | Details |
@@ -380,6 +434,8 @@ Published by NTIA in July 2021 as part of Executive Order 14028 implementation. 
 4. **Overlooking license implications in SaaS deployments.** AGPL-3.0 triggers copyleft obligations for network use (SaaS), unlike GPL which only triggers on distribution. Organizations running AGPL-licensed components in SaaS products may have unrecognized compliance obligations. Always flag AGPL components regardless of distribution model.
 
 5. **Failing to track SBOM freshness.** An SBOM is a point-in-time snapshot. Software composition changes with every dependency update, build, or deployment. SBOMs older than the most recent build/release are potentially inaccurate. Check the SBOM timestamp against the software's actual release date and flag stale SBOMs.
+
+6. **Applying VEX to the wrong product, component, or release.** VEX is scoped evidence, not a global waiver. Do not accept a `not_affected` or `fixed` status until product identity, component identity, vulnerability aliases, explicit status, justification, freshness, source authenticity, and supporting evidence all match the assessed release.
 
 ---
 
