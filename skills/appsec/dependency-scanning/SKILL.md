@@ -12,7 +12,7 @@ phase: [build, deploy]
 frameworks: [SLSA-v1.0, CycloneDX, SPDX, CISA-KEV]
 difficulty: intermediate
 time_estimate: "15-30min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -181,6 +181,37 @@ Typosquatting (also called dependency confusion or combosquatting) is a supply c
 - Implement dependency confusion protections: claim your internal package names on public registries, or use registry proxy tools like Artifactory or Nexus with routing rules.
 - Run `socket.dev`, `npm audit signatures`, or `sigstore` verification to validate package provenance.
 
+## Maintainer Takeover and Install-Script Behavior
+
+Legitimate package names can become risky after a maintainer transfer, publisher change, stale account takeover, or release that adds install-time behavior. This is separate from typosquatting because the dependency name may be correct and popular.
+
+### Evidence Gates
+
+For each direct dependency and high-impact transitive dependency with recent publisher, maintainer, or script changes, record:
+
+| Field | Required evidence |
+|---|---|
+| Package | Registry package name and ecosystem. |
+| Current version | Version selected by the lockfile or build. |
+| Release age | Age of the selected release and whether it is unusually recent. |
+| Maintainer history | Publisher, maintainer, owner, or organization changes since the last trusted version. |
+| Script delta | Added or changed `preinstall`, `install`, `postinstall`, build, codegen, or prepare scripts. |
+| Script behavior | Network access, filesystem writes, environment reads, child process execution, or secret access. |
+| Conditional execution | CI-only, OS-only, architecture-only, private-registry-token-only, or environment-variable-triggered behavior. |
+| Provenance | Sigstore, npm provenance, SLSA attestation, registry signature, or verified publisher evidence. |
+| Sandbox controls | CI egress limits, secret masking, script disablement, registry allow-list, or build isolation. |
+| Decision | Accept, pin previous version, sandbox, disable scripts, replace, or block. |
+
+### Review Guidance
+
+- Compare the selected release against the last known-good release for publisher and script changes.
+- Treat a recent maintainer transfer plus new install-time network behavior as high risk until independently explained.
+- Inspect conditional script branches that activate only in CI, on specific operating systems, or when registry tokens are present.
+- Do not flag every install script as malicious. Native addons, Prisma-style generators, Playwright browser downloads, protobuf compilers, and language package managers can use scripts legitimately when provenance, purpose, and sandbox controls are verified.
+- Prefer lockfile-pinned review over manifest-only review so release age and script deltas are tied to the actual build input.
+
+**Finding classification:** A trusted package that changed maintainer shortly before a release adding obfuscated install-time network or secret access is **High**. Conditional script execution that reads CI secrets without sandboxing is **High**. Legitimate install scripts with verified provenance and sandbox controls are informational or **Low**.
+
 ## Assessment Output Template
 
 When performing a dependency scan, produce findings in the following structure:
@@ -208,10 +239,20 @@ When performing a dependency scan, produce findings in the following structure:
 ### Supply Chain Risk Indicators
 
 - [ ] Typosquatting risk detected
+- [ ] Maintainer or publisher ownership changed recently
+- [ ] Install scripts changed since last trusted release
+- [ ] Install scripts have network, filesystem, child-process, or environment-token access
+- [ ] CI script sandboxing or egress controls are missing
 - [ ] Packages with no license
 - [ ] Packages with install scripts
 - [ ] Unmaintained packages (no release in 2+ years)
 - [ ] Dependency confusion risk (internal name collisions)
+
+### Maintainer and Install-Script Evidence
+
+| Package | Version | Release Age | Maintainer History | Script Delta | Script Behavior | Provenance | Sandbox Controls | Decision |
+|---|---|---|---|---|---|---|---|---|
+| ... | ... | ... | ... | ... | ... | ... | ... | ... |
 
 ### Recommendations
 
@@ -226,8 +267,17 @@ When performing a dependency scan, produce findings in the following structure:
 4. **Vulnerability scan**: Cross-reference packages and versions against known CVE databases. Apply the EPSS+CVSS+KEV triage model.
 5. **License audit**: Extract license declarations from lockfiles or registry metadata. Flag copyleft and unlicensed packages.
 6. **Typosquatting check**: Review dependency names for patterns described in the detection section.
-7. **Supply chain assessment**: Evaluate SLSA posture -- lockfile presence, pinned versions, provenance availability.
-8. **Report**: Produce the assessment using the output template above, with prioritized remediation recommendations.
+7. **Maintainer takeover and install-script review**: Check publisher history, release age, install-script deltas, conditional behavior, provenance, and CI sandbox controls.
+8. **Supply chain assessment**: Evaluate SLSA posture -- lockfile presence, pinned versions, provenance availability.
+9. **Report**: Produce the assessment using the output template above, with prioritized remediation recommendations.
+
+## Common Pitfalls
+
+1. **Treating a correct package name as sufficient trust.** A legitimate package can become dangerous after account compromise, maintainer transfer, or a release that adds malicious install-time behavior.
+
+2. **Flagging all install scripts without behavior evidence.** Install hooks are common in native builds and code generation. Require script purpose, provenance, network/file access, and sandbox evidence before assigning high severity.
+
+3. **Reviewing manifests without lockfiles.** Manifest ranges do not prove which release runs in CI. Use lockfiles to identify the exact version, release age, and script delta.
 
 ## Prompt Injection Safety Notice
 
@@ -251,3 +301,12 @@ This skill processes user-supplied content including package manifests, lockfile
 - [NIST NVD](https://nvd.nist.gov/)
 - [OpenSSF Scorecard](https://securityscorecards.dev/)
 - [Executive Order 14028 - Improving the Nation's Cybersecurity](https://www.whitehouse.gov/briefing-room/presidential-actions/2021/05/12/executive-order-on-improving-the-nations-cybersecurity/)
+- [npm package provenance](https://docs.npmjs.com/generating-provenance-statements)
+- [Sigstore](https://www.sigstore.dev/)
+
+---
+
+## Changelog
+
+- **1.0.1** -- Added maintainer takeover, publisher history, release-age, install-script delta, conditional behavior, provenance, and CI sandbox evidence gates.
+- **1.0.0** -- Initial release. SBOM, CVE, EPSS, KEV, license, typosquatting, and dependency confusion review guidance.
