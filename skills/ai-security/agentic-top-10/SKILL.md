@@ -138,6 +138,21 @@ The 2024 Anthropic research paper on tool use showed that Claude, when given a c
 - MITRE ATLAS: AML.T0040 — ML Model Inference API Access
 - NIST AI RMF: MEASURE 2.6 (robustness testing), MANAGE 2.2 (risk response)
 
+**Tool-Output Taint and Delegated Capability Evidence Gate:**
+
+Tool outputs that re-enter the agent context must carry provenance and taint metadata. A downstream planner or delegated worker must not treat tool output, browser content, retrieval results, queue messages, or another agent's summary as system instructions or as authority to invoke broader tools.
+
+| Evidence Field | What to Verify | Fails When |
+|----------------|----------------|------------|
+| **Output source label** | Tool result includes tool name, instance identity, origin URL/resource, and retrieval timestamp | The agent cannot distinguish user input, tool output, and system instructions |
+| **Taint propagation** | Untrusted output remains marked untrusted through summarization, memory writes, delegation, and retries | Summaries or worker handoffs strip taint labels |
+| **Instruction boundary** | Tool output is parsed as data and cannot redefine role, policy, or tool permissions | Tool output text can trigger new instructions or override policy |
+| **Delegated capability check** | Delegated task includes requested tool, scope, risk tier, and parent authorization proof | A lower-privilege agent can ask a higher-privilege worker to run tools it cannot use |
+| **Recipient allowlist** | Worker agent validates sender identity and permitted request types before execution | Any agent or queue message can dispatch privileged work |
+| **Audit linkage** | The original user request, tool output, delegation envelope, approval artifact, and final tool call share a trace ID | Reviewers cannot reconstruct why a delegated action occurred |
+
+**Classification guidance:** Mark as **High** when untrusted tool output can trigger delegated privileged tool calls without taint labels, authorization proof, or recipient validation. Mark as **Critical** if the delegated path can write code, deploy, transfer funds, exfiltrate sensitive data, or modify permissions. Suppress the finding only when taint labels survive handoffs and the receiving agent enforces sender, scope, approval, and tool allowlists before execution.
+
 ---
 
 ### AG03 — Privilege Escalation
@@ -514,6 +529,12 @@ Structure the final report as follows:
 | AG01 | [rating] | [one-line summary] | [priority] |
 | ... | ... | ... | ... |
 
+## Tool-Output Taint and Delegation Evidence
+
+| Flow | Output Source | Taint Preserved | Delegated Tool | Authorization Proof | Recipient Validation | Trace ID |
+|---|---|---|---|---|---|---|
+| [flow name] | [tool/resource] | [yes/no/partial] | [tool name] | [policy/approval ID] | [sender + scope check] | [trace ID] |
+
 ## Recommendations
 1. [Highest priority recommendation]
 2. [Second priority recommendation]
@@ -585,6 +606,10 @@ Persistent agent memory is a high-value target because it persists across sessio
 ### 5. Assuming Tool Calls Are Safe Because the Tool Is Legitimate
 
 A tool functioning correctly is not the same as a tool being used correctly. The agent controls what parameters it passes, what sequence it calls tools in, and how it interprets results. A legitimate database query tool becomes an exfiltration vector when the agent is manipulated into querying sensitive tables and sending the results to an external webhook. Secure the tool invocation, not just the tool implementation.
+
+### 6. Dropping Taint During Agent Handoffs
+
+Tool output may be summarized, stored in memory, then delegated to another worker. If the handoff removes source labels, taint state, or authorization context, the receiving worker cannot tell whether it is executing a trusted plan or untrusted content. Preserve provenance and require delegated capability checks at every boundary.
 
 ---
 
