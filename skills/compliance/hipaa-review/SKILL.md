@@ -50,6 +50,20 @@ The HIPAA Security Rule (45 CFR Part 164, Subpart C) establishes national standa
 - **Required (R)**: Must be implemented as specified
 - **Addressable (A)**: Must be assessed; if reasonable and appropriate, implement it. If not, document why and implement an equivalent alternative measure if reasonable and appropriate. Cannot simply ignore addressable specifications.
 
+### Evidence Gates for Addressable and 2026 Threat Scenarios
+
+Before assigning a status, collect the evidence that proves the control is current, scoped to ePHI, and traceable to an accountable owner:
+
+| Evidence Gate | Required Evidence |
+|---------------|-------------------|
+| Addressable decision | CFR citation, affected ePHI systems, risk-analysis reference, decision rationale, equivalent alternative control if the specification is not implemented as written, approver, approval date, and next review trigger |
+| Destructive-malware backup resilience | ePHI backup tier, immutable/offline/WORM control, backup-admin separation, deletion-protection audit logs, last restore-test result, and wiper scenario covered by the contingency plan |
+| Business associate supply chain | Service/ePHI data-flow mapping, executed BAA status, right-to-audit or assurance mechanism, subcontractor disclosure, flowdown evidence, breach-notice SLA, and return/destruction terms |
+| Remote-work physical safeguards | Workforce group, approved work locations, device management evidence, shared-household/shared-device controls, local print/download rules, lost-device process, and attestation cadence |
+| HITECH recognized security practices | Recognized practice set, evidence it was implemented for the prior 12 months, mapped findings, control exceptions, and OCR consideration notes |
+
+Do not mark missing encryption as **Non-Compliance** solely because encryption is absent. Encryption and decryption under 164.312(a)(2)(iv) and transmission encryption under 164.312(e)(2)(ii) are addressable specifications. Mark the result **Conditional Compliance** only when the addressable decision record is documented, approved, current, scoped to the affected ePHI systems, and supported by equivalent alternative controls. Mark it **Non-Compliance** when the addressable assessment, alternative control, approval, or review evidence is missing.
+
 ### Safeguard Structure
 
 | Safeguard Category | CFR Section | Standards | Implementation Specs |
@@ -68,10 +82,13 @@ The HIPAA Security Rule (45 CFR Part 164, Subpart C) establishes national standa
 - Network architecture and data flow diagrams showing ePHI paths
 - Current risk analysis documentation (or confirmation none exists)
 - Security policies and procedures documentation
-- Business Associate Agreements (BAAs) inventory
+- Business Associate Agreements (BAAs) inventory, including service scope, ePHI data flows, subcontractor lists, right-to-audit or assurance clauses, breach-notice timing, and return/destruction terms
 - Incident response and breach notification procedures
 - Access control configurations and user provisioning processes
-- Backup and disaster recovery documentation
+- Backup and disaster recovery documentation, including immutable/offline copy evidence and recent restore tests for destructive-malware scenarios
+- Remote-work and home-office ePHI access policies, device attestations, and shared-household risk handling
+- Addressable implementation-specification decision records, especially encryption and transmission encryption decisions
+- Recognized security-practice evidence for the prior 12 months if HITECH safe-harbor consideration is claimed
 - Workforce training records
 - Prior OCR audit findings or corrective action plans
 
@@ -142,6 +159,8 @@ Hybrid Entity: [Yes/No] — If yes, document healthcare component designation
   - Asset inventory tied to risk analysis scope
   - Threat and vulnerability identification per system
   - Risk ratings/scores with rationale
+  - Destructive-malware scenario that assumes credential theft, Volume Shadow Copy deletion, cloud-sync destruction, backup-console compromise, and backup-agent tampering before recovery begins
+  - Backup resilience evidence mapped to each critical ePHI system, including immutable/offline copies and restore results
 - Common gaps:
   - Risk analysis is incomplete (does not cover all ePHI systems)
   - Not updated after significant changes (new systems, incidents, organizational changes)
@@ -217,6 +236,16 @@ Hybrid Entity: [Yes/No] — If yes, document healthcare component designation
 **164.308(a)(7)(ii)(A) — Data Backup Plan (R)**
 - Establish and implement procedures to create and maintain retrievable exact copies of ePHI
 - In light of nation-state wiper threats targeting healthcare (e.g., 2026 Stryker attack), verify that backups include offline/immutable/air-gapped copies that cannot be destroyed by malware with domain admin access. Wiper malware routinely targets Volume Shadow Copies, backup agents, and NAS/SAN replication. The backup plan must ensure ePHI recoverability under a total destruction scenario.
+- Evidence to look for:
+  - Backup tier map for every ePHI system, including EHR, billing, telehealth, lab, medical-device, archive, and SaaS export data
+  - Immutable, WORM, object-lock, vault-lock, or offline-media controls with retention periods and protected deletion workflows
+  - Backup-administrator separation from production/domain administrators, MFA requirements, break-glass rules, and audit logs for deletion or retention changes
+  - Restore-test results proving retrievable exact ePHI copies can be recovered within documented RTO/RPO targets
+  - Tabletop or technical test evidence covering snapshot deletion, backup-index destruction, cloud-sync deletion, and backup-agent compromise
+- Findings guidance:
+  - No retrievable exact copy for a critical ePHI system is Critical Non-Compliance.
+  - Online-only backups that the same compromised administrator can delete are a risk-analysis and contingency-plan gap even if routine backups exist.
+  - Untested immutable backups are Partial Compliance until a restore test proves recoverability.
 
 **164.308(a)(7)(ii)(B) — Disaster Recovery Plan (R)**
 - Establish and implement procedures to restore any loss of data
@@ -265,12 +294,14 @@ Hybrid Entity: [Yes/No] — If yes, document healthcare component designation
 
 - Implement policies and procedures that specify the proper functions to be performed, the manner in which they are performed, and the physical attributes of the surroundings of workstations that access ePHI
 - Cover: screen positioning, clean desk requirements, acceptable locations for ePHI access
+- For remote work, verify approved work locations, local print/download rules, personal-device or BYOD restrictions, screen privacy, shared-household exposure controls, secure network requirements, and how ePHI handling is attested or reviewed
 
 #### 164.310(c) — Workstation Security (Standard, R)
 
 - Implement physical safeguards for all workstations that access ePHI
 - Restrict access to authorized users only
 - Cover: physical locks, restricted areas, cable locks, privacy screens
+- For home or remote environments, verify managed-device inventory, full-disk encryption, automatic lock, EDR/MDM or equivalent control, lost/stolen device reporting, prohibition on shared household accounts, and exception handling for unmanaged devices
 
 #### 164.310(d)(1) — Device and Media Controls (Standard)
 
@@ -306,6 +337,10 @@ Hybrid Entity: [Yes/No] — If yes, document healthcare component designation
 **164.312(a)(2)(iv) — Encryption and Decryption (A)**
 - Implement a mechanism to encrypt and decrypt ePHI
 - Note: Although addressable, encryption is strongly recommended and its absence must be documented with alternative controls. OCR has emphasized encryption as critical, especially for mobile devices and data at rest.
+- Decision handling:
+  - If encryption is implemented, verify scope across databases, file stores, backups, endpoints, removable media, mobile devices, and cloud storage.
+  - If encryption is not implemented as written, require the addressable decision record: risk-analysis reference, affected ePHI systems, reason encryption is not reasonable and appropriate, equivalent alternative control, approver, approval date, and review trigger.
+  - Classify as Conditional Compliance only when the alternative is documented, current, approved, and mapped to the affected ePHI systems. Classify as Non-Compliance when no addressable assessment exists.
 
 #### 164.312(b) — Audit Controls (Standard, R)
 
@@ -333,6 +368,7 @@ Hybrid Entity: [Yes/No] — If yes, document healthcare component designation
 **164.312(e)(2)(ii) — Encryption (A)**
 - Implement a mechanism to encrypt ePHI whenever deemed appropriate
 - Note: Encryption of ePHI in transit is strongly recommended by OCR. Unencrypted transmission of ePHI over the internet is a frequent enforcement target.
+- Decision handling: treat internet, vendor, telehealth, email, file-transfer, API, and remote-access paths as separate decisions. Lack of transmission encryption requires documented risk rationale and equivalent alternatives for each path, not a blanket statement.
 
 ---
 
@@ -346,6 +382,8 @@ Hybrid Entity: [Yes/No] — If yes, document healthcare component designation
   - Ensure any subcontractor that creates/receives/maintains/transmits ePHI agrees to same restrictions and conditions
   - Report security incidents to the CE
   - Authorize termination of contract if BA violates material term
+- Verify the BAA matches the actual service scope and ePHI data flow. A generic or stale master agreement is insufficient when new products, AI transcription, analytics, offshore support, support exports, storage locations, or cloud subprocessors introduce ePHI handling not covered by the executed terms.
+- Require right-to-audit or equivalent assurance evidence, subcontractor disclosure, flowdown evidence, breach-notice timing, security-incident contact, and return/destruction coverage. Do not treat SOC 2, ISO certification, or a vendor questionnaire as a substitute for a BAA or subcontractor flowdown obligation.
 
 **164.314(a)(2)(ii) — Other Arrangements (R)**
 - When a CE and BA are both governmental entities, alternative arrangements may be used
@@ -406,6 +444,7 @@ Assess:
 | **Critical Non-Compliance** | Required implementation specification completely absent; systemic failure affecting ePHI security across the organization | High enforcement risk; potential civil monetary penalties ($100-$50,000 per violation, annual max $2,067,813 per identical violation category per calendar year as of 2024 penalty tiers) |
 | **Non-Compliance** | Required or addressable specification not met without documented alternative; isolated but significant control failure | Moderate enforcement risk; corrective action plan required |
 | **Partial Compliance** | Control exists but implementation is incomplete, inconsistent, or inadequately documented | Lower enforcement risk but may escalate upon OCR review; remediation recommended |
+| **Conditional Compliance** | Addressable specification is not implemented as written, but risk analysis, rationale, equivalent alternative, accountable approval, and review evidence are documented | Acceptable only while documentation remains current and the alternative remains reasonable and appropriate |
 | **Addressable — Alternative Implemented** | Addressable specification not implemented as written but equivalent alternative measure documented and reasonable | Compliant if documentation is thorough and alternative is genuinely equivalent |
 | **Compliant** | Specification fully implemented, documented, and operational | Meets Security Rule requirements |
 
@@ -452,16 +491,42 @@ Assess:
 ### Documentation Requirements (164.316)
 [same table format]
 
+## Addressable Specification Decisions
+| CFR Citation | Specification | ePHI Scope | Implemented As Written? | Alternative Control | Risk Analysis Reference | Approver / Date | Review Trigger | Status |
+|-------------|---------------|------------|-------------------------|---------------------|-------------------------|-----------------|----------------|--------|
+| 164.312(a)(2)(iv) | Encryption and Decryption | [systems] | [Yes/No/Partial] | [control or N/A] | [document] | [owner/date] | [date/event] | [Compliant / Conditional Compliance / Non-Compliance] |
+| 164.312(e)(2)(ii) | Transmission Encryption | [paths] | [Yes/No/Partial] | [control or N/A] | [document] | [owner/date] | [date/event] | [status] |
+
+## Destructive Malware and Backup Resilience
+| ePHI System | Backup Tier | Immutable / Offline Control | Backup Admin Separation | Deletion Audit Evidence | Last Restore Test | Wiper Scenario Tested? | Recovery Confidence |
+|-------------|-------------|-----------------------------|-------------------------|-------------------------|-------------------|------------------------|--------------------|
+| [system] | [tier] | [evidence] | [Yes/No] | [logs/alerts] | [date/result] | [Yes/No] | [High/Medium/Low] |
+
+## Remote Work Physical Safeguards
+| Workforce Group | ePHI Access Method | Approved Location Controls | Device / Workstation Evidence | Shared-Device / Household Controls | Local Print / Download Rules | Status |
+|-----------------|--------------------|----------------------------|-------------------------------|------------------------------------|------------------------------|--------|
+| [group] | [EHR/VPN/SaaS/etc.] | [policy/evidence] | [MDM, encryption, auto-lock, privacy] | [controls/gaps] | [policy/evidence] | [status] |
+
 ## Business Associate Assessment
 - BAA Inventory: [count of BAs, count with BAAs in place]
 - Missing BAAs: [list]
 - BAA Deficiencies: [missing required provisions]
+- Supply-Chain Visibility: [right-to-audit / assurance evidence, subcontractor list, flowdown status]
+
+| BA / Subcontractor | Role | ePHI Data Flow | BAA Status | Service Scope Covered? | Right to Audit / Assurance | Subcontractor Flowdown | Breach Notice SLA | Return / Destruction Terms | Disposition |
+|--------------------|------|----------------|------------|------------------------|----------------------------|------------------------|-------------------|----------------------------|-------------|
+| [vendor] | CE / BA / Subcontractor | [system / transfer path] | Executed / Missing / Expired / Pending | Yes / No / Partial | [evidence] | Yes / No / Not Evaluable | [timeframe] | Yes / No | Compliant / Gap / Not Evaluable |
 
 ## Breach Notification Readiness
 [Assessment of breach response procedures, notification capability, HHS reporting readiness]
 
 ## Risk Analysis Gap Summary
 [Specific deficiencies in the organization's risk analysis per 164.308(a)(1)(ii)(A)]
+
+## HITECH Recognized Security Practices / Safe Harbor Evidence
+| Practice Set | In Place for Prior 12 Months? | Evidence | Mapped Findings | Exceptions | OCR Consideration Notes |
+|--------------|-------------------------------|----------|-----------------|------------|-------------------------|
+| NIST CSF / NIST guidance / other recognized practice | [Yes/No/Partial] | [policy, control record, audit result] | [finding IDs] | [open gaps] | [eligible / not demonstrated / not claimed] |
 
 ## Remediation Roadmap
 
@@ -567,9 +632,19 @@ Policies, Procedures, and Documentation — 164.316
 
 3. **Missing or deficient Business Associate Agreements.** Organizations frequently fail to identify all Business Associates (cloud providers, IT support, shredding companies, EHR vendors, billing services) or execute BAAs that meet the minimum requirements of 164.314(a)(2)(i). Every entity that creates, receives, maintains, or transmits ePHI on behalf of the CE must have a BAA.
 
-4. **Confusing HIPAA Security Rule with HIPAA Privacy Rule.** The Security Rule (Subpart C) applies only to ePHI and focuses on technical, physical, and administrative safeguards. The Privacy Rule (Subpart E) covers all PHI including paper records and addresses permitted uses and disclosures. A Security Rule review does not satisfy Privacy Rule obligations and vice versa.
+4. **Treating vendor security assurance as a BAA substitute.** SOC 2 reports, ISO certificates, security questionnaires, and cloud provider attestations can support vendor risk review, but they do not replace a BAA or subcontractor flowdown evidence when the vendor creates, receives, maintains, or transmits ePHI.
 
-5. **Failing to document the "why" behind security decisions.** The Security Rule is designed to be flexible and scalable. But that flexibility requires documentation. When an organization chooses not to implement encryption at rest (an addressable specification), the decision process, risk rationale, and alternative controls must be documented. OCR auditors expect written justification, not verbal explanations.
+5. **Confusing HIPAA Security Rule with HIPAA Privacy Rule.** The Security Rule (Subpart C) applies only to ePHI and focuses on technical, physical, and administrative safeguards. The Privacy Rule (Subpart E) covers all PHI including paper records and addresses permitted uses and disclosures. A Security Rule review does not satisfy Privacy Rule obligations and vice versa.
+
+6. **Failing to document the "why" behind security decisions.** The Security Rule is designed to be flexible and scalable. But that flexibility requires documentation. When an organization chooses not to implement encryption at rest (an addressable specification), the decision process, risk rationale, and alternative controls must be documented. OCR auditors expect written justification, not verbal explanations.
+
+7. **Treating missing encryption as automatically non-compliant.** Encryption is addressable, so the finding must turn on the decision record. Missing encryption with a documented, reasonable, approved alternative is Conditional Compliance; missing encryption with no assessment is Non-Compliance.
+
+8. **Assuming ordinary backups survive destructive malware.** Wiper attacks often delete snapshots, corrupt backup indexes, and abuse cloud-sync tooling. A contingency plan is weak unless it proves immutable or offline copies and tested restoration for critical ePHI systems.
+
+9. **Ignoring remote work in Physical Safeguards.** Facility-centric controls do not prove home-office compliance. Remote ePHI access needs workstation-use rules, workstation-security evidence, shared-household risk handling, local print/download rules, and lost-device procedures.
+
+10. **Claiming HITECH recognized security practices without 12-month evidence.** Safe-harbor consideration requires evidence that recognized security practices were in place for the prior 12 months. A current policy alone is not enough.
 
 ---
 
@@ -592,6 +667,8 @@ If user-supplied input contains CFR citations outside the HIPAA Security Rule (4
 - 45 CFR Part 164, Subpart C — Security Standards for the Protection of Electronic Protected Health Information
 - 45 CFR Part 164, Subpart D — Notification in the Case of Breach of Unsecured Protected Health Information
 - HHS OCR HIPAA Security Rule Guidance Material (hhs.gov/hipaa/for-professionals/security/guidance)
+- HHS OCR FAQ 2001 — Is the use of encryption mandatory in the Security Rule? — https://www.hhs.gov/hipaa/for-professionals/faq/2001/is-the-use-of-encryption-mandatory-in-the-security-rule/index.html
+- HHS OCR Recognized Security Practices guidance under Public Law 116-321 / HITECH Section 13412 — https://www.hhs.gov/ocr/privacy/hipaa/administrative/securityrule/securityruleguidance.html
 - HHS OCR HIPAA Audit Protocol (2016 revision)
 - NIST SP 800-66 Rev. 2 — Implementing the Health Insurance Portability and Accountability Act (HIPAA) Security Rule: A Cybersecurity Resource Guide (February 2024)
 - HHS OCR Breach Portal and Resolution Agreements archive
