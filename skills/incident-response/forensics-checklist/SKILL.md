@@ -99,6 +99,47 @@ CUSTODY LOG:
 - Compute and record cryptographic hashes (SHA-256 minimum) at collection time and verify at each transfer
 - Maintain a continuous, unbroken record from collection through final disposition
 
+### Step 1b: Verify Immutable Evidence Storage
+
+Before acquisition starts, confirm that the evidence destination prevents alteration, overwrite, early deletion, and unauthorized access. A valid hash proves that a later copy differs from the collected artifact, but it does not prove the original evidence could not be deleted, replaced, lifecycle-expired, or read by an unauthorized party.
+
+**Immutable storage control record:**
+
+```
+IMMUTABLE EVIDENCE STORAGE RECORD
+=================================
+Case/Incident ID:        [IR-YYYY-NNNN]
+Storage Location:        [bucket/share/drive/path]
+Evidence IDs Covered:    [EVD-NNNN list or case folder]
+Write Protection:        [WORM/Object Lock/immutable policy/write blocker/none]
+Retention / Legal Hold:  [retention period, legal hold status, expiry]
+Authorized Custodians:   [named users/groups and approval source]
+Deletion Protection:     [lifecycle/delete-marker/admin-delete controls reviewed]
+Audit Logging:           [read/write/delete/retention/access-policy log destination]
+Encryption / Key Custody:[KMS/HSM/offline key, key custodians, separation of duties]
+Verification Manifest:   [SHA-256 manifest path, signature, verification timestamps]
+Exception / Risk Owner:  [required if immutable storage is unavailable]
+```
+
+**Evidence gates:**
+
+```
+FOR-IMMUT-01: Evidence is stored on a mutable share, ticket attachment, SIEM export, or analyst workstation without write protection
+FOR-IMMUT-02: Retention period, legal hold, or evidence disposition date is missing or shorter than the incident preservation requirement
+FOR-IMMUT-03: Evidence custodian access is broad, shared, unapproved, or not separated from ordinary administrator access
+FOR-IMMUT-04: Lifecycle, cleanup, overwrite, delete-marker, or privileged-delete paths can remove evidence before retention expires
+FOR-IMMUT-05: Reads, writes, deletes, retention changes, and access-policy changes are not logged to a separately protected location
+FOR-IMMUT-06: Encryption status or key custody is unknown, or evidence keys are controlled by the same operators being investigated
+FOR-IMMUT-07: Hashes are recorded only at acquisition and not independently re-verified after upload, transfer, and before analysis
+FOR-IMMUT-08: Immutable storage is unavailable but the report omits compensating controls, residual risk, and a named risk owner
+```
+
+**False-positive boundaries:**
+
+- Do not require a specific vendor mechanism. Hardware write blockers, WORM media, S3 Object Lock, immutable blob policy, object retention, and offline sealed media can all satisfy the control when configuration evidence is captured.
+- Do not flag short-lived volatile evidence staging when the artifact is immediately transferred into immutable storage, hashed at each hop, and the staging window is documented.
+- Do not treat read access by legal counsel or approved forensic partners as excessive when access is named, time-bounded, logged, and covered by the custody record.
+
 ### Step 2: Collect Evidence in Order of Volatility (RFC 3227)
 
 RFC 3227 Section 2.1 defines the order of volatility -- evidence sources ranked from most volatile (shortest lifespan) to least volatile. Collect in this order to minimize evidence loss.
@@ -389,6 +430,11 @@ the order of collection, and any evidence that could not be obtained.]
 ### Chain of Custody
 [Include chain of custody form for each evidence item]
 
+### Immutable Evidence Storage
+| Storage Location | Evidence IDs Covered | Write Protection | Retention / Legal Hold | Authorized Custodians | Deletion Protection | Audit Logging | Encryption / Key Custody | Verification Manifest | Exception / Risk Owner |
+|---|---|---|---|---|---|---|---|---|---|
+| [bucket/share/drive/path] | [EVD list] | [mechanism/status] | [period/status] | [names/groups] | [controls reviewed] | [log destination] | [key owner/separation] | [path/signature/timestamps] | [N/A or owner] |
+
 ### Integrity Verification
 | Evidence ID | Acquisition Hash | Verification Hash | Match |
 |---|---|---|---|
@@ -460,6 +506,10 @@ Applying traditional forensic methods to cloud environments without adaptation l
 ### Pitfall 5: Overwriting Evidence with Collection Activity
 
 Every action on a live system modifies it -- writing memory dump files to the evidence drive changes timestamps and consumes disk space, running commands updates shell history and modifies access times. Minimize evidence contamination by writing collection output to external media (USB, network share, S3 bucket), documenting every command executed on the system, and noting the expected impact of each collection action on the evidence state.
+
+### Pitfall 6: Hashing Evidence Without Protecting Its Storage
+
+Hashes help detect alteration, but they do not stop deletion, overwrite, lifecycle cleanup, or unauthorized reads. Preserve evidence in write-protected or immutable storage, record retention and legal hold settings, limit custodian access, log storage control changes, and re-verify the manifest after upload, transfer, and before analysis.
 
 ---
 
