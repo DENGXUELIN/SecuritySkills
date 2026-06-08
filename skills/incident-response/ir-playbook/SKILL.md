@@ -110,6 +110,36 @@ Verify that the foundational elements for incident response are in place. If gap
 | Regulatory notification requirements documented | [ ] | GDPR, HIPAA, state laws, SEC |
 | Evidence storage with chain-of-custody procedures | [ ] | |
 
+#### Step 1.1: Communication Channel Integrity Gate
+
+For SEV-1 and SEV-2 incidents, treat response communications as part of the control surface. Do not assume email, chat, ticketing, paging, endpoint-management, or normal collaboration systems are safe until the team has assessed adversary visibility and recorded a trusted coordination path.
+
+**Required evidence:**
+
+| Gate | Evidence to Capture | Fail / Not Evaluable Condition |
+|------|---------------------|--------------------------------|
+| Channel trust status | Trust status for corporate email, chat, ticketing, phone bridge, paging, endpoint-management, and IR-retainer portals | Channel is used for containment or notification decisions before attacker visibility is assessed |
+| Switch trigger and timestamp | Severity trigger, compromise indicator, incident commander approval, timestamp, and selected out-of-band channel | No documented reason or time for moving away from normal communications |
+| Participant verification | War-room roster, role, verification method, pre-established contact source, join/leave timestamps, and access revocation | Unknown participants or external responders join without trusted callback or identity verification |
+| Access control and need-to-know | Channel owner, invite controls, access changes, transcript/export permissions, and retention setting | War room remains open to broad groups, compromised users, or stale participants |
+| Decision and order preservation | Trusted record for containment orders, legal approvals, public/regulatory notices, and business shutdown decisions | High-impact actions are issued only in transient chat or untrusted channels |
+| Adversary visibility review | Review of mailbox rules, chat exports, IdP sessions, ticket watchers, admin audit logs, and endpoint-management access | The team does not check whether the attacker can monitor or alter the selected channel |
+| Return-to-normal criteria | Evidence required before resuming internal channels, approver, timestamp, and cleanup actions | Internal channels are resumed without proof that access, forwarding, sessions, and memberships are clean |
+
+Use these finding IDs when reporting gaps:
+
+```text
+IR-COMMS-01: SEV-1/SEV-2 response uses a channel the adversary can plausibly monitor without documented risk acceptance
+IR-COMMS-02: No timestamped trigger, approver, or selected out-of-band channel is recorded
+IR-COMMS-03: War-room, bridge, ticket, or retainer-portal participants are not verified through trusted contact records
+IR-COMMS-04: Containment orders, legal approvals, public notices, or regulator communications lack a trusted preservation record
+IR-COMMS-05: The team does not review attacker visibility into mailboxes, chat exports, IdP sessions, ticket queues, or endpoint-management tools
+IR-COMMS-06: War-room access control is not limited to need-to-know participants or stale access is not removed
+IR-COMMS-07: Internal communication resumes without documented return-to-normal criteria and cleanup evidence
+```
+
+**Finding classification:** Using attacker-visible communications for active containment or notification decisions is **High**, and **Critical** if it exposes regulated data or changes response outcome. Missing participant verification, approver traceability, access control, or return-to-normal evidence is **Medium**. Incomplete retention is **Low** unless it affects legal, regulatory, or containment decisions.
+
 ### Phase 2: Detection and Analysis (NIST) / Identification (SANS)
 
 #### Step 2.1: Incident Classification
@@ -412,6 +442,11 @@ and recommended immediate actions. Lead with the most critical fact.]
 |---|---|---|---|
 | [Executive / Legal / Regulator / Customer / Insurance] | [Yes / No / Pending] | [timestamp] | [Email / Phone / Portal] |
 
+### Communication Channel Integrity
+| Channel | Trust Status | Switch Trigger / Time | Participants Verified | Access Control | Preservation Record | Return-to-Normal Criteria | Status |
+|---|---|---|---|---|---|---|---|
+| [Email / Chat / Ticketing / Phone / IR portal / Endpoint management] | [Trusted / Suspect / Compromised / Out-of-band] | [trigger + timestamp + approver] | [roster and verification method] | [owner, access changes, retention/export controls] | [decision log / approval record / transcript ID] | [cleanup evidence and approver] | [Pass/Fail/Not Evaluable] |
+
 ### Escalation Decisions
 [Document any escalation triggers hit and actions taken]
 
@@ -455,6 +490,10 @@ Responders under pressure often prioritize containment speed over evidence prese
 ### Pitfall 2: Alerting the Attacker During Investigation
 
 Communicating about the incident over channels the attacker may be monitoring (corporate email, Slack, Teams) can tip off the adversary, prompting them to accelerate data exfiltration, deploy destructive payloads, or cover their tracks. For SEV-1 and SEV-2 incidents, use out-of-band communication channels (personal phones, dedicated secure messaging, physical meetings) until the attacker's access to communication systems has been assessed and ruled out.
+
+### Pitfall 2b: Switching Channels Without Preserving Authority
+
+Moving to a phone bridge or private chat can reduce attacker visibility but create a different failure mode: unverified participants, missing decision logs, and containment orders with no named approver. Record who joined, how they were verified, what channel was used, which decisions were made, where the record was preserved, and what evidence allowed normal channels to resume.
 
 ### Pitfall 3: Failing to Establish a Clear Incident Commander
 
