@@ -516,6 +516,8 @@ curl.*\|.*sh|curl.*\|.*bash|wget.*\|.*sh|pip install.*--trusted-host
 - Logs stored only locally with no centralized aggregation or monitoring.
 - No alerting on suspicious patterns (brute-force attempts, impossible travel, privilege escalation).
 - Log injection vulnerabilities (user input written to logs without sanitization, enabling log forging).
+- Structured log field injection where untrusted objects can overwrite reserved fields such as `event`, `level`, `outcome`, `user_id`, `trace_id`, or `source_ip`.
+- Security event logs that are sanitized but lack actor, action, resource, outcome, source, timestamp, or correlation/request ID needed for investigation.
 
 **CWE Mappings:**
 
@@ -536,13 +538,33 @@ logger\.|log\.|console\.log|logging\.|Log\.|syslog|winston|bunyan|pino|log4j|NLo
 log.*password|log.*token|log.*secret|log.*credit_card|log.*ssn|logger.*api_key
 # Log injection
 log.*req\.body|log.*request\.getParameter|logger\.info\(.*\+.*req
+# Structured log reserved-field overwrite
+logger\.(info|warn|error)\(\{.*\.\.\.req\.|log\.(info|warn|error)\(\{.*\.\.\.request
 ```
+
+**Log Forging and Audit Context Evidence Gate:**
+
+Before reporting or dismissing an A09 logging finding, verify both exploitability and incident-response usefulness.
+
+| ID | Required evidence | Pass condition | Fail / Unknown action |
+|---|---|---|---|
+| LOG-FORGE-01 | User-controlled source | Request body, query, header, route parameter, or identity metadata reaches the log sink | Downgrade to informational if no attacker-controlled data reaches the sink |
+| LOG-FORGE-02 | Line/control-character handling | CR, LF, tabs, ANSI escapes, and other control characters are encoded, stripped, or stored safely by the logging framework | Report CWE-117 when line-oriented logs can be forged |
+| LOG-FORGE-03 | Structured-field protection | Reserved fields are set by trusted code and user-supplied objects cannot overwrite event, severity, actor, outcome, trace, tenant, or source fields | Report structured log forging if attacker data can replace reserved fields |
+| LOG-FORGE-04 | Context completeness | Security events include actor, action, resource, outcome, source, timestamp, and request/correlation ID | Report CWE-223/CWE-778 when the log is too sparse for investigation |
+| LOG-FORGE-05 | Sensitive-data boundary | Credentials, tokens, secrets, full PAN, SSN, and high-risk PII are redacted before logging | Report CWE-532/CWE-779 when sensitive values are logged |
+| LOG-FORGE-06 | Production reachability | The log path runs in production or deployed server code, not only in tests, demos, or intentionally vulnerable training fixtures | Exclude test-only/debug-only examples from confirmed findings |
+| LOG-FORGE-07 | Downstream parser behavior | SIEM or log pipeline preserves fields safely and does not split forged multiline events into separate trusted audit records | Treat unknown parser behavior as needing validation |
+| LOG-FORGE-08 | Monitoring outcome | Relevant security events are routed to centralized/tamper-evident storage and alerting where required | Report monitoring gap if events are only local or unactioned |
+
+Static log messages, fixed structured events, and framework-escaped JSON logs are not log forging findings when attacker-controlled values cannot create new records or override reserved fields. Keep them in scope for context-completeness and sensitive-data checks if they are security-relevant events.
 
 **Mitigations:**
 
 - Log all authentication events, access control failures, input validation failures, and high-value business transactions.
 - Use structured logging (JSON) with consistent fields: timestamp, event type, user ID, source IP, resource, outcome.
-- Sanitize log inputs to prevent log injection (encode newlines and control characters).
+- Sanitize log inputs to prevent log injection by encoding or neutralizing newlines, delimiters, and control characters before line-oriented logging.
+- For structured logs, never spread untrusted request objects into the top-level event object; copy only allowlisted user fields into a nested `metadata` or `input` object so reserved audit fields cannot be overwritten.
 - Never log credentials, tokens, full credit card numbers, or other secrets; mask or redact sensitive fields.
 - Ship logs to a centralized, tamper-evident logging system (SIEM, ELK, Splunk, CloudWatch).
 - Configure alerts for anomalous patterns: repeated auth failures, privilege escalation, unusual data access volumes.
@@ -648,6 +670,12 @@ Present findings in this structure:
 | 2 | High | A01:2021 | CWE-862 | api/orders.js:15 | Missing authorization on order endpoint |
 | ... | ... | ... | ... | ... | ... |
 
+### Logging Evidence Review
+
+| Event / Sink | User-Controlled Source | Control Chars Neutralized | Reserved Fields Protected | Required Context Present | Sensitive Data Redacted | Downstream Parser Checked | Status |
+|---|---|---|---|---|---|---|---|
+| [event] | [source] | [Yes/No/Unknown] | [Yes/No/Unknown] | [Yes/No/Partial] | [Yes/No/Unknown] | [Yes/No/Unknown] | [Pass/Fail/Needs validation] |
+
 ### Statistics
 
 - **Critical:** X
@@ -686,6 +714,8 @@ Present findings in this structure:
 4. **Reporting deprecated algorithms without context.** MD5 used for non-security checksums (e.g., cache busting, ETags) is not a cryptographic failure. Only flag weak algorithms when they protect sensitive data, passwords, or integrity-critical operations. State the security impact clearly.
 
 5. **Ignoring transitive dependencies.** A project may have zero direct vulnerable dependencies but inherit critical CVEs through transitive dependencies. Always analyze the full dependency tree, not just top-level declarations.
+
+6. **Treating any structured log as automatically safe.** JSON logging reduces line-based forging risk, but it can still be forged if untrusted request objects overwrite reserved fields such as `event`, `level`, `outcome`, or `user_id`. Verify field ownership and downstream parser behavior.
 
 ## Prompt Injection Safety Notice
 
