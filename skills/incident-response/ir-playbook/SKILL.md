@@ -13,7 +13,7 @@ phase: [respond, recover]
 frameworks: [NIST-SP-800-61r2, SANS-IH]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.1"
+version: "1.0.2"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -274,6 +274,47 @@ Restore systems to normal operations:
 5. **Stakeholder confirmation** -- Obtain business owner sign-off before declaring systems operational
 6. **Update IOC blocklists** -- Ensure all identified IOCs remain blocked across perimeter and endpoint controls
 
+#### Step 3.3a: Backup Recovery Trust and Credential Evidence Gate
+
+Before reconnecting restored systems to production, prove that the recovery source, recovery control plane, and recovery credentials are trustworthy. Ransomware, wiper, and hands-on-keyboard intrusions often target backup consoles, replication jobs, storage accounts, restore automation, and golden images before encryption or destruction begins.
+
+For every critical restored system, collect a recovery evidence record:
+
+| Evidence Area | Required Evidence | Hold / Proceed Rule |
+|---|---|---|
+| **Last known-good point** | Earliest attacker access time, privilege-escalation time, backup/snapshot time, and evidence that the selected restore point predates persistence or staging | Hold if the backup may contain attacker-created accounts, web shells, scheduled tasks, malware, or staged data |
+| **Backup integrity and immutability** | Restore-test result, provider integrity status, checksum/hash where available, immutability/WORM/retention-lock settings, deletion-protection status, and failed-deletion audit events | Mark `Not Evaluable` when integrity or immutability evidence is missing for SEV-1/SEV-2 recovery |
+| **Backup control-plane isolation** | Separate backup-admin identity, MFA status, break-glass custody, network segmentation, vault/storage access logs, and replication-job audit logs | Hold if the same compromised identity plane could alter, delete, or restore backups |
+| **Recovery credential hygiene** | Rotation or reissue evidence for domain admin, cloud admin, backup admin, service accounts, API keys, certificates, restore automation, and deployment runners | Do not reconnect systems restored with credentials exposed during the incident |
+| **Known-good image and automation provenance** | Golden-image signature/checksum, build pipeline run, IaC commit, package source, restore script version, and malware scan result | Hold if image or automation provenance cannot be tied to a clean build path |
+| **Persistence scan before promotion** | EDR/AV result, IOC sweep, local account review, scheduled task/service review, startup item review, web shell scan, and remote-management tool inventory | Keep the system isolated until persistence checks pass or exceptions are approved |
+| **Phased reconnect monitoring** | Canary accounts, high-signal detections, egress monitoring, authentication anomaly rules, rollback criteria, and monitoring window owner | Roll back to containment on post-restore beaconing, credential abuse, or destructive behavior |
+
+Use this status vocabulary in the incident report:
+
+- `Proceed` -- required evidence is present, persistence scans pass, credentials are rotated, and monitoring/rollback criteria are active.
+- `Hold` -- evidence is incomplete or a recovery trust condition failed; keep the system isolated while remediation continues.
+- `Roll back` -- post-restore monitoring shows re-compromise, destructive activity, or credential abuse.
+- `Not Evaluable` -- evidence does not exist or cannot be obtained; escalate the recovery decision and document residual risk.
+
+```
+Recovery Trust Evidence Record:
+- System / Service:             [hostname, app, cluster, or workload]
+- Recovery Source:              [backup vault/snapshot/golden image/rebuild pipeline]
+- Snapshot or Image Time:       [YYYY-MM-DD HH:MM UTC]
+- Earliest Attacker Access:     [YYYY-MM-DD HH:MM UTC or unknown]
+- Integrity Evidence:           [restore test/hash/provider status]
+- Immutability Evidence:        [WORM/retention lock/legal hold/deletion protection]
+- Control Plane Isolation:      [separate admins/MFA/segmentation/audit logs]
+- Credentials Rotated:          [domain/cloud/backup/service/API/cert summary]
+- Image / Automation Provenance:[signature/checksum/IaC commit/pipeline run]
+- Persistence Scan Result:      [Pass/Fail/Not Evaluable]
+- Reconnect Phase:              [Isolated | Limited | Production]
+- Monitoring Window:            [start/end, detections enabled, owner]
+- Rollback Criteria:            [specific trigger]
+- Recovery Decision:            [Proceed | Hold | Roll back | Not Evaluable]
+```
+
 #### Step 3.4: Stakeholder Notification
 
 Use the appropriate communication template based on the audience.
@@ -367,7 +408,7 @@ Produce the incident response report with these exact sections:
 ```markdown
 ## Incident Response Report: [Incident ID]
 **Date:** [YYYY-MM-DD]
-**Skill:** ir-playbook v1.0.0
+**Skill:** ir-playbook v1.0.2
 **Frameworks:** NIST SP 800-61 Rev 2, SANS Incident Handler's Handbook
 **Incident Commander:** [Name or "Unassigned -- assign immediately"]
 
@@ -406,6 +447,11 @@ and recommended immediate actions. Lead with the most critical fact.]
 - **Eradication Actions:** [List of removal actions taken]
 - **Recovery Actions:** [List of restoration actions taken or planned]
 - **Enhanced Monitoring:** [Description of increased monitoring posture]
+
+### Backup Recovery Trust Evidence
+| System / Service | Recovery Source | Last Known-Good Basis | Integrity / Immutability | Control Plane Isolation | Credentials Rotated | Persistence Scan | Reconnect Phase | Decision |
+|---|---|---|---|---|---|---|---|---|
+| [system] | [snapshot/image/rebuild] | [timeline evidence] | [restore test/hash/WORM] | [admin/MFA/audit proof] | [summary] | [Pass/Fail/Not Evaluable] | [isolated/limited/prod] | [Proceed/Hold/Roll back/Not Evaluable] |
 
 ### Stakeholder Notifications
 | Stakeholder | Notified | Timestamp | Method |
@@ -464,6 +510,10 @@ Without a designated incident commander, response efforts become fragmented. Mul
 
 Reconnecting systems to the network before thoroughly removing all persistence mechanisms, backdoors, and compromised credentials results in re-compromise -- often within hours. Attackers routinely deploy multiple persistence mechanisms (scheduled tasks, web shells, new user accounts, modified startup scripts, implanted SSH keys). Validate eradication through IOC scanning, behavioral monitoring, and integrity verification before transitioning to recovery.
 
+### Pitfall 4a: Restoring From Backups Without Proving Recovery Trust
+
+A fast restore is not necessarily a safe restore. Backups can postdate initial access, contain persistence, share the compromised identity plane, or depend on restore automation credentials captured by the attacker. Do not declare recovery complete until the last known-good point, backup immutability, backup control-plane isolation, credential rotation, image provenance, persistence scan, and phased monitoring evidence support the recovery decision.
+
 ### Pitfall 5: Neglecting Regulatory Notification Deadlines
 
 Breach notification regulations impose strict timelines that begin running at the moment of discovery, not at the conclusion of investigation. GDPR requires notification within 72 hours of becoming aware of a personal data breach. Missing these deadlines exposes the organization to regulatory penalties independent of the incident itself. Track notification deadlines from the moment a potential data breach is identified, and involve legal counsel early.
@@ -497,3 +547,5 @@ This skill processes incident data that may include attacker-controlled content 
 11. **CISA Destructive Malware Guidance** -- https://www.cisa.gov/topics/cyber-threats-and-advisories
 12. **H-ISAC (Health Information Sharing and Analysis Center)** -- https://h-isac.org/
 13. **KrebsOnSecurity: Iran-backed wiper attack on Stryker medtech (2026)** -- https://krebsonsystems.com/2026/03/iran-backed-hackers-claim-wiper-attack-on-medtech-firm-stryker/
+14. **CISA #StopRansomware Guide** -- https://www.cisa.gov/stopransomware/ransomware-guide
+15. **NIST SP 800-61 Rev 3** -- Incident Response Recommendations and Considerations for Cybersecurity Risk Management -- https://csrc.nist.gov/pubs/sp/800/61/r3/final
