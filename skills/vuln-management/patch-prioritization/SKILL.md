@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [SSVC-2.1, EPSS-v3, CISA-KEV]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -48,6 +48,7 @@ Before starting, collect or confirm:
 - [ ] **Current SLA assignments:** Existing SLA tiers and deadlines for each finding, if previously triaged
 - [ ] **Asset inventory context:** Business criticality, exposure (internet-facing, internal, air-gapped), owner, and environment (production, staging, dev) for affected systems
 - [ ] **Patch availability:** Whether vendor patches, hotfixes, or workarounds exist for each CVE
+- [ ] **Vendor lifecycle status:** Supported, end-of-support date, extended support contract status, unsupported/end-of-life status, and whether the vendor has published a no-fix or workaround-only advisory
 - [ ] **Change management constraints:** Maintenance windows, freeze periods, change advisory board (CAB) schedules
 - [ ] **Compensating controls inventory:** WAF rules, network segmentation, EDR policies, disabled features currently in place
 - [ ] **Compliance mandates:** Applicable regulatory requirements (CISA BOD 22-01, PCI DSS 4.0 Requirement 6.3.3, HIPAA, FedRAMP)
@@ -82,6 +83,7 @@ Vulnerability Inventory Entry:
 - CISA KEV:            [Yes | No]
 - SSVC Decision:       [Immediate | Out-of-Cycle | Scheduled | Defer]
 - Patch Available:     [Yes (version) | No | Workaround Only]
+- Vendor Support:      [Supported | Extended support until YYYY-MM-DD | EOL/Unsupported | Unknown]
 - Current SLA:         [Tier and deadline]
 - SLA Status:          [Within SLA | At Risk | Breached]
 ```
@@ -109,6 +111,42 @@ Assign or validate SLA tiers using the following matrix. SLA tiers are derived f
 2. **SSVC primacy:** The SSVC decision outcome is the primary driver; EPSS and CVSS serve as secondary validation
 3. **Upward adjustment only:** If EPSS or KEV status indicates higher urgency than the SSVC decision alone, escalate the tier; never use EPSS to downgrade an SSVC Immediate decision
 4. **Asset criticality modifier:** For non-critical assets (dev, test, sandbox), the SLA tier may be relaxed by one level with documented justification
+
+#### Unsupported Software and No-Patch Lifecycle Gate
+
+Do not process end-of-life software, unsupported runtimes, no-fix vendor advisories, or workaround-only advisories as ordinary patch delays. A normal exception can only extend time to apply an available fix. When no vendor security fix stream exists, the plan must prove a lifecycle path: upgrade, extended support, retirement/replacement, or tested isolation until exposure is removed.
+
+Apply these checks before granting an SLA extension or risk acceptance:
+
+| ID | Required evidence | Pass condition | Fail / Unknown action |
+|---|---|---|---|
+| PATCH-EOL-01 | Vendor lifecycle proof | Vendor page, lifecycle export, package metadata, support contract, or advisory proves support state and retrieval date | Mark lifecycle state `Unknown`; block exception approval |
+| PATCH-EOL-02 | Fixability decision | One of `Patch`, `Major upgrade`, `Extended support`, `Vendor workaround`, `Virtual patch`, `Retire/replace`, or `No safe mitigation` is selected with rationale | Escalate to security owner review |
+| PATCH-EOL-03 | Asset/version coverage | Every affected asset and version is mapped to support state, patch path, and exposure | Treat unmapped assets as still vulnerable |
+| PATCH-EOL-04 | Exploitation and exposure overlay | KEV/active exploitation/EPSS plus internet-facing or privileged exposure is reflected in the SLA tier | Unsupported internet-facing KEV remains P0 until exposure is removed |
+| PATCH-EOL-05 | Interim control validation | Workaround, WAF/IPS rule, isolation, feature disablement, or access restriction is tested against the exploit path and covers all affected assets | Do not count the control for extension credit |
+| PATCH-EOL-06 | Migration or retirement path | Owner, funded ticket or roadmap item, target version/replacement, and deadline fit within the maximum exception duration for the original SLA tier | Mark status `Blocked`; require executive risk decision for P0/P1 |
+| PATCH-EOL-07 | Approval authority | Approval comes from the authority required for the original SLA tier and explicitly accepts unsupported-use risk | System-owner-only approval is insufficient for P0/P1 |
+| PATCH-EOL-08 | Retest trigger | Re-evaluation date/event exists for advisory changes, contract activation, replacement deployment, exception expiry, or control drift | Set next action to `Rescan/review required` |
+
+```
+Unsupported Software Evidence:
+- CVE ID:              [CVE-YYYY-NNNNN]
+- Product/Version:     [vendor product and affected version]
+- Vendor Support:      [Supported | Extended support | EOL/Unsupported | Unknown]
+- Lifecycle Evidence:  [URL/export/advisory/support contract and retrieval date]
+- Patch Path:          [Patch | Major upgrade | Extended support | Workaround | Virtual patch | Retire/replace | No safe mitigation]
+- Affected Coverage:   [N of M assets mapped, with unmapped assets listed]
+- Exploitation/Exposure: [KEV/active exploitation/EPSS and exposure notes]
+- Interim Control:     [specific tested control mapped to exploit vector]
+- Migration Owner:     [team/person]
+- Migration Deadline:  [YYYY-MM-DD]
+- Approval Authority:  [name/title required for original SLA tier]
+- Retest Trigger:      [date/event]
+- Lifecycle Status:    [Managed | Blocked | Unknown | Exposure removed]
+```
+
+If patch availability, vendor support, or workaround coverage is unknown, prefer `Unknown` over `Managed` and make the next action evidence collection. Unknown lifecycle state must not silently inherit a low SLA tier.
 
 ### Step 3: EPSS Trend Analysis
 
@@ -278,7 +316,7 @@ Produce a structured report with these exact sections:
 ```markdown
 ## Patch Prioritization Report
 **Date:** [YYYY-MM-DD]
-**Skill:** patch-prioritization v1.0.0
+**Skill:** patch-prioritization v1.0.1
 **Frameworks:** SSVC 2.1, EPSS v3, CISA KEV
 **Reviewer:** AI-assisted (human review required for P0/P1 actions and risk acceptances)
 
@@ -319,6 +357,13 @@ findings requiring immediate action.]
 | CVE ID | Control Type | Effectiveness | SLA Extension | Expiration |
 |---|---|---|---|---|
 | [CVE-ID] | [type] | [Full/Partial] | [+N days] | [date] |
+
+### Unsupported Software and No-Patch Lifecycle Items
+[List all findings where vendor support is expired, unknown, workaround-only, or no security patch exists]
+
+| CVE ID | Product/Version | Support State | Patch Path | Affected Coverage | Interim Control | Migration/Retirement Deadline | Approval | Lifecycle Status |
+|---|---|---|---|---|---|---|---|---|
+| [CVE-ID] | [product/version] | [Supported/Extended/EOL/Unknown] | [path] | [N/M assets] | [tested control] | [date] | [approver/status] | [Managed/Blocked/Unknown/Exposure removed] |
 
 ### Risk Exceptions
 [List all active risk acceptance/exception records]
@@ -374,6 +419,8 @@ Known Exploited Vulnerabilities catalog maintained by CISA. Contains CVEs with c
 
 5. **Scheduling patches without rollback plans.** Patch deployment failures without rollback procedures cause unplanned outages that erode trust in the patching program. Every patch window must include a validated rollback procedure, tested in a non-production environment where possible.
 
+6. **Treating unsupported products as normal exceptions.** End-of-life or no-patch findings cannot be fixed by waiting for the next patch window. A 90-day exception without lifecycle proof, tested isolation, an owner-backed migration/retirement path, and a retest trigger creates open-ended risk.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -395,6 +442,7 @@ Known Exploited Vulnerabilities catalog maintained by CISA. Contains CVEs with c
 - EPSS Data Portal: https://epss.cyentia.com/
 - CISA KEV Catalog: https://www.cisa.gov/known-exploited-vulnerabilities-catalog
 - CISA BOD 22-01: https://www.cisa.gov/binding-operational-directive-22-01
+- NIST SP 800-40 Rev. 4 (Guide to Enterprise Patch Management Planning): https://csrc.nist.gov/pubs/sp/800/40/r4/final
 - NIST SP 800-39 (Risk Management): https://csrc.nist.gov/publications/detail/sp/800-39/final
 - NIST SP 800-53 Rev. 5 (SI-2 Flaw Remediation): https://csrc.nist.gov/publications/detail/sp/800-53/rev-5/final
 - ISO 27005:2022 (Risk Treatment): https://www.iso.org/standard/80585.html
