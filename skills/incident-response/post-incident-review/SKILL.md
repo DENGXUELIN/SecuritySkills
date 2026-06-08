@@ -13,7 +13,7 @@ phase: [recover]
 frameworks: [NIST-SP-800-61r2]
 difficulty: beginner
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -58,6 +58,7 @@ Before conducting the PIR, gather or confirm:
 - [ ] **Existing controls** -- Documentation of security controls that were in place at the time of the incident (detection rules, access controls, network segmentation, patching cadence).
 - [ ] **Previous PIR reports** -- Any prior post-incident reviews for similar incident types, to identify recurring patterns.
 - [ ] **Metrics data** -- Timestamps needed to compute MTTD, MTTR, and MTTC (see Step 4).
+- [ ] **Remediation validation evidence** -- For prior or proposed remediation, gather retest results, detection replay evidence, configuration exports, patch verification, access review evidence, backup restore tests, tabletop/runbook drill results, recurrence metrics, and residual risk decisions.
 
 ---
 
@@ -266,10 +267,10 @@ Convert analysis findings into specific, measurable, assignable, and time-bound 
 
 **Remediation action template:**
 
-| ID | Finding | Action | Owner | Priority | Deadline | Tracking |
-|---|---|---|---|---|---|---|
-| REM-001 | [Specific finding from RCA or control failure mapping] | [Specific remediation action] | [Name and team] | [P0/P1/P2/P3] | [YYYY-MM-DD] | [Ticket ID] |
-| REM-002 | [Finding] | [Action] | [Owner] | [Priority] | [Deadline] | [Ticket ID] |
+| ID | Finding | Action | Implementation Owner | Effectiveness Owner | Priority | Deadline | Tracking | Validation Method | Required Evidence |
+|---|---|---|---|---|---|---|---|---|---|
+| REM-001 | [Specific finding from RCA or control failure mapping] | [Specific remediation action] | [Name and team] | [Name/team or "same owner justified"] | [P0/P1/P2/P3] | [YYYY-MM-DD] | [Ticket ID] | [Control retest / detection replay / tabletop / configuration export / patch verification / backup restore / runbook drill / access review] | [Pre/post evidence needed before closure] |
+| REM-002 | [Finding] | [Action] | [Owner] | [Effectiveness owner] | [Priority] | [Deadline] | [Ticket ID] | [Method] | [Evidence] |
 
 **Remediation prioritization:**
 
@@ -279,6 +280,27 @@ Convert analysis findings into specific, measurable, assignable, and time-bound 
 | P1 | Significant gap that contributed to the incident severity or delayed response | 30 days |
 | P2 | Moderate gap that represents a defense-in-depth weakness | 90 days |
 | P3 | Minor improvement or best-practice enhancement | Next quarter |
+
+**Remediation effectiveness validation gate:**
+
+For every P0/P1 remediation and every action tied directly to the root cause, distinguish `Implemented` from `Effective`. Do not close the PIR follow-up as `Effective` until the validation evidence shows that the incident-enabling condition changed and the recurrence likelihood or impact was reduced.
+
+| ID | Required validation | Pass condition | If missing |
+|---|---|---|---|
+| PIR-EFF-01 | Validation method selected | The action has a concrete validation method such as control retest, detection replay, tabletop exercise, configuration export, access review, patch verification, backup restore test, runbook drill, or equivalent evidence. | Mark `Implemented - Not Validated`; do not mark `Effective`. |
+| PIR-EFF-02 | Pre/post comparison | Evidence compares the incident-enabling condition before and after remediation, using comparable scope, sample, or scenario. | Mark `Not Evaluable` for effectiveness. |
+| PIR-EFF-03 | Effectiveness owner | A reviewer, control owner, or risk owner is accountable for validation; if the implementation owner validates their own work, the PIR explains why independent review was not practical. | Require management/risk acceptance before closure. |
+| PIR-EFF-04 | Validation date and artifact | The PIR records a validation date plus artifact references such as test results, exported configuration, replay logs, ticket links, screenshots, or drill notes. | Keep remediation status `Implemented` only. |
+| PIR-EFF-05 | Recurrence signal | The PIR defines the monitored signal that would show recurrence or control drift, such as alert count, metric threshold, exception count, incident category, failed control test, or backup restore result. | Add a follow-up monitoring action. |
+| PIR-EFF-06 | Residual risk decision | Remaining risk is accepted, transferred, mitigated by another action, or escalated with an owner and review date. | Do not mark the action closed. |
+| PIR-EFF-07 | Closure rule | `Effective` is used only when implementation plus validation evidence are both complete. `Implemented` means the change exists but has not yet proved outcome improvement. | Reclassify premature closures. |
+| PIR-EFF-08 | P0/P1 retest cadence | Critical and high-priority remediations include a retest date or recurring control check tied to the follow-up schedule. | Add a dated retest task before PIR closure. |
+
+**Effectiveness validation matrix:**
+
+| Remediation ID | Implementation Status | Validation Method | Pre/Post Comparison | Effectiveness Evidence | Recurrence Signal | Residual Risk Decision | Closure State |
+|---|---|---|---|---|---|---|---|
+| REM-001 | [Not Started / In Progress / Implemented] | [Method] | [Before vs after condition] | [Artifact/date/owner] | [Metric or alert] | [Accepted / Mitigated / Escalated] | [Implemented / Effective / Not Evaluable] |
 
 ---
 
@@ -302,7 +324,7 @@ Produce the post-incident review report with these exact sections:
 ## Post-Incident Review: [Incident ID]
 **Date of Review:** [YYYY-MM-DD]
 **Date of Incident:** [YYYY-MM-DD]
-**Skill:** post-incident-review v1.0.0
+**Skill:** post-incident-review v1.0.1
 **Framework:** NIST SP 800-61 Rev 2
 **PIR Facilitator:** [Name or "AI-assisted -- human facilitator required"]
 
@@ -354,9 +376,14 @@ root cause, and the number/priority of remediation actions identified.]
 - [Gap or failure identified during retrospective]
 
 ### Remediation Plan
-| ID | Finding | Action | Owner | Priority | Deadline | Ticket |
-|---|---|---|---|---|---|---|
-| REM-001 | [Finding] | [Action] | [Owner] | [P0-P3] | [Date] | [ID] |
+| ID | Finding | Action | Implementation Owner | Effectiveness Owner | Priority | Deadline | Ticket | Validation Method |
+|---|---|---|---|---|---|---|---|---|
+| REM-001 | [Finding] | [Action] | [Owner] | [Validator] | [P0-P3] | [Date] | [ID] | [Method] |
+
+### Remediation Effectiveness Validation
+| Remediation ID | Implementation Status | Validation Method | Pre/Post Comparison | Effectiveness Evidence | Recurrence Signal | Residual Risk Decision | Closure State |
+|---|---|---|---|---|---|---|---|
+| REM-001 | [Not Started / In Progress / Implemented] | [Method] | [Before vs after condition] | [Artifact/date/owner] | [Metric or alert] | [Accepted / Mitigated / Escalated] | [Implemented / Effective / Not Evaluable] |
 
 ### Follow-Up Schedule
 - **Remediation Review Date:** [YYYY-MM-DD -- typically 30 days after PIR]
@@ -410,7 +437,9 @@ When the PIR focuses on who made mistakes rather than what systemic conditions e
 
 ### Pitfall 3: Identifying Remediation Actions Without Tracking Them
 
-Documenting lessons learned and remediation actions in a PIR report that is then filed and forgotten produces zero security improvement. Every remediation action must be entered into the organization's work tracking system (Jira, ServiceNow, Azure DevOps) with an owner, priority, deadline, and scheduled review date. The PIR facilitator should schedule a follow-up review (typically 30 days after the PIR) to verify remediation progress.
+Documenting lessons learned and remediation actions in a PIR report that is then filed and forgotten produces zero security improvement. Every remediation action must be entered into the organization's work tracking system (Jira, ServiceNow, Azure DevOps) with an owner, priority, deadline, validation method, effectiveness owner, and scheduled review date. The PIR facilitator should schedule a follow-up review (typically 30 days after the PIR) to verify remediation progress and effectiveness evidence.
+
+Ticket closure is not effectiveness evidence by itself. A closed Jira or ServiceNow task only proves implementation workflow state; the PIR still needs retest, replay, configuration export, access review, restore test, drill, or monitoring evidence that the original incident-enabling condition changed. If the change is deployed but not validated, report the closure state as `Implemented`, not `Effective`.
 
 ### Pitfall 4: Stopping Root Cause Analysis at the Proximate Cause
 
