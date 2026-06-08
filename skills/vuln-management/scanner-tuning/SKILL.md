@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [CVSS-4.0, CWE]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -177,6 +177,34 @@ Authentication Configuration:
 - Last Verification:   [YYYY-MM-DD, success rate: [N]%]
 ```
 
+#### Credential Safety and Lockout Evidence Gate
+
+Treat credentialed coverage as valid only when authentication succeeded and scanner behavior cannot cause avoidable lockouts or privilege drift. If this evidence is missing, classify the affected assets as **Not Evaluable** instead of clean.
+
+| Evidence Area | Required Evidence | Finding Trigger |
+|---|---|---|
+| **Dedicated principals** | Scanner uses named scan-only accounts or keys by platform, scope, and environment | Shared human/admin account, domain-wide account reused across unrelated scan scopes, or unknown owner |
+| **Least privilege and drift** | Role/group membership, sudo policy, API role, and network-device privilege match only the checks being run | Domain admin/root/API write privilege without documented need, stale group membership, or privilege escalation since last review |
+| **Vault/PAM controls** | Credential source, checkout TTL, rotation date, audit trail, and break-glass owner are recorded | Static scanner-local password, missing checkout logs, expired credential, or no rotation evidence |
+| **Lockout alignment** | Scanner retry count, concurrency, credential-test batch size, and schedule are lower than domain, IdP, PAM, and local lockout thresholds | Retry/concurrency can exceed lockout threshold before aborting or overlaps with password rotation windows |
+| **Authentication denominator** | Report total targeted assets, authenticated assets, **Failed Authentication** assets, skipped local checks, and unsupported assets separately | Credentialed policy reports 100% clean while failed-auth or skipped-check assets are folded into clean results |
+| **Abort and containment behavior** | Failed-auth threshold, automatic abort, notification path, and credential disable/rotation procedure are documented and tested | Scan continues after repeated authentication failures, causes lockouts, or lacks an escalation path |
+
+```
+Credential Safety Evidence Record:
+- Credential Set / Principal:       [account/key name, platform, owner]
+- Scope:                            [asset group, network range, environment]
+- Vault/PAM Source:                 [CyberArk | HashiCorp Vault | Scanner-native | Other]
+- Least Privilege Evidence:         [role/group/sudo/API permission evidence]
+- Lockout Policy Alignment:         [lockout threshold, retry count, concurrency, test batch size]
+- Authentication Success Denominator: [authenticated / targeted assets, unsupported, failed auth]
+- Failed Authentication Assets:     [asset list or count; mark Not Evaluable]
+- Skipped Local Checks:             [check family and reason]
+- Abort Threshold / Behavior:       [N failures or N%; action taken]
+- Rotation and Audit Evidence:      [last rotation date, checkout log, approver/auditor]
+- Decision:                         [Pass | Fail | Not Evaluable]
+```
+
 ### Step 4: Severity Override Criteria
 
 Define criteria for overriding scanner-assigned severity ratings when they do not reflect actual organizational risk.
@@ -290,9 +318,9 @@ Classify the overall scanner tuning state into one of the following:
 | Classification | Definition | Criteria |
 |---|---|---|
 | **Poorly Tuned** | Scanner produces unreliable results | False positive rate > 30%, unauthenticated only, no severity overrides documented, no cross-scanner correlation |
-| **Basic** | Scanner operational but significant tuning gaps | False positive rate 15-30%, partial credential coverage, some ad-hoc overrides without documentation |
-| **Tuned** | Scanner produces reliable, actionable results | False positive rate < 15%, full credentialed scanning, documented overrides, regular policy review |
-| **Optimized** | Scanner program is mature and well-integrated | False positive rate < 5%, multi-scanner correlation, automated result ingestion, severity overrides with CVSS 4.0 justification, scan scheduling aligned with change management |
+| **Basic** | Scanner operational but significant tuning gaps | False positive rate 15-30%, partial credential coverage, some ad-hoc overrides without documentation, failed-auth assets not consistently separated from clean results |
+| **Tuned** | Scanner produces reliable, actionable results | False positive rate < 15%, full credentialed scanning, documented credential safety evidence, documented overrides, regular policy review |
+| **Optimized** | Scanner program is mature and well-integrated | False positive rate < 5%, multi-scanner correlation, automated result ingestion, credential safety and lockout evidence gates enforced, severity overrides with CVSS 4.0 justification, scan scheduling aligned with change management |
 
 ---
 
@@ -303,7 +331,7 @@ Produce a structured report with these exact sections:
 ```markdown
 ## Scanner Tuning Report
 **Date:** [YYYY-MM-DD]
-**Skill:** scanner-tuning v1.0.0
+**Skill:** scanner-tuning v1.0.1
 **Frameworks:** CVSS 4.0, CWE
 **Reviewer:** AI-assisted (human review required for policy changes and severity overrides)
 
@@ -321,6 +349,12 @@ Highlight the most impactful tuning recommendations.]
 | Dangerous Checks | [Enabled / Disabled] | [Disabled for production] | [Priority] |
 | Scan Frequency | [Current schedule] | [Recommended schedule] | [Priority] |
 | Port Range | [Current range] | [Recommended range] | [Priority] |
+
+### Credential Safety Evidence
+
+| Credential Set | Scope | Vault/PAM Source | Lockout Alignment | Auth Success | Failed Auth Assets | Privilege Drift | Abort Behavior | Decision |
+|---|---|---|---|---|---|---|---|---|
+| [principal] | [assets/env] | [source + TTL] | [threshold vs retry/concurrency] | [N/N authenticated] | [N; Not Evaluable] | [none / finding] | [abort rule + notification] | [Pass/Fail/Not Evaluable] |
 
 ### False Positive Analysis
 
@@ -398,6 +432,8 @@ Common Weakness Enumeration. A community-developed list of software and hardware
 4. **Failing to re-evaluate severity overrides when context changes.** A severity downgrade justified by network segmentation becomes invalid if the segmentation is later removed or modified. Severity overrides must be reviewed quarterly and immediately upon any change to the deployment context (network changes, system migration, data classification changes).
 
 5. **Not correlating results across scanners.** Organizations running multiple scanners often treat each scanner's output independently, leading to duplicate remediation efforts for the same vulnerability and missed findings that only one scanner detects. Establish a correlation process using CVE ID as the primary key and CWE as a fallback for non-CVE findings.
+
+6. **Counting failed-authentication assets as clean credentialed results.** A policy name can say "credentialed" while individual hosts fail login, skip local package checks, or hit lockout protection. Track Failed Authentication and unsupported assets as Not Evaluable until a successful credential test proves coverage.
 
 ---
 
