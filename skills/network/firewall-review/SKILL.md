@@ -192,6 +192,21 @@ Rules with zero hit counts over an extended period (30+ days) indicate stale pol
 
 **Finding classification:** Unused rules present for 90+ days are **Medium**. Rules referencing decommissioned resources are **High** (may indicate orphaned access paths).
 
+**Hit-Counter Freshness Evidence Gate:**
+
+Do not classify a rule as unused from a zero hit counter alone. First prove that the counter covers the review period and has not been reset by firewall reloads, policy installs, HA failover, device replacement, log ingestion gaps, or rule reordering.
+
+| Evidence Field | What to Verify | Fails When |
+|----------------|----------------|------------|
+| **Counter baseline timestamp** | Date/time when hit counters were last cleared or began accumulating | Baseline is unknown or newer than the claimed unused period |
+| **Policy install / commit history** | Firewall policy install time and rule UUID continuity across changes | Rule was recreated or reordered during the review period |
+| **Device uptime and HA events** | Reboot, failover, active/passive swap, or cluster member replacement history | Hit counters reset after the alleged unused window began |
+| **Flow-log cross-check** | NetFlow, VPC Flow Logs, SIEM, proxy, or packet logs confirm no matching traffic | Logs are unavailable or contradict the zero counter |
+| **Object lifecycle evidence** | Source/destination objects still map to active assets or decommission records | A zero-hit rule references an orphaned object without asset-owner confirmation |
+| **Owner and ticket evidence** | Business owner, change ticket, expiry, and removal approval are documented | Removal is recommended without accountable owner review |
+
+**Classification guidance:** Mark the rule as **Medium** unused only when the counter baseline spans at least the policy review period and flow logs agree. Mark as **High** when the rule grants access to decommissioned resources or broad sensitive destinations and no owner can justify it. Suppress an unused-rule finding when counters were reset recently, the rule was just installed, or independent logs show legitimate traffic despite a zero local counter.
+
 ---
 
 #### 2.5 Rule Ordering Review (NIST SP 800-41, Section 4.3)
@@ -317,6 +332,11 @@ Produce the final report using the following structure.
 | SMTP (25)     | Yes/No    | <mail server IPs>      |
 | HTTPS (443)   | Yes/No    | <proxy or direct>      |
 
+### Unused Rule Evidence
+| Rule | Hit Counter | Counter Baseline | Uptime / HA Reset History | Flow-Log Cross-Check | Owner / Ticket | Disposition |
+|------|-------------|------------------|---------------------------|----------------------|----------------|-------------|
+| <rule id> | 0 / <count> | <timestamp or unknown> | <none / reset / unknown> | <confirmed unused / traffic observed / unavailable> | <owner and ticket> | Remove / Keep / Needs Review |
+
 ### Prioritized Remediation Plan
 1. **[Critical]** <action item with control reference>
 2. **[High]** <action item with control reference>
@@ -359,7 +379,9 @@ Produce the final report using the following structure.
 
 4. **Assuming hit count of zero means the rule is unused.** Hit counters reset on firewall reload or failover. Verify the counter baseline timestamp before recommending rule removal. Cross-reference with SIEM/flow data where available.
 
-5. **Conflating network ACLs with security groups in cloud environments.** In AWS, NACLs are stateless and operate at the subnet level; security groups are stateful and operate at the instance level. Both must be audited. A permissive NACL can undermine restrictive security group rules for responses.
+5. **Ignoring policy-install and HA reset history.** A newly installed policy, cluster failover, or device replacement can zero counters for active rules. Treat counter freshness as missing until uptime, policy commit history, and independent flow logs cover the claimed review period.
+
+6. **Conflating network ACLs with security groups in cloud environments.** In AWS, NACLs are stateless and operate at the subnet level; security groups are stateful and operate at the instance level. Both must be audited. A permissive NACL can undermine restrictive security group rules for responses.
 
 ---
 
@@ -386,4 +408,5 @@ This skill processes firewall configurations that may contain user-supplied comm
 
 ## Changelog
 
+- **1.0.1** -- Added hit-counter freshness evidence gates for unused-rule review.
 - **1.0.0** -- Initial release. Full coverage of CIS Controls v8 (4.4, 4.5) and NIST SP 800-41 Rev 1 firewall audit methodology.
