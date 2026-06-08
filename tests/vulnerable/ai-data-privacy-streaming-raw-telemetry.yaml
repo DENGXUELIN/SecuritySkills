@@ -1,0 +1,50 @@
+case: ai-data-privacy-streaming-raw-telemetry
+skill: ai-data-privacy
+expected_risk: High
+description: >
+  Final response redaction exists, but raw streamed deltas and GenAI trace
+  attributes export sensitive prompt, RAG, and tool-call content before the
+  redactor runs.
+review_evidence:
+  system_under_review: virtual-care-assistant
+  data_sensitivity: regulated-health-and-account-data
+  streaming_path:
+    transport: sse
+    emission_boundary: response.write
+    emitted_value: raw_model_delta
+    final_redaction_after_stream: true
+    incremental_redaction_before_boundary: false
+    replay_buffer_retention_days: 14
+  telemetry_path:
+    instrumentation: opentelemetry-genai
+    exported_attributes:
+      - rag.context
+      - tool.call.args
+      - gen_ai.prompt
+      - gen_ai.completion
+    export_destination: third-party-apm
+    dpa_evidence: missing
+    retention_policy: vendor-default
+  callback_path:
+    framework_callback: production-tracer
+    callback_position: before-output-redaction-parser
+    content_capture_setting: unknown
+  findings:
+    - id: AI-PRIV-STREAM-02
+      status: fail
+      reason: streamed deltas leave the server before redaction
+    - id: AI-PRIV-TRACE-01
+      status: fail
+      reason: content-bearing GenAI trace fields are exported raw
+    - id: AI-PRIV-TRACE-02
+      status: fail
+      reason: no DPA, retention, or access-control evidence for raw trace export
+expected_output:
+  streaming_and_telemetry_boundary_review:
+    raw_content_possible: true
+    redaction_before_boundary: false
+    result: Fail
+  finding_severity: High
+  recommended_action: >
+    Move redaction before every stream write, disable or redact content-bearing
+    GenAI trace events, and document approved telemetry export destinations.

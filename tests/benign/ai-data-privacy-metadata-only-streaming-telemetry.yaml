@@ -1,0 +1,49 @@
+case: ai-data-privacy-metadata-only-streaming-telemetry
+skill: ai-data-privacy
+expected_risk: Low
+description: >
+  Streaming output is redacted before each chunk is emitted and telemetry stores
+  only non-reversible metadata, so observability should not be treated as raw PII
+  logging.
+review_evidence:
+  system_under_review: support-triage-assistant
+  data_sensitivity: customer-support-text
+  streaming_path:
+    transport: websocket
+    emission_boundary: send_text
+    pre_boundary_redactor: redact_incremental
+    incremental_redaction_state: carries_chunk_suffix_prefix_window
+    final_redaction_after_stream: true
+    replay_buffer_retention_days: 0
+  telemetry_path:
+    instrumentation: opentelemetry-genai
+    exported_attributes:
+      - app.prompt.sha256
+      - gen_ai.usage.input_tokens
+      - gen_ai.usage.output_tokens
+      - gen_ai.request.model
+      - app.redaction.result
+    content_bearing_events_enabled: false
+    export_destination: internal-otel-collector
+    retention_policy: 30-days
+    dpa_evidence: not_applicable_internal
+  callback_path:
+    framework_callback: production-tracer
+    callback_position: after-redaction-wrapper
+    content_capture_setting: metadata-only
+  findings:
+    - id: AI-PRIV-STREAM-02
+      status: pass
+      reason: every emitted chunk is redacted before the WebSocket boundary
+    - id: AI-PRIV-TRACE-05
+      status: pass
+      reason: telemetry is limited to hashes, counts, model ID, and redaction status
+expected_output:
+  streaming_and_telemetry_boundary_review:
+    raw_content_possible: false
+    redaction_before_boundary: true
+    result: Pass
+  finding_severity: Informational
+  recommended_action: >
+    Keep metadata-only telemetry policy under change control and revalidate if
+    content-bearing GenAI events are enabled.

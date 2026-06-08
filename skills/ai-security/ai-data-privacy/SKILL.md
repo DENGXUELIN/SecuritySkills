@@ -13,7 +13,7 @@ phase: [design, build, review, operate]
 frameworks: [NIST-AI-RMF-1.0, OWASP-LLM02-2025]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -77,6 +77,8 @@ Before beginning the assessment, gather the following. If any item is unavailabl
 | Privacy policy | Public-facing policy documents | Defines commitments to users about data handling |
 | Data retention policies | Internal governance docs, code configs | Determines how long AI-processed data persists |
 | Logging configuration | Application code, infrastructure configs | Reveals what prompt/completion data is captured |
+| Streaming and callback boundaries | SSE/WebSocket handlers, provider callbacks, framework tracers, replay buffers | Confirms redaction occurs before each content emission boundary |
+| GenAI telemetry export configuration | OpenTelemetry/APM/LLMOps configs, provider dashboards, trace processors | Distinguishes raw prompt/completion/tool/RAG exports from metadata-only telemetry |
 | Training/fine-tuning data documentation | Data pipeline docs, dataset cards | Identifies personal data in training corpus |
 | Consent management implementation | Frontend code, API code, database schemas | Shows how user consent is captured and enforced |
 | Data classification scheme | Governance documentation | Defines sensitivity levels applied to AI data flows |
@@ -177,6 +179,61 @@ Grep: "metadata_filter|access_control|permission|authorization|tenant" in **/*.{
 | User prompts containing PII are sent to the model without redaction | High |
 | System prompts contain hardcoded PII (even test data) | Medium |
 | No assessment of model memorization risk for fine-tuned models trained on PII-containing data | Medium |
+
+---
+
+### Step 2A -- Streaming and GenAI Telemetry Boundary Assessment
+
+Evaluate whether PII/PHI controls run before every emission and export boundary, not only before the final response is stored or displayed.
+
+**What to look for in code and configuration:**
+
+- SSE, WebSocket, callback, webhook, or mobile push streams that write raw model deltas before final-response redaction.
+- Stateful incremental redaction for PII that can span token or chunk boundaries.
+- OpenTelemetry, APM, provider dashboard, LLMOps, prompt-management, eval, or replay tooling that captures prompts, completions, RAG snippets, tool-call arguments/results, intermediate messages, or model events.
+- Framework callbacks or tracers that observe raw prompts, raw completions, retrieved context, tool I/O, or chain steps before application-level parsers run.
+- Trace export destinations, retention periods, access controls, DPAs, and environment-specific capture settings.
+- Replay buffers, CDN edge traces, browser queues, mobile logs, and server-side streaming caches that may persist streamed deltas.
+
+**Detection methods using allowed tools:**
+
+```
+# Find streaming emission boundaries
+Grep: "stream|SSE|EventSource|WebSocket|res.write|response.write|send_text|yield" in **/*.{py,ts,js}
+Grep: "delta|chunk|on_llm_new_token|on_chat_model_stream|callback" in **/*.{py,ts,js}
+
+# Find GenAI telemetry and content-bearing trace paths
+Grep: "opentelemetry|trace|span|set_attribute|add_event|LangSmith|Langfuse|LLMOps|APM" in **/*.{py,ts,js,yaml,yml}
+Grep: "prompt|completion|rag.context|tool.call|retrieved|context" in **/*.{py,ts,js,yaml,yml}
+
+# Check for pre-boundary redaction and export policy controls
+Grep: "redact|mask|scrub|pii|presidio|content_capture|capture_content|trace_content" in **/*.{py,ts,js,yaml,yml}
+Grep: "retention|sampling|dpa|exporter|processor|replay|buffer" in **/*.{py,ts,js,yaml,yml,json}
+```
+
+**Streaming and telemetry evidence gates:**
+
+| Gate | Evidence Required | Pass / Fail Guidance |
+|---|---|---|
+| AI-PRIV-STREAM-01 | Inventory of SSE/WebSocket/callback/replay emission boundaries | Pass only when every boundary is identified or explicitly out of scope |
+| AI-PRIV-STREAM-02 | Redaction/filter location for each streamed delta before it leaves the server/process | Fail if final-response redaction runs after raw chunks are already emitted |
+| AI-PRIV-STREAM-03 | Incremental redaction state for PII split across chunks/tokens | Unknown if chunk-level scanning is stateless and boundary-spanning PII is plausible |
+| AI-PRIV-TRACE-01 | GenAI span/event attribute policy for prompts, completions, RAG snippets, and tool I/O | Fail when raw content-bearing events are exported without approved controls |
+| AI-PRIV-TRACE-02 | Trace/export destinations, retention, access controls, and DPA/vendor coverage | High when raw sensitive content leaves the application to an unapproved vendor |
+| AI-PRIV-TRACE-03 | Framework callback capture points before parsers/redactors | Unknown or fail when callbacks can see raw content but configuration evidence is missing |
+| AI-PRIV-TRACE-04 | Environment parity for dev/staging/prod trace capture and production-like data | Fail if non-prod traces raw production data with weaker controls |
+| AI-PRIV-TRACE-05 | Metadata-only telemetry proof for hashes, token counts, model IDs, latency, and redacted snippets | Do not flag as raw PII logging when telemetry is non-reversible metadata only |
+
+**What constitutes a finding:**
+
+| Condition | Severity |
+|---|---|
+| Raw PHI/regulated PII streamed to clients before redaction | Critical |
+| Raw prompt, completion, tool, or RAG content exported to third-party telemetry without DPA, retention, and access-control evidence | High |
+| Final-response redaction exists but SSE/WebSocket/callback deltas are emitted raw first | High |
+| Callback/tracer configuration is present but content-capture settings are unknown | Medium / Not Evaluable |
+| Sampling is used as the only privacy control for content-bearing traces | Medium |
+| Telemetry stores only non-reversible hashes, token counts, model IDs, latency, and redacted snippets | No finding unless policy or retention evidence is missing |
 
 ---
 
@@ -384,8 +441,8 @@ Grep: "consent_check|is_consented|has_consent|filter_consented|exclude_opted_out
 | Severity | Criteria | Response SLA |
 |---|---|---|
 | **Critical** | Personal data processed without legal basis, PHI exposed without HIPAA controls, or regulatory non-compliance with immediate enforcement risk. | Immediate -- halt processing |
-| **High** | Significant privacy risk with clear exposure path: PII in prompts without redaction, missing retention policies on PII-containing stores, or no consent mechanism for training data. | 7 days -- remediate before next release |
-| **Medium** | Moderate privacy gap requiring specific conditions: incomplete documentation, missing memorization testing, or partial consent implementation. | 30 days -- schedule remediation |
+| **High** | Significant privacy risk with clear exposure path: PII in prompts without redaction, raw streamed deltas before filtering, raw GenAI trace export without vendor controls, missing retention policies on PII-containing stores, or no consent mechanism for training data. | 7 days -- remediate before next release |
+| **Medium** | Moderate privacy gap requiring specific conditions: incomplete documentation, unknown telemetry capture settings, missing memorization testing, or partial consent implementation. | 30 days -- schedule remediation |
 | **Low** | Minor gap with limited direct privacy risk: defense-in-depth recommendations, documentation improvements, or best practice deviations. | 90 days -- track in backlog |
 | **Informational** | Recommendations for improvement with no current privacy risk. | No SLA -- advisory |
 
@@ -434,6 +491,12 @@ user input -> prompt assembly -> LLM API -> completion -> output -> logging/stor
 | EU AI Act compliance | [Yes/Partial/No/N/A] | [description] | [severity] |
 | Consent management | [Yes/Partial/No] | [description] | [severity] |
 
+## Streaming and Telemetry Boundary Review
+
+| Boundary / Export | Raw Content Possible | Redaction Before Boundary | Export Destination / Retention | DPA / Access Evidence | Result |
+|---|---|---|---|---|---|
+| [SSE/WebSocket/callback/trace/replay] | [Yes/No/Unknown] | [Yes/No/N/A] | [Destination and retention] | [Evidence] | [Pass/Fail/Unknown] |
+
 ## Recommendations
 [Prioritized list of remediation actions with regulatory alignment]
 ```
@@ -472,6 +535,8 @@ user input -> prompt assembly -> LLM API -> completion -> output -> logging/stor
 
 5. **Ignoring model memorization as a privacy risk.** Organizations that use pre-trained or fine-tuned models often do not test for memorization of personal data. A model that has memorized PII from its training corpus is effectively a data store containing personal data -- it can reproduce that data on specific prompts. This has regulatory implications: if the model contains memorized PII of EU residents, GDPR obligations apply to the model weights themselves, not just the training dataset.
 
+6. **Treating final-response redaction as streaming redaction.** In streaming systems, each SSE/WebSocket delta, callback, trace event, replay buffer, or provider dashboard export is its own privacy boundary. A final redaction pass is too late if raw chunks, RAG snippets, or tool-call arguments have already been emitted or exported.
+
 ---
 
 ## References
@@ -487,3 +552,4 @@ user input -> prompt assembly -> LLM API -> completion -> output -> logging/stor
 - Microsoft Presidio (PII detection and anonymization) -- https://github.com/microsoft/presidio
 - NIST SP 800-188, De-Identifying Government Datasets -- https://csrc.nist.gov/publications/detail/sp/800-188/final
 - Article 29 Working Party, Guidelines on Data Protection Impact Assessment (WP 248) -- https://ec.europa.eu/newsroom/article29/items/611236
+- OpenTelemetry GenAI semantic conventions -- https://opentelemetry.io/docs/specs/semconv/gen-ai/
