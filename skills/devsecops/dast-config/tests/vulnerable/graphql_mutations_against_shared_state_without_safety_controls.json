@@ -1,0 +1,134 @@
+{
+  "fixture": "graphql_mutations_against_shared_state_without_safety_controls",
+  "skill": "dast-config",
+  "description": "Vulnerable fixture for active GraphQL DAST that has depth and argument limits but executes mutations against shared staging state and production-like integrations.",
+  "scan": {
+    "tool": "OWASP ZAP Automation Framework",
+    "scan_type": "active-graphql",
+    "environment": "shared-staging",
+    "endpoint": "https://staging.example.test/graphql",
+    "workflow": ".github/workflows/zap-full-scan.yml"
+  },
+  "graphql_job": {
+    "endpoint": "https://staging.example.test/graphql",
+    "maxQueryDepth": 5,
+    "maxArgsCount": 10,
+    "optionalArgsEnabled": true,
+    "argsType": "BOTH",
+    "mutation_policy": "execute-generated-operations"
+  },
+  "schema_freshness": {
+    "schema_source": "checked-in-schema-file",
+    "schema_hash": "unknown",
+    "exported_at": "2026-04-01T00:00:00Z",
+    "deployment_revision": "not-recorded",
+    "scan_time_match": false
+  },
+  "mutation_inventory": {
+    "status": "missing",
+    "known_mutations_found_in_recent_incident": [
+      "refundOrder",
+      "rotateApiKey",
+      "disableUser",
+      "deleteAccount",
+      "transferCredits",
+      "sendWebhook"
+    ],
+    "owner_mapping": "missing",
+    "side_effect_classification": "missing"
+  },
+  "decision_matrix": {
+    "status": "missing",
+    "default_behavior": "scanner may execute generated mutations",
+    "owner_approval": "missing",
+    "destructive_exclusion_list": "missing"
+  },
+  "scanner_enforcement": {
+    "allowed_operations": "*",
+    "excluded_operations": [],
+    "custom_graphql_hook": "missing",
+    "operation_log_review": "not-performed",
+    "keyword_only_filtering": false
+  },
+  "integrations": {
+    "payment": "shared-staging-connected-to-provider-test-account",
+    "email": "shared-staging-sends-to-real-domain-allowlist",
+    "webhook": "shared-partner-webhook-endpoints",
+    "identity": "shared-staging-idp-tenant",
+    "dry_run_flags": "not-enforced"
+  },
+  "data_isolation": {
+    "seed_tenant": "missing",
+    "seed_users": "missing",
+    "shared_records_in_scope": true,
+    "production_like_records": true
+  },
+  "reset_and_reconciliation": {
+    "cleanup_job": "missing",
+    "before_counts": "missing",
+    "after_counts": "missing",
+    "audit_events_reviewed": false,
+    "rollback_evidence": "missing",
+    "known_side_effects": [
+      "test refunds created",
+      "API keys rotated",
+      "shared accounts disabled",
+      "webhook deliveries sent"
+    ]
+  },
+  "compensating_validation": {
+    "excluded_mutations_validated": [],
+    "authorization_checks": "unknown",
+    "input_validation_checks": "unknown",
+    "business_logic_checks": "unknown",
+    "residual_risk_decision": "missing"
+  },
+  "expected_gate_results": [
+    {
+      "gate": "DAST-GQL-01",
+      "status": "Fail",
+      "evidence": "Schema is stale and not matched to the deployed endpoint at scan time."
+    },
+    {
+      "gate": "DAST-GQL-02",
+      "status": "Fail",
+      "evidence": "No current mutation inventory, owner mapping, or side-effect classification exists."
+    },
+    {
+      "gate": "DAST-GQL-03",
+      "status": "Fail",
+      "evidence": "No per-mutation scan decision matrix or owner approval exists."
+    },
+    {
+      "gate": "DAST-GQL-04",
+      "status": "Fail",
+      "evidence": "Scanner can execute generated mutation operations and no destructive exclusions are enforced."
+    },
+    {
+      "gate": "DAST-GQL-05",
+      "status": "Fail",
+      "evidence": "Payment, email, webhook, and identity integrations are shared production-like services without dry-run enforcement."
+    },
+    {
+      "gate": "DAST-GQL-06",
+      "status": "Fail",
+      "evidence": "Mutations target shared staging and production-like records with no disposable seed tenant."
+    },
+    {
+      "gate": "DAST-GQL-07",
+      "status": "Fail",
+      "evidence": "No cleanup job, before/after counts, audit review, or rollback evidence exists."
+    },
+    {
+      "gate": "DAST-GQL-08",
+      "status": "Not Evaluable",
+      "evidence": "No destructive mutations are excluded, and no compensating validation or residual-risk decision exists."
+    }
+  ],
+  "expected_assessment": {
+    "overall_status": "Fail",
+    "risk_rating": "Critical",
+    "confidence": "Low",
+    "finding": "GraphQL active DAST can execute destructive mutations against shared state and production-like integrations."
+  }
+}

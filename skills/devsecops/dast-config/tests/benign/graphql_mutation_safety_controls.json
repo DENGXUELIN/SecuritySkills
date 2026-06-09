@@ -1,0 +1,192 @@
+{
+  "fixture": "graphql_mutation_safety_controls",
+  "skill": "dast-config",
+  "description": "Benign fixture for active GraphQL DAST where mutations are inventoried, approved per operation, sandboxed, seeded, reset, and validated when excluded.",
+  "scan": {
+    "tool": "OWASP ZAP Automation Framework",
+    "scan_type": "active-graphql",
+    "environment": "ephemeral-staging",
+    "endpoint": "https://staging.example.test/graphql",
+    "workflow": ".github/workflows/dast-graphql.yml"
+  },
+  "schema_freshness": {
+    "endpoint": "https://staging.example.test/graphql",
+    "schema_source": "ci-export-from-running-staging",
+    "schema_hash": "sha256-example-gql-schema-20260609",
+    "exported_at": "2026-06-09T04:20:00Z",
+    "deployment_revision": "app-rev-graphql-20260609",
+    "scan_started_at": "2026-06-09T04:35:00Z",
+    "scan_time_match": true
+  },
+  "mutation_inventory": [
+    {
+      "name": "updateProfile",
+      "owner": "identity-team",
+      "object_type": "UserProfile",
+      "side_effect_class": "seeded-user-only",
+      "integration_touched": "none",
+      "deprecated_or_internal": false
+    },
+    {
+      "name": "createDraftOrder",
+      "owner": "orders-team",
+      "object_type": "Order",
+      "side_effect_class": "dry-run",
+      "integration_touched": "sandbox-payment",
+      "deprecated_or_internal": false
+    },
+    {
+      "name": "refundOrder",
+      "owner": "payments-team",
+      "object_type": "Payment",
+      "side_effect_class": "destructive",
+      "integration_touched": "payment-provider",
+      "deprecated_or_internal": false
+    },
+    {
+      "name": "rotateApiKey",
+      "owner": "platform-team",
+      "object_type": "ApiCredential",
+      "side_effect_class": "destructive",
+      "integration_touched": "identity-provider",
+      "deprecated_or_internal": false
+    },
+    {
+      "name": "deleteAccount",
+      "owner": "identity-team",
+      "object_type": "Account",
+      "side_effect_class": "destructive",
+      "integration_touched": "email-webhook",
+      "deprecated_or_internal": false
+    }
+  ],
+  "decision_matrix": [
+    {
+      "mutation": "updateProfile",
+      "decision": "execute",
+      "rationale": "Only runs against per-scan seeded user.",
+      "approved_by": "identity-team-owner",
+      "evidence": "seed-user-dast-run-4821"
+    },
+    {
+      "mutation": "createDraftOrder",
+      "decision": "dry-run",
+      "rationale": "Order creation executes with payment dry-run and test-mode side effects.",
+      "approved_by": "orders-team-owner",
+      "evidence": "sandbox-order-dry-run-enabled"
+    },
+    {
+      "mutation": "refundOrder",
+      "decision": "exclude-and-manual-api-validation",
+      "rationale": "Refunds are destructive and validated with controlled API replay outside active scanner.",
+      "approved_by": "payments-team-owner",
+      "evidence": "manual-validation-payments-20260609"
+    },
+    {
+      "mutation": "rotateApiKey",
+      "decision": "exclude-and-manual-api-validation",
+      "rationale": "Credential rotation would invalidate shared service accounts.",
+      "approved_by": "platform-team-owner",
+      "evidence": "manual-validation-credential-rotation-20260609"
+    },
+    {
+      "mutation": "deleteAccount",
+      "decision": "exclude",
+      "rationale": "Deletion covered by non-DAST integration test against disposable tenant.",
+      "approved_by": "identity-team-owner",
+      "evidence": "delete-account-compensating-test-20260609"
+    }
+  ],
+  "scanner_enforcement": {
+    "allowed_operations": [
+      "updateProfile",
+      "createDraftOrder"
+    ],
+    "excluded_operations": [
+      "refundOrder",
+      "rotateApiKey",
+      "deleteAccount"
+    ],
+    "custom_graphql_hook": "zap/scripts/graphql_mutation_filter.js",
+    "operation_log_review": "excluded operations were not sent during dast-run-4821",
+    "keyword_only_filtering": false
+  },
+  "sandbox_and_seed_data": {
+    "payment": "sandbox-test-mode",
+    "email": "mail-sink",
+    "webhook": "local-webhook-capture",
+    "identity": "ephemeral-idp-tenant",
+    "seed_tenant": "dast-tenant-run-4821",
+    "seed_users": [
+      "dast-user-4821",
+      "dast-admin-4821"
+    ],
+    "shared_records_in_scope": false
+  },
+  "reset_and_reconciliation": {
+    "cleanup_job": "dast-reset-4821",
+    "before_counts": "baseline-counts-captured",
+    "after_counts": "matched-baseline-after-cleanup",
+    "audit_events_reviewed": true,
+    "failed_cleanup_retry_policy": "retry-twice-then-block-promotion",
+    "rollback_evidence": "reset-log-dast-run-4821"
+  },
+  "compensating_validation": {
+    "excluded_mutations_validated": [
+      "refundOrder",
+      "rotateApiKey",
+      "deleteAccount"
+    ],
+    "authorization_checks": "covered",
+    "input_validation_checks": "covered",
+    "business_logic_checks": "covered",
+    "residual_risk_decision": "not-required"
+  },
+  "expected_gate_results": [
+    {
+      "gate": "DAST-GQL-01",
+      "status": "Pass",
+      "evidence": "Schema hash and export timestamp match the deployed staging revision at scan time."
+    },
+    {
+      "gate": "DAST-GQL-02",
+      "status": "Pass",
+      "evidence": "Current mutation inventory lists owners, object types, side-effect classes, and touched integrations."
+    },
+    {
+      "gate": "DAST-GQL-03",
+      "status": "Pass",
+      "evidence": "Each mutation has an approved execute, dry-run, exclude, or manual validation decision."
+    },
+    {
+      "gate": "DAST-GQL-04",
+      "status": "Pass",
+      "evidence": "Scanner allowlist and GraphQL hook prevent excluded destructive operations from being sent."
+    },
+    {
+      "gate": "DAST-GQL-05",
+      "status": "Pass",
+      "evidence": "Payment, email, webhook, and identity side effects use sandbox integrations."
+    },
+    {
+      "gate": "DAST-GQL-06",
+      "status": "Pass",
+      "evidence": "All executable mutations target disposable per-run tenant and seed users."
+    },
+    {
+      "gate": "DAST-GQL-07",
+      "status": "Pass",
+      "evidence": "Cleanup job, before/after counts, audit review, and retry policy prove rollback."
+    },
+    {
+      "gate": "DAST-GQL-08",
+      "status": "Pass",
+      "evidence": "Excluded destructive mutations have compensating manual/API validation."
+    }
+  ],
+  "expected_assessment": {
+    "overall_status": "Pass",
+    "risk_rating": "Low",
+    "confidence": "High"
+  }
+}

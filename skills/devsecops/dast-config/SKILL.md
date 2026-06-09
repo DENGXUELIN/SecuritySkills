@@ -12,7 +12,7 @@ phase: [build, deploy]
 frameworks: [OWASP-Top-10-2021, OWASP-Testing-Guide-v4.2]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -268,6 +268,30 @@ jobs:
 - Query depth limits are set to prevent resource exhaustion during scanning.
 - Mutations are handled carefully (exclude destructive mutations from active scanning).
 
+#### 3.3 GraphQL Mutation Safety Evidence Gate
+
+Active DAST against GraphQL is only safe when state-changing mutations are inventoried and controlled. Depth limits and argument limits reduce resource exhaustion, but they do not prevent the scanner from executing business-impacting mutations such as delete, refund, rotate, disable, transfer, resend, reset, revoke, invite, or publish operations.
+
+**Required GraphQL mutation safety gates:**
+
+| Gate | Required evidence | Fail if |
+|---|---|---|
+| `DAST-GQL-01` | Fresh schema evidence for each GraphQL endpoint, including schema hash/export time, deployment revision, source of truth, and scan-time match. | Scanner uses a stale schema, an unknown schema source, or no freshness check before active scanning. |
+| `DAST-GQL-02` | Complete mutation inventory from the current schema, including mutation name, owner, object type, side-effect class, integration touched, and whether it is deprecated/internal. | Mutations are only controlled by keyword matching, or newly added/deprecated mutations are missing from the inventory. |
+| `DAST-GQL-03` | Per-mutation scan decision matrix: execute, exclude, dry-run, seeded-only, or manual/API validation, with owner approval and rationale. | Active scan can execute mutations without an explicit decision and owner-approved rationale. |
+| `DAST-GQL-04` | Destructive mutation exclusions are enforced in scanner config through allowlists, operation-name filters, excluded paths/payloads, or custom GraphQL hooks, with evidence that excluded operations were not sent. | `delete`, `refund`, `rotate`, `disable`, `transfer`, `reset`, `revoke`, or `publish` mutations remain reachable by the active scanner. |
+| `DAST-GQL-05` | Dry-run/test-mode flags and sandbox integrations are verified for payment, email, webhook, identity, notification, and external side-effect services. | Production-like or shared staging integrations receive scanner-triggered mutation traffic. |
+| `DAST-GQL-06` | Disposable seed data and isolation evidence show per-run tenants/users/objects, generated identifiers, and no shared customer-like records in mutation targets. | Mutations target shared staging data, persistent tenants, or production-derived records without isolation. |
+| `DAST-GQL-07` | Reset/rollback/reconciliation evidence includes before/after object counts, cleanup job logs, audit events, and retry handling for failed cleanup. | The scan can modify state without a proven reset path and post-scan reconciliation. |
+| `DAST-GQL-08` | Excluded mutations have compensating manual/API validation or a documented `Not Evaluable` risk decision with owner, expiry, and retest trigger. | Dangerous mutations are excluded with no alternative validation or residual-risk decision. |
+
+**Status and severity guidance:**
+
+- Mark GraphQL active scans as `Not Evaluable` when the current schema cannot be matched to the deployed endpoint.
+- Treat active scanner access to destructive mutations against shared state as **High** severity; escalate to **Critical** when live payment, email, identity, webhook, or production-like integrations can be triggered.
+- Do not accept keyword-only mutation exclusion as sufficient. Require evidence that the scanner did not send excluded operation names or payloads.
+- Cap confidence at **Low** when mutations are excluded but no compensating validation covers authorization, input validation, and business-logic checks.
+
 **Finding classification:** No API scanning for applications with API endpoints is **High**. OpenAPI spec out of date is **Medium**. No GraphQL scanning for GraphQL endpoints is **Medium**.
 
 ---
@@ -481,9 +505,9 @@ DAST tools report findings per-URL, producing hundreds of duplicate alerts for t
 
 | Severity | Definition |
 |----------|-----------|
-| **Critical** | No authenticated scanning; active scanning targeting production; injection scan rules disabled; no scope restrictions. |
-| **High** | No DAST in CI/CD; no API scanning for API endpoints; active scanning disabled entirely; hardcoded credentials in config; destructive endpoints not excluded; authentication verification absent. |
-| **Medium** | No passive scanning on PRs; no scheduled full scan; OpenAPI spec out of date; no triage workflow; no deduplication; ZAP action unpinned; missing GraphQL scanning; missing security header rules. |
+| **Critical** | No authenticated scanning; active scanning targeting production; injection scan rules disabled; no scope restrictions; GraphQL mutations can trigger live payment, email, identity, webhook, or production-like integrations. |
+| **High** | No DAST in CI/CD; no API scanning for API endpoints; active scanning disabled entirely; hardcoded credentials in config; destructive endpoints not excluded; authentication verification absent; GraphQL mutation inventory, decision matrix, or rollback evidence missing for active scans. |
+| **Medium** | No passive scanning on PRs; no scheduled full scan; OpenAPI spec out of date; no triage workflow; no deduplication; ZAP action unpinned; missing GraphQL scanning; missing security header rules; excluded GraphQL mutations lack compensating validation. |
 | **Low** | Suboptimal scan duration settings; cosmetic report formatting; non-critical passive rules disabled. |
 
 ---
@@ -519,6 +543,23 @@ DAST tools report findings per-URL, producing hundreds of duplicate alerts for t
 | Active scanning (staging) | Yes/No | <workflow file> |
 | API scanning | Yes/No | <OpenAPI/GraphQL import> |
 | Results deduplication | Yes/No | <dedup method> |
+
+### GraphQL Mutation Safety
+
+| Endpoint | Schema Hash/Export Time | Mutation Inventory | Decision Matrix | Destructive Exclusions | Sandbox Integrations | Seed Data | Reset/Rollback | Status |
+|---|---|---|---|---|---|---|---|---|
+| <endpoint> | <hash/time/revision> | <complete/partial/missing> | <complete/partial/missing> | <verified/missing> | <verified/missing> | <isolated/shared/missing> | <verified/missing> | <Pass/Fail/Not Evaluable> |
+
+| Gate | Evidence Reviewed | Status | Risk |
+|---|---|---|---|
+| `DAST-GQL-01` | <schema freshness evidence> | <Pass/Fail/Not Evaluable> | <risk> |
+| `DAST-GQL-02` | <mutation inventory> | <Pass/Fail/Not Evaluable> | <risk> |
+| `DAST-GQL-03` | <per-mutation scan decision matrix> | <Pass/Fail/Not Evaluable> | <risk> |
+| `DAST-GQL-04` | <destructive mutation exclusion enforcement> | <Pass/Fail/Not Evaluable> | <risk> |
+| `DAST-GQL-05` | <dry-run flags and sandbox integrations> | <Pass/Fail/Not Evaluable> | <risk> |
+| `DAST-GQL-06` | <disposable seed data and isolation> | <Pass/Fail/Not Evaluable> | <risk> |
+| `DAST-GQL-07` | <reset, rollback, and reconciliation evidence> | <Pass/Fail/Not Evaluable> | <risk> |
+| `DAST-GQL-08` | <compensating validation for excluded mutations> | <Pass/Fail/Not Evaluable> | <risk> |
 
 ### Findings
 
@@ -584,6 +625,8 @@ DAST tools report findings per-URL, producing hundreds of duplicate alerts for t
 
 5. **Running only scheduled weekly scans instead of integrating into CI.** Weekly scans create a feedback loop measured in days. Passive baseline scans in CI (on every PR) give developers immediate feedback on security header regressions and configuration issues, while weekly full scans provide comprehensive active testing coverage.
 
+6. **Assuming GraphQL depth limits make mutations safe.** `maxQueryDepth`, `maxArgsCount`, and introspection limits do not stop a scanner from executing valid state-changing mutations. Active GraphQL DAST needs a current mutation inventory, per-mutation decisions, sandbox integrations, disposable data, reset evidence, and compensating validation for excluded operations.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -614,4 +657,5 @@ This skill processes DAST configuration files that may contain target URLs, auth
 
 ## Changelog
 
+- **1.0.1** -- Add GraphQL mutation safety gates for schema freshness, mutation inventory, per-mutation decisions, destructive exclusions, sandbox integrations, disposable seed data, reset/rollback evidence, and compensating validation.
 - **1.0.0** -- Initial release. Full coverage of DAST configuration review against OWASP Top 10:2021 and OWASP Testing Guide v4.2, with ZAP-specific patterns.
