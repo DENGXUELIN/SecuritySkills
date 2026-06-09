@@ -1,0 +1,76 @@
+{
+  "case_id": "iam-idp-disabled-residual-sessions-machine-identities",
+  "skill": "iam-review",
+  "expected_skill_decision": "high_risk_residual_access",
+  "scenario": "The IdP user is disabled and the SCIM ticket is closed, but SaaS sessions, OAuth refresh tokens, app-local RBAC, and owner-linked machine identities remain active.",
+  "source_lifecycle_event": {
+    "event_type": "termination",
+    "source_of_truth": "idp_only",
+    "idp": "entra-id",
+    "idp_event_id": "evt-disable-7781",
+    "scim_patch_result": "success",
+    "terminated_user": "user-7781",
+    "terminated_at": "2026-06-06T10:00:00Z",
+    "ticket_state": "closed"
+  },
+  "downstream_evidence": [
+    {
+      "relying_party": "support-saas",
+      "app_account_state": "disabled",
+      "browser_sessions": "active",
+      "oauth_refresh_tokens": "active",
+      "personal_api_tokens": "active",
+      "mobile_device_tokens": "unknown",
+      "last_successful_api_call_after_disable": "2026-06-06T10:27:00Z",
+      "verification_result": "failed"
+    },
+    {
+      "relying_party": "data-warehouse",
+      "idp_group_removed": "engineering-prod-admin",
+      "app_local_role": "prod_admin",
+      "cached_claim_ttl_hours": 24,
+      "last_full_sync": "2026-06-01T00:00:00Z",
+      "data_plane_authorization_test": "allowed_after_idp_group_removal",
+      "verification_result": "failed"
+    }
+  ],
+  "machine_identity_review": {
+    "owned_service_accounts": [
+      {
+        "service_account": "svc-prod-deploy",
+        "former_owner": "user-7781",
+        "cloud_role": "prod-deploy-admin",
+        "static_key_count": 2,
+        "last_key_use_after_termination": "2026-06-06T10:31:00Z",
+        "oidc_trust_policy": "still_allows_legacy_repo_branch",
+        "breakglass_exception": "missing",
+        "verification_result": "failed"
+      }
+    ],
+    "deploy_keys": [
+      {
+        "repository": "prod-infra",
+        "former_owner": "user-7781",
+        "key_state": "active",
+        "last_use_after_termination": true
+      }
+    ]
+  },
+  "evidence_gate_results": {
+    "IAM-STALE-09": "fail",
+    "IAM-STALE-10": "fail",
+    "IAM-STALE-11": "fail",
+    "IAM-STALE-12": "not_evaluable"
+  },
+  "output_expectations": {
+    "downstream_deprovisioning_status": "failed",
+    "finding_severity": "HIGH",
+    "required_findings": [
+      "residual_sessions_after_idp_disable",
+      "active_refresh_and_personal_tokens",
+      "app_local_role_cache_not_revoked",
+      "machine_identity_owner_lifecycle_gap",
+      "ticket_closure_used_as_revocation_proof"
+    ]
+  }
+}

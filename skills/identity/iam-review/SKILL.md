@@ -13,7 +13,7 @@ phase: [design, operate]
 frameworks: [NIST-SP-800-63B, NIST-SP-800-207, CIS-Controls-v8]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -256,6 +256,10 @@ IAM-STALE-05: Deprovisioning SLA not met (industry standard: same-day for termin
 IAM-STALE-06: No automated lifecycle management (SCIM provisioning/deprovisioning)
 IAM-STALE-07: Accounts disabled but not deleted after retention period
 IAM-STALE-08: Access reviews not conducted on required cadence (quarterly for privileged, semi-annual for standard)
+IAM-STALE-09: IdP-disabled user still has relying-party sessions, refresh tokens, API tokens, or mobile tokens
+IAM-STALE-10: Group or role removal does not propagate to app-local RBAC, cached claims, or entitlement tables
+IAM-STALE-11: Human owner lifecycle changes do not trigger machine identity, deploy key, OAuth app, OIDC trust, or CI/CD secret review
+IAM-STALE-12: Non-SCIM application lacks compensating disablement, token revocation, reconciliation, and residual-access evidence
 ```
 
 **Platform-specific checks:**
@@ -273,8 +277,32 @@ IAM-STALE-08: Access reviews not conducted on required cadence (quarterly for pr
 |---|---|---|
 | Former employee with active admin access | **Critical** | Immediate unauthorized access risk |
 | Orphaned service account with production access | **High** | No owner to monitor or respond to abuse |
+| IdP disabled but relying-party sessions or refresh tokens remain valid | **High** | Source-of-truth disablement did not revoke effective access |
+| Departed owner still controls service accounts, OAuth apps, deploy keys, or OIDC trusts | **High** | Machine identities can outlive human lifecycle controls |
 | Inactive human account > 90 days | **Medium** | Credential stuffing / takeover target |
 | Disabled but not deleted account > 180 days | **Low** | Hygiene improvement |
+
+#### Downstream Deprovisioning Evidence Gate
+
+Before marking deprovisioning complete, prove that the source lifecycle event propagated to every relying party and credential form that can continue access after the IdP object is disabled. Treat unknown downstream state as **NOT EVALUABLE**; treat confirmed residual access for privileged, regulated, production, or externally exposed systems as **HIGH** or **CRITICAL** depending on scope.
+
+| Field | Evidence Required | Unsafe Shortcut |
+|---|---|---|
+| Source lifecycle event | HRIS ticket, IdP event ID, SCIM PATCH/DELETE, group removal, owner transfer, termination timestamp | Deprovisioning is inferred from a disabled directory object only |
+| Relying-party account state | App-local user status, local role/group table, warehouse grants, SaaS admin console, last sync result | SSO login blocked but app-local account remains active |
+| Session and token revocation | Browser/mobile sessions, OAuth refresh tokens, personal API tokens, CLI tokens, device tokens, recovery tokens | Logout or IdP disable is assumed to revoke all tokens |
+| Group/role propagation | Group delta, cached claim TTL, entitlement table result, app-local RBAC removal, data-plane authorization test | IdP group removal is not checked in the application |
+| Machine identity impact | Owned service accounts, deploy keys, OAuth apps, certificates, OIDC trusts, CI/CD secrets, cloud role bindings | Departed owner leaves non-human credentials unreviewed |
+| Exception and compensating control | Non-SCIM owner, manual disable SLA, reconciliation cadence, monitoring, expiry/review date | Non-SCIM app is either auto-failed or auto-passed without evidence |
+| Verification result | Complete, partial, failed, not evaluable, residual access remaining, retest date | Ticket closure is used as proof of effective revocation |
+
+**False Positive Calibration:**
+
+- Do not flag a SaaS app solely because it lacks SCIM when documented manual disablement, token revocation, reconciliation, and residual-access tests are current.
+- Do not close a stale-account finding solely because SCIM succeeded; SCIM can disable a user while sessions, refresh tokens, app-local roles, or personal tokens remain valid.
+- Workload identity federation reduces static key risk, but OIDC trust policies, deploy keys, OAuth applications, and service account ownership still need review when owners leave or teams change.
+
+**Additional references:** RFC 7009 (OAuth 2.0 Token Revocation), RFC 7644 (SCIM Protocol), and NIST SP 800-207 zero-trust per-session access decisions.
 
 ---
 
@@ -408,11 +436,17 @@ For each finding, produce a row with:
 - Least Privilege (Step 3): [count]
 - Service Accounts (Step 4): [count]
 - Stale Accounts (Step 5): [count]
+- Downstream Deprovisioning (Step 5): [complete / partial / failed / not evaluable]
 - JIT Access (Step 6): [count]
 - Zero Trust (Step 7): [count]
 
 ### Detailed Findings
 [Findings table — see above]
+
+### Downstream Deprovisioning Evidence
+| Lifecycle Event | IdP / SCIM Evidence | Relying Party | App Account State | Token / Session Revocation | Group / Role Propagation | Machine Identity Impact | Verification Result |
+|---|---|---|---|---|---|---|---|
+| [termination/group removal/owner change] | [event ID and timestamp] | [app/cloud/SaaS] | [disabled/active/unknown] | [revoked/active/unknown] | [complete/partial/failed] | [none/reassigned/revoked/unknown] | [complete/partial/failed/not evaluable] |
 
 ### Remediation Roadmap
 [Prioritized actions: immediate (0-7 days), short-term (30 days), medium-term (90 days)]

@@ -1,0 +1,75 @@
+{
+  "case_id": "iam-downstream-deprovisioning-token-revocation-complete",
+  "skill": "iam-review",
+  "expected_skill_decision": "deprovisioning_complete_with_evidence",
+  "scenario": "A terminated employee is disabled in the IdP and every relying party proves app-local disablement, token revocation, group removal, and machine identity reassignment.",
+  "source_lifecycle_event": {
+    "event_type": "termination",
+    "source_of_truth": "hris",
+    "idp": "okta",
+    "idp_event_id": "evt-term-1042",
+    "scim_patch_result": "success",
+    "terminated_user": "user-1042",
+    "terminated_at": "2026-06-06T09:00:00Z"
+  },
+  "downstream_evidence": [
+    {
+      "relying_party": "payroll-saas",
+      "app_account_state": "disabled",
+      "app_audit_event_id": "audit-payroll-disable-778",
+      "browser_sessions": "revoked",
+      "oauth_refresh_tokens": "revoked",
+      "personal_api_tokens": "revoked",
+      "mobile_device_tokens": "revoked",
+      "group_role_propagation": "complete",
+      "last_sync_at": "2026-06-06T09:04:00Z",
+      "verification_result": "complete"
+    },
+    {
+      "relying_party": "data-warehouse",
+      "app_account_state": "disabled",
+      "warehouse_grants": "removed",
+      "cached_claim_ttl_minutes": 15,
+      "data_plane_authorization_test": "denied_after_revocation",
+      "verification_result": "complete"
+    }
+  ],
+  "machine_identity_review": {
+    "owned_service_accounts": [
+      {
+        "service_account": "svc-billing-export",
+        "owner_reassigned_to": "team-billing-platform",
+        "static_keys": "none",
+        "oidc_trust_policy_reviewed": true,
+        "ci_secrets_reassigned": true,
+        "verification_result": "complete"
+      }
+    ],
+    "oauth_apps": [
+      {
+        "app_id": "oauth-export-tool",
+        "owner_reassigned": true,
+        "refresh_tokens_revoked": true,
+        "verification_result": "complete"
+      }
+    ]
+  },
+  "evidence_gate_results": {
+    "IAM-STALE-09": "pass",
+    "IAM-STALE-10": "pass",
+    "IAM-STALE-11": "pass",
+    "IAM-STALE-12": "not_applicable"
+  },
+  "output_expectations": {
+    "downstream_deprovisioning_status": "complete",
+    "finding_severity": "PASS",
+    "required_report_fields": [
+      "source_lifecycle_event",
+      "relying_party_account_state",
+      "token_session_revocation",
+      "group_role_propagation",
+      "machine_identity_impact",
+      "verification_result"
+    ]
+  }
+}
