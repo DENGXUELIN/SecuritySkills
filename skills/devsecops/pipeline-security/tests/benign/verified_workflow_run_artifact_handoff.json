@@ -1,0 +1,165 @@
+{
+  "case_id": "pipeline_workflow_run_verified_artifact_handoff",
+  "description": "A privileged workflow_run consumer only publishes artifacts after mapping the producer chain, verifying trusted source, validating artifact provenance, and isolating caches from PR workflows.",
+  "repository": "acme/payments-api",
+  "chains": [
+    {
+      "chain_id": "release-build-to-publish",
+      "producer": {
+        "workflow_name": "trusted-release-build",
+        "trigger": "push",
+        "event_type": "push",
+        "head_repository": "acme/payments-api",
+        "head_repository_owner": "acme",
+        "fork": false,
+        "head_branch": "main",
+        "head_sha": "sha-example-trusted-release-20260609",
+        "actor": "release-bot",
+        "actor_team": "release-engineering",
+        "conclusion": "success",
+        "workflow_file_ref": ".github/workflows/release-build.yml@sha-example-trusted-release-20260609"
+      },
+      "produced_material": [
+        {
+          "type": "artifact",
+          "name": "dist-package",
+          "artifact_id": "artifact-981245",
+          "digest": "sha256-example-dist-package-20260609",
+          "provenance": {
+            "type": "slsa-v1",
+            "attestation": "attestation-dist-package-981245",
+            "builder_id": "github-actions-hosted",
+            "source_sha": "sha-example-trusted-release-20260609",
+            "workflow_name": "trusted-release-build",
+            "verified_by_consumer": true
+          }
+        },
+        {
+          "type": "coverage_report",
+          "name": "coverage-summary",
+          "digest": "sha256-example-coverage-summary-20260609",
+          "executed_by_consumer": false
+        }
+      ],
+      "consumer": {
+        "workflow_name": "publish-release",
+        "trigger": "workflow_run",
+        "listens_to": [
+          "trusted-release-build"
+        ],
+        "permissions": {
+          "contents": "write",
+          "packages": "write",
+          "id-token": "write",
+          "actions": "read"
+        },
+        "secrets_available": [
+          "package-publish-token"
+        ],
+        "environment": {
+          "name": "production-release",
+          "required_reviewers": [
+            "release-engineering"
+          ],
+          "protected_branch_only": true
+        },
+        "pre_download_checks": [
+          "workflow_run.head_repository.full_name == acme/payments-api",
+          "workflow_run.head_branch == main",
+          "workflow_run.head_sha matches protected branch tip",
+          "workflow_run.actor is release-bot or release-engineering member",
+          "workflow_run.event == push",
+          "workflow_run.conclusion == success",
+          "workflow_run.name == trusted-release-build"
+        ],
+        "artifact_verification": [
+          "downloaded artifact digest equals expected digest from attestation",
+          "SLSA provenance subject digest equals artifact digest",
+          "provenance source sha equals workflow_run.head_sha",
+          "rebuild fallback exists for missing attestation"
+        ],
+        "fail_closed_before_download": true
+      },
+      "cache_isolation": {
+        "producer_cache_key": "release-main-${{ github.sha }}",
+        "pr_cache_key_prefix": "pr-${{ github.event.pull_request.head.sha }}",
+        "release_restore_keys": [
+          "release-main-"
+        ],
+        "pr_restore_keys": [
+          "pr-"
+        ],
+        "shared_with_pull_request": false,
+        "docker_layer_cache_shared": false,
+        "package_manager_cache_shared": false
+      },
+      "expected_status": "Pass"
+    },
+    {
+      "chain_id": "pr-build-to-analysis",
+      "producer": {
+        "workflow_name": "pull-request-build",
+        "trigger": "pull_request",
+        "event_type": "pull_request",
+        "head_repository": "contributor/payments-api",
+        "head_repository_owner": "contributor",
+        "fork": true,
+        "head_branch": "feature",
+        "head_sha": "sha-example-fork-pr-20260609",
+        "actor": "external-contributor",
+        "conclusion": "success"
+      },
+      "produced_material": [
+        {
+          "type": "artifact",
+          "name": "test-results",
+          "digest": "sha256-example-pr-test-results-20260609",
+          "executed_by_consumer": false,
+          "published_by_consumer": false
+        }
+      ],
+      "consumer": {
+        "workflow_name": "pr-result-commenter",
+        "trigger": "workflow_run",
+        "permissions": {
+          "contents": "read",
+          "pull-requests": "write"
+        },
+        "secrets_available": [],
+        "pre_download_checks": [
+          "workflow_run.name == pull-request-build",
+          "workflow_run.conclusion == success",
+          "consumer never executes downloaded files",
+          "consumer only parses fixed-format JSON after schema validation"
+        ],
+        "artifact_verification": [
+          "schema validation before parsing",
+          "path traversal checks before extraction",
+          "no shell execution"
+        ],
+        "fail_closed_before_download": true
+      },
+      "cache_isolation": {
+        "shared_with_release_or_deploy": false,
+        "restore_keys_overlap_release": false
+      },
+      "expected_status": "Pass"
+    }
+  ],
+  "expected_gate_results": {
+    "PIPE-HANDOFF-01": "Pass",
+    "PIPE-HANDOFF-02": "Pass",
+    "PIPE-HANDOFF-03": "Pass",
+    "PIPE-HANDOFF-04": "Pass",
+    "PIPE-HANDOFF-05": "Pass",
+    "PIPE-HANDOFF-06": "Pass",
+    "PIPE-HANDOFF-07": "Pass",
+    "PIPE-HANDOFF-08": "Pass"
+  },
+  "expected_assessment": {
+    "cicd_sec_4": "Pass",
+    "cicd_sec_9": "Pass",
+    "status_cap": "None",
+    "finding": "Privileged workflow_run consumers are restricted to trusted producers, verified source and artifact identity, isolated caches, least-privilege permissions, and fail-closed behavior."
+  }
+}

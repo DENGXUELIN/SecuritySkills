@@ -1,0 +1,186 @@
+{
+  "case_id": "pipeline_workflow_run_untrusted_artifact_execution",
+  "description": "A pull_request workflow from forks uploads a dist artifact, then a privileged workflow_run publish job downloads and executes it with write permissions and package secrets without trusted source, digest, provenance, or cache isolation checks.",
+  "repository": "acme/payments-api",
+  "chains": [
+    {
+      "chain_id": "pr-build-to-publish",
+      "producer": {
+        "workflow_name": "pr-build",
+        "trigger": "pull_request",
+        "event_type": "pull_request",
+        "head_repository": "external-user/payments-api",
+        "head_repository_owner": "external-user",
+        "fork": true,
+        "head_branch": "feature-release-script",
+        "head_sha": "sha-example-untrusted-pr-20260609",
+        "actor": "external-user",
+        "conclusion": "success",
+        "workflow_file_ref": ".github/workflows/pr-build.yml from pull request head"
+      },
+      "produced_material": [
+        {
+          "type": "artifact",
+          "name": "dist",
+          "artifact_id": "artifact-unsafe-dist",
+          "contents": [
+            "dist/release.sh",
+            "dist/package.json",
+            "dist/generated-release-notes.md"
+          ],
+          "digest": "not_recorded",
+          "provenance": "missing",
+          "attestation": "missing"
+        },
+        {
+          "type": "cache",
+          "name": "node-build-cache",
+          "cache_key": "node-${{ hashFiles('package-lock.json') }}",
+          "restore_keys": [
+            "node-"
+          ],
+          "shared_with_release": true
+        }
+      ],
+      "consumer": {
+        "workflow_name": "publish-release",
+        "trigger": "workflow_run",
+        "listens_to": [
+          "pr-build"
+        ],
+        "permissions": "write-all",
+        "secrets_available": [
+          "NPM_PUBLISH_TOKEN",
+          "RELEASE_SIGNING_KEY",
+          "CLOUD_DEPLOY_TOKEN"
+        ],
+        "environment": {
+          "name": "release",
+          "required_reviewers": [],
+          "protected_branch_only": false
+        },
+        "pre_download_checks": [
+          "workflow_run.conclusion == success"
+        ],
+        "missing_checks": [
+          "head_repository owner trusted",
+          "fork status denied",
+          "head_branch protected",
+          "actor/team authorization",
+          "event type constrained to push",
+          "workflow name allowlist",
+          "head SHA bound to protected branch"
+        ],
+        "artifact_use": [
+          "actions/download-artifact using github.event.workflow_run.id",
+          "chmod +x dist/release.sh",
+          "./dist/release.sh",
+          "npm publish ./dist",
+          "cosign sign generated image using release signing key"
+        ],
+        "artifact_verification": [],
+        "fail_closed_before_download": false
+      },
+      "cache_isolation": {
+        "producer_cache_key": "node-${{ hashFiles('package-lock.json') }}",
+        "consumer_restore_keys": [
+          "node-"
+        ],
+        "shared_with_pull_request": true,
+        "shared_with_release": true,
+        "docker_layer_cache_shared": true,
+        "package_manager_cache_shared": true
+      }
+    },
+    {
+      "chain_id": "coverage-to-deploy-metadata",
+      "producer": {
+        "workflow_name": "fork-coverage",
+        "trigger": "pull_request",
+        "event_type": "pull_request",
+        "head_repository": "external-user/payments-api",
+        "fork": true,
+        "head_sha": "sha-example-untrusted-coverage-20260609",
+        "actor": "external-user",
+        "conclusion": "success"
+      },
+      "produced_material": [
+        {
+          "type": "coverage_report",
+          "name": "coverage-summary",
+          "digest": "not_recorded",
+          "provenance": "missing",
+          "trusted_format_validation": false
+        }
+      ],
+      "consumer": {
+        "workflow_name": "deployment-metadata",
+        "trigger": "workflow_run",
+        "permissions": {
+          "deployments": "write",
+          "contents": "write"
+        },
+        "secrets_available": [
+          "DEPLOYMENT_METADATA_TOKEN"
+        ],
+        "pre_download_checks": [
+          "workflow_run.conclusion == success"
+        ],
+        "artifact_use": [
+          "extract coverage archive without path restrictions",
+          "execute generated summary hook",
+          "attach generated deployment metadata"
+        ],
+        "artifact_verification": [],
+        "fail_closed_before_download": false
+      },
+      "cache_isolation": {
+        "shared_with_release_or_deploy": "unknown",
+        "restore_keys_overlap_release": "unknown"
+      }
+    }
+  ],
+  "expected_gate_results": {
+    "PIPE-HANDOFF-01": "Fail",
+    "PIPE-HANDOFF-02": "Fail",
+    "PIPE-HANDOFF-03": "Fail",
+    "PIPE-HANDOFF-04": "Fail",
+    "PIPE-HANDOFF-05": "Fail",
+    "PIPE-HANDOFF-06": "Fail",
+    "PIPE-HANDOFF-07": "Fail",
+    "PIPE-HANDOFF-08": "Fail"
+  },
+  "expected_findings": [
+    {
+      "gate": "PIPE-HANDOFF-02",
+      "severity": "Critical",
+      "finding": "The privileged publish workflow only checks workflow_run.conclusion and does not verify trusted repository, fork status, protected branch, actor/team, event type, workflow name, or head SHA before consuming artifacts."
+    },
+    {
+      "gate": "PIPE-HANDOFF-03",
+      "severity": "Critical",
+      "finding": "The consumer executes dist/release.sh and publishes packages without artifact digest verification, signed attestation, SLSA provenance, in-toto link, or trusted rebuild."
+    },
+    {
+      "gate": "PIPE-HANDOFF-05",
+      "severity": "High",
+      "finding": "Untrusted PR and release workflows share broad cache restore keys, package manager caches, and Docker layer caches across the trust boundary."
+    },
+    {
+      "gate": "PIPE-HANDOFF-06",
+      "severity": "Critical",
+      "finding": "The workflow_run consumer uses write-all and has package, signing, and cloud deployment secrets without source/provenance gates."
+    },
+    {
+      "gate": "PIPE-HANDOFF-07",
+      "severity": "High",
+      "finding": "The consumer does not fail closed before artifact download for forked, stale, rerun, cancelled, failed, or manually modified producer runs."
+    }
+  ],
+  "expected_assessment": {
+    "cicd_sec_4": "Fail",
+    "cicd_sec_9": "Fail",
+    "status_cap": "Critical",
+    "reason": "A privileged workflow_run consumer executes and publishes unverified artifacts from an untrusted pull_request producer with shared caches and write-all permissions."
+  }
+}

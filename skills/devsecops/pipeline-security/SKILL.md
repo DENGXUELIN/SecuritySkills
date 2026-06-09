@@ -12,7 +12,7 @@ phase: [build, deploy]
 frameworks: [SLSA-v1.0, OWASP-CICD-Top-10]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -266,6 +266,19 @@ on: pull_request_target
 
 **Finding format:** Report any `pull_request_target` usage, direct expression injection in `run:` steps, fork workflow policies, and whether PR code can influence privileged pipelines.
 
+##### `workflow_run` Artifact Handoff Evidence Gate
+
+Do not treat absence of `pull_request_target` as sufficient PPE protection. A lower-trust producer workflow can upload artifacts, caches, coverage reports, build outputs, or generated scripts that a later privileged `workflow_run` consumer downloads and executes with write permissions, secrets, package tokens, signing keys, or deployment credentials.
+
+- `PIPE-HANDOFF-01` - Map every producer/consumer chain: producer workflow name, trigger, event type, head repository, head branch/ref, head SHA, actor, artifact/cache/report identity, consumer workflow, consumer trigger, and consumer permissions.
+- `PIPE-HANDOFF-02` - Require trusted source checks before privileged consumption: repository owner, fork status, branch protection, environment, actor/team membership, event type, conclusion, and expected workflow name must be verified before download, execution, signing, publishing, or deployment.
+- `PIPE-HANDOFF-03` - Bind artifacts to immutable source and workflow identity using digest verification, signed artifact attestations, SLSA provenance, in-toto links, or rebuild-from-trusted-source before executing generated files or publishing outputs.
+- `PIPE-HANDOFF-04` - Treat downloaded PR-controlled scripts, archives, coverage reports, dependency caches, build directories, generated release notes, and package metadata as untrusted until verification proves they came from the trusted commit and workflow.
+- `PIPE-HANDOFF-05` - Isolate caches across trust boundaries. Untrusted PR workflows must not share cache keys, restore key prefixes, package manager caches, Docker layer caches, build caches, or tool caches with release, signing, deployment, or package-publish workflows.
+- `PIPE-HANDOFF-06` - Verify consumer permissions are least-privilege and gated by environment protections. `write-all`, package publish, release creation, signing, cloud deployment, and secret access require stronger source/provenance checks.
+- `PIPE-HANDOFF-07` - Require explicit deny behavior for untrusted, forked, stale, rerun, cancelled, failed, or manually modified producer runs. The consumer should fail closed before artifact download or cache restore.
+- `PIPE-HANDOFF-08` - Cap status at Critical when a privileged consumer executes or publishes unverified artifacts from an untrusted producer; cap at High when trust checks or cache isolation are incomplete; mark Not Evaluable when the producer/consumer chain cannot be mapped.
+
 ---
 
 #### CICD-SEC-5: Insufficient PBAC (Pipeline-Based Access Controls)
@@ -479,6 +492,23 @@ Produce the final report using the following structure:
 | CICD-SEC-1 | Insufficient Flow Control | High/Med/Low | Pass/Fail/Partial | <summary> |
 | CICD-SEC-2 | Inadequate IAM | ... | ... | ... |
 | ... | ... | ... | ... | ... |
+
+### Privileged Workflow Handoff Evidence
+
+| Chain ID | Producer Workflow / Trigger | Producer Trust Source | Artifact or Cache | Consumer Workflow / Permissions | Verification Before Use | Cache Isolation | Status |
+|----------|-----------------------------|-----------------------|------------------|---------------------------------|-------------------------|----------------|--------|
+| <chain> | <workflow + event> | <repo/ref/SHA/actor/conclusion> | <name/digest/key> | <workflow + token/secrets> | <digest/provenance/rebuild/trust checks> | <separated/shared/unknown> | <Pass/Fail/NE> |
+
+| Gate | Evidence Required | Result | Finding |
+|------|-------------------|--------|---------|
+| PIPE-HANDOFF-01 | Complete producer/consumer workflow chain mapping | <Pass/Fail/NE> | <notes> |
+| PIPE-HANDOFF-02 | Trusted source checks before privileged artifact/cache consumption | <Pass/Fail/NE> | <notes> |
+| PIPE-HANDOFF-03 | Artifact digest, signature, provenance, or trusted rebuild binding | <Pass/Fail/NE> | <notes> |
+| PIPE-HANDOFF-04 | PR-controlled generated files/reports/scripts treated as untrusted until verified | <Pass/Fail/NE> | <notes> |
+| PIPE-HANDOFF-05 | Cache key and restore-key isolation across trust boundaries | <Pass/Fail/NE> | <notes> |
+| PIPE-HANDOFF-06 | Consumer permissions and environment gates scoped to verified source | <Pass/Fail/NE> | <notes> |
+| PIPE-HANDOFF-07 | Fail-closed behavior for untrusted, stale, rerun, cancelled, failed, or manually modified producers | <Pass/Fail/NE> | <notes> |
+| PIPE-HANDOFF-08 | Severity/status cap applied for unmapped or unverified privileged handoffs | <Pass/Fail/NE> | <notes> |
 
 ### Detailed Findings
 
