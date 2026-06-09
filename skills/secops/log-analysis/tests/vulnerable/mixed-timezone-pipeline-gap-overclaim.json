@@ -1,0 +1,59 @@
+{
+  "id": "log-analysis-vulnerable-timeline-overclaim-001",
+  "skill": "log-analysis",
+  "skill_version": "1.0.1",
+  "scenario": "Report makes definitive negative claims from mixed timestamps during a pipeline gap",
+  "expected_result": "Flag low-confidence timeline and evidence-handling gaps before accepting the incident conclusion.",
+  "reported_conclusion": "No lateral movement occurred after the suspicious sign-in.",
+  "timeline": [
+    {
+      "source": "vpn",
+      "timestamp": "2026-06-06 01:55:00",
+      "timezone": "local-unknown",
+      "event": "new remote access session"
+    },
+    {
+      "source": "edr",
+      "timestamp": "2026-06-06T09:02:15Z",
+      "timestamp_field_used": "ingestion_time",
+      "event": "process execution alert"
+    },
+    {
+      "source": "siem",
+      "timestamp": "2026-06-06T09:04:00Z",
+      "timestamp_field_used": "alert_created_time",
+      "event": "correlation alert"
+    }
+  ],
+  "pipeline_status": {
+    "endpoint_log_gap": "2026-06-06T08:10:00Z/2026-06-06T08:45:00Z",
+    "proxy_backfill_delay_minutes": 50,
+    "parser_change_deployed": "2026-06-06T08:30:00Z",
+    "dropped_event_count_unknown": true
+  },
+  "missing_evidence": [
+    "LOG-TIME-01 timezone, UTC offset, and daylight-saving context",
+    "LOG-TIME-02 clock-skew tolerance before cross-source ordering",
+    "LOG-TIME-03 event timestamp versus ingestion timestamp distinction",
+    "LOG-TIME-04 pipeline gap review for the incident window",
+    "LOG-TIME-05 raw-event spot checks after parser normalization",
+    "LOG-TIME-06 timeline confidence calibration",
+    "LOG-EVID-01 query text, filters, and time bounds",
+    "LOG-EVID-02 raw export reference and hash",
+    "LOG-EVID-04 raw event IDs or export row references"
+  ],
+  "should_flag": [
+    {
+      "gate_id": "LOG-TIME-03",
+      "finding": "The report orders activity using ingestion and alert creation times instead of source event times."
+    },
+    {
+      "gate_id": "LOG-TIME-04",
+      "finding": "Endpoint pipeline gap overlaps the period where the report claims no lateral movement occurred."
+    },
+    {
+      "gate_id": "LOG-EVID-02",
+      "finding": "Raw export and integrity hash are missing, so the normalized timeline cannot be independently verified."
+    }
+  ]
+}

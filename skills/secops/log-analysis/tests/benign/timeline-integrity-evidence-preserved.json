@@ -1,0 +1,32 @@
+{
+  "id": "log-analysis-benign-timeline-evidence-001",
+  "skill": "log-analysis",
+  "skill_version": "1.0.1",
+  "scenario": "Cross-source incident timeline has normalized time and preserved raw evidence",
+  "expected_result": "Allow high-confidence timeline conclusions because time normalization, pipeline health, raw references, and evidence integrity are documented.",
+  "analysis_window": {
+    "start_utc": "2026-06-06T08:00:00Z",
+    "end_utc": "2026-06-06T09:00:00Z",
+    "objective": "Determine whether suspicious sign-in preceded endpoint execution"
+  },
+  "timeline_integrity": {
+    "LOG-TIME-01": "Azure sign-in, EDR, and proxy logs normalized to UTC with source offsets recorded",
+    "LOG-TIME-02": "clock skew tolerance documented as plus or minus 90 seconds from NTP status",
+    "LOG-TIME-03": "event_time used for activity ordering; ingestion_time retained separately",
+    "LOG-TIME-04": "pipeline status shows no source outage or dropped-event alert for the analysis window",
+    "LOG-TIME-05": "three normalized SIEM rows spot-checked against raw source exports",
+    "LOG-TIME-06": "timeline confidence rated high with source health rationale"
+  },
+  "evidence_handling": {
+    "LOG-EVID-01": "query text, filters, indexes, and time bounds saved in case notes",
+    "LOG-EVID-02": "raw export stored in immutable evidence bucket with sha256 hash",
+    "LOG-EVID-03": "user identifiers redacted in report but raw event row references retained",
+    "LOG-EVID-04": "findings cite raw event IDs and export row numbers",
+    "LOG-EVID-05": "handoff record names analyst, reviewer, evidence owner, and timestamp"
+  },
+  "output_expectations": [
+    "Timeline Integrity and Evidence Handling section is populated.",
+    "Timeline uses event_time, not ingestion_time, for ordering.",
+    "Visibility limits and confidence rationale are explicit."
+  ]
+}

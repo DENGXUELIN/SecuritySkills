@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [MITRE-ATT&CK-v16, NIST-SP-800-92]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -317,6 +317,24 @@ Step 5: Build timeline
   -> Identify gaps in visibility (log sources not available)
 ```
 
+### Step 8: Timeline Integrity and Evidence Handling
+
+Before making high-confidence incident conclusions, verify that the timeline and evidence are defensible. A precise-looking sequence is unreliable if timestamps are mixed, ingestion time is confused with event time, the log pipeline had gaps, or normalized SIEM fields are not tied back to raw exports.
+
+| Gate | Evidence Required | Finding Trigger |
+|---|---|---|
+| LOG-TIME-01 | Record timezone, UTC offset, daylight-saving context, and normalization method for every log source. | Local time, UTC, or DST-adjusted timestamps are mixed without documentation. |
+| LOG-TIME-02 | Record clock-skew tolerance and time-sync source before ordering cross-source events. | Events from different hosts or tools are ordered exactly despite unknown skew. |
+| LOG-TIME-03 | Distinguish event timestamp, ingestion timestamp, processing timestamp, and alert firing time. | SIEM ingestion time is treated as the time the activity occurred. |
+| LOG-TIME-04 | Review log pipeline gaps, dropped events, backfills, retention limits, and source outages for the incident window. | Report makes negative claims during a known collection gap. |
+| LOG-TIME-05 | Spot-check normalized SIEM fields against raw events and document parser loss, field truncation, or duplicated events. | Conclusions rely only on transformed fields with no raw-event reference. |
+| LOG-TIME-06 | Calibrate timeline confidence as high, medium, or low based on source health, time integrity, and raw evidence coverage. | Report presents exact sequence certainty without evidence-quality limits. |
+| LOG-EVID-01 | Preserve query text, filters, time bounds, source indexes, and analyst notes used to produce findings. | Finding cannot be reproduced from the report. |
+| LOG-EVID-02 | Record export reference, hash, immutable storage location, and retention owner for raw evidence. | Evidence is summarized but not preserved or integrity-checked. |
+| LOG-EVID-03 | Document redaction decisions so sensitive values are protected without losing analytic meaning. | Redaction hides fields needed to validate the finding. |
+| LOG-EVID-04 | Link each finding to raw event IDs or export row references, not only screenshots or narrative excerpts. | Evidence is not traceable to source events. |
+| LOG-EVID-05 | Document chain-of-custody handoff when logs support legal, customer, regulatory, or executive decisions. | High-impact conclusions lack custody, integrity, or reviewer records. |
+
 ---
 
 ## 4. Findings Classification
@@ -373,6 +391,16 @@ Produce log analysis findings in this structure:
 | Timestamp (UTC) | Source | Event | ATT&CK Technique | Assessment |
 |-----------------|--------|-------|-------------------|------------|
 | [HH:MM:SS] | [Source] | [Description] | [T-ID] | [Suspicious / Benign / Confirmed malicious] |
+
+### Timeline Integrity and Evidence Handling
+| Field | Value |
+|-------|-------|
+| Time Normalization | [timezone, UTC offset, DST context, normalization method] |
+| Clock Skew / Sync | [tolerance, NTP/time source, known drift] |
+| Event vs Ingestion Time | [fields used and why] |
+| Pipeline Gaps | [source outages, dropped events, retention/backfill limits] |
+| Raw Evidence References | [query, export, hash, immutable location, raw event IDs] |
+| Timeline Confidence | [High / Medium / Low with rationale] |
 
 ### Baseline Observations
 [Any baseline deviations noted, with comparison to established norms]
