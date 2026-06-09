@@ -1,0 +1,77 @@
+{
+  "scenario": "transitive-privilege-and-ci-shadow-admin",
+  "skill": "privileged-access",
+  "expected_skill_version": "1.0.1",
+  "cases": [
+    {
+      "platform": "active-directory",
+      "evidence_type": "group_membership_export",
+      "principal": "helpdesk-tier2",
+      "group_path": [
+        "helpdesk-tier2",
+        "workstation-admins",
+        "delegated-account-operators"
+      ],
+      "effective_capabilities": [
+        "reset_privileged_user_credentials",
+        "modify_mfa_methods",
+        "add_members_to_server_admins"
+      ],
+      "pam_coverage": "none",
+      "access_review_evidence": null,
+      "expected_findings": [
+        {
+          "id": "PAM-EFFPRIV-01",
+          "severity": "high",
+          "reason": "nested delegated group path grants privileged identity administration but is absent from the PAM inventory"
+        },
+        {
+          "id": "PAM-EFFPRIV-02",
+          "severity": "high",
+          "reason": "helpdesk role can reset privileged credentials without dual control or access-review evidence"
+        }
+      ]
+    },
+    {
+      "platform": "aws",
+      "evidence_type": "iam_policy_json",
+      "principal": {
+        "type": "automation_principal",
+        "name": "github-actions-prod-deployer",
+        "pam_onboarded": false,
+        "jit_required": false
+      },
+      "policy_statements": [
+        {
+          "effect": "Allow",
+          "actions": [
+            "iam:PassRole",
+            "iam:AttachRolePolicy",
+            "sts:AssumeRole"
+          ],
+          "resources": [
+            "arn:aws:iam::123456789012:role/prod-admin",
+            "arn:aws:iam::123456789012:role/*"
+          ]
+        }
+      ],
+      "boundary_evidence": {
+        "permission_boundary": null,
+        "deny_policy": null,
+        "approval_ticket": null
+      },
+      "expected_findings": [
+        {
+          "id": "PAM-EFFPRIV-03",
+          "severity": "high",
+          "reason": "automation principal can pass or assume privileged roles without PAM or JIT evidence"
+        },
+        {
+          "id": "PAM-EFFPRIV-04",
+          "severity": "high",
+          "reason": "automation can modify privileged role policy outside an approval-gated workflow"
+        }
+      ]
+    }
+  ]
+}

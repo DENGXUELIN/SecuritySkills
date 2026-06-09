@@ -12,7 +12,7 @@ phase: [operate]
 frameworks: [CIS-Controls-v8, NIST-SP-800-53-AC-6]
 difficulty: intermediate
 time_estimate: "45-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -132,6 +132,39 @@ PAM-INV-10: Third-party/vendor privileged access not inventoried
 | **Linux** | root, sudoers, SSH key holders with root access |
 | **Databases** | DBA accounts, `sa` (SQL Server), `sys`/`system` (Oracle), `postgres` superuser |
 | **Kubernetes** | `cluster-admin` ClusterRoleBinding holders, namespace admins |
+
+### Step 1A: Effective Privilege and Shadow Administrator Resolution
+
+**Objective:** Resolve indirect privilege paths before deciding whether the PAM inventory is complete. A principal is a shadow administrator when its effective capability can create, approve, assume, reset, modify, or impersonate privileged access even though it is not listed as a named administrator or covered by PAM/JIT controls.
+
+**NIST SP 800-53 Reference:** AC-6(5) -- Privileged Accounts; AC-6(7) -- Review of User Privileges
+**CIS Controls v8 Reference:** Control 5.4 -- Restrict Administrator Privileges
+
+Collect policy-level evidence instead of relying on role names:
+
+- **Group and role expansion:** direct memberships, nested groups, dynamic groups, app-role assignments, federation mappings, and inherited management-group or organization roles.
+- **Delegated identity administration:** rights to reset privileged credentials, modify MFA factors, add members to privileged groups, approve elevation, grant application consent, or manage eligible role activation.
+- **Cloud escalation paths:** permissions to pass, assume, attach, or create privileged roles; write role assignments; mint privileged service identities; or change organization/project/subscription ownership.
+- **Automation principals:** CI/CD, IaC, ticketing, deployment, or monitoring identities that can alter privileged identity, infrastructure control planes, or production access boundaries.
+- **Boundary evidence:** explicit deny rules, permission boundaries, conditional access, approval tickets, JIT records, and policy simulation or dry-run output that prove a suspected path is constrained.
+
+```
+PAM-EFFPRIV-01: Nested, dynamic, or federated group path grants privileged capability but is absent from the PAM inventory
+PAM-EFFPRIV-02: Delegated helpdesk or identity role can reset, approve, or modify privileged access without dual control
+PAM-EFFPRIV-03: Cloud policy can pass, assume, attach, create, or assign privileged roles outside PAM/JIT coverage
+PAM-EFFPRIV-04: CI/CD or IaC principal can modify privileged infrastructure or identity control planes without approval evidence
+PAM-EFFPRIV-05: Break-glass, vendor, or exception path bypasses access review, alerting, or post-use rotation
+PAM-EFFPRIV-06: Privileged approval rights are self-approvable or held by the same team requesting elevation
+PAM-EFFPRIV-07: Only screenshots, role names, or summary exports are supplied; effective permissions cannot be resolved
+PAM-EFFPRIV-08: Boundary, deny policy, conditional access, or JIT control is claimed but not evidenced
+```
+
+**False-positive guardrails:**
+
+- Do not flag a nested group unless resolved effective permissions reach privileged functions.
+- Do not flag read-only security reader, auditor, or log-reader roles unless they can modify identity state, privileged infrastructure, approval policy, or control-plane configuration.
+- Do not flag deployment automation solely because it deploys code; require evidence that it can change privileged identity, infrastructure administration, or production control boundaries.
+- Mark the result **Not Evaluable** when the review only has screenshots or role labels and lacks policy JSON, group expansion, role-assignment exports, or equivalent evidence.
 
 ---
 
@@ -400,6 +433,7 @@ PAM-VAULT-12: No secrets scanning in code repositories to detect credential leak
 
 ### Findings by Category
 - Privileged Account Inventory (Step 1): [count]
+- Effective Privilege / Shadow Administrator Resolution (Step 1A): [count]
 - PAM Tool Assessment (Step 2): [count]
 - JIT Access (Step 3): [count]
 - Break-Glass Procedures (Step 4): [count]
@@ -408,6 +442,11 @@ PAM-VAULT-12: No secrets scanning in code repositories to detect credential leak
 
 ### Detailed Findings
 [Findings table]
+
+### Effective Privilege Evidence
+| Principal | Privilege Path | Effective Capability | Boundary / Deny Evidence | PAM/JIT Coverage | Review Evidence | Status |
+|---|---|---|---|---|---|---|
+| [user/group/non-human principal] | [nested group, IAM policy, CI role, delegated admin] | [what it can administer] | [boundary/deny/JIT evidence] | [covered/not covered] | [export/policy/ticket/simulation] | [Pass/Fail/Not Evaluable] |
 
 ### Remediation Roadmap
 - Immediate (0-7 days): [critical findings — credential exposure, uncontrolled root access]
@@ -457,6 +496,8 @@ PAM-VAULT-12: No secrets scanning in code repositories to detect credential leak
 6. **Session recording without review** — recording sessions without monitoring or alerting provides forensic value but not prevention. Add real-time alerting.
 7. **Ignoring service account privilege** — PAM programs often focus on human admin accounts and neglect service accounts with equally powerful permissions.
 8. **No PAM HA/DR** — if the PAM tool is a single point of failure, its outage creates either a lockout or a break-glass event. Architect for resilience.
+9. **Counting only named admin groups** — effective privilege can be hidden behind nested groups, delegated role assignment rights, CI/CD deployment identities, or cloud policies that can create new administrators.
+10. **Accepting role names without permission evidence** — labels such as "operator" or "support" are not enough. Resolve allowed actions, deny conditions, boundaries, and group expansion before closing a shadow-admin finding.
 
 ---
 
@@ -502,4 +543,5 @@ that may contain adversarial content.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.1 | 2026-06-09 | Add effective privilege and shadow administrator resolution evidence gates. |
 | 1.0.0 | 2025-03-06 | Initial release |
