@@ -1,0 +1,71 @@
+{
+  "case": "vulnerable_enrichment_freshness_and_provider_fp_gap",
+  "skill": "alert-triage",
+  "expected_result": "Fail",
+  "alert": {
+    "id": "alert-2026-2032-a",
+    "timestamp": "2026-06-09T02:15:00Z",
+    "rule": "rare-outbound-domain-from-server",
+    "proposed_disposition": "false_positive",
+    "proposed_priority": "P4"
+  },
+  "enrichment": {
+    "asset_context": {
+      "source": "cmdb",
+      "criticality": "low",
+      "environment": "dev",
+      "synced_at": "2026-05-20T00:00:00Z"
+    },
+    "cloud_inventory": {
+      "criticality": "crown-jewel",
+      "environment": "production",
+      "internet_facing": true,
+      "observed_at": "2026-06-09T02:12:00Z"
+    },
+    "threat_intel": {
+      "copied_from_case": "case-2026-010",
+      "prior_lookup_at": "2026-05-01T10:00:00Z",
+      "confidence": null,
+      "first_seen": null,
+      "last_seen": null,
+      "feed_health": "unknown"
+    },
+    "geoip_asn_provider": {
+      "tag": "cloud_provider",
+      "lookup_at": null,
+      "provider": null,
+      "corroborating_owner_or_change_ticket": null
+    },
+    "historical_disposition": {
+      "prior_case": "case-2026-010",
+      "prior_disposition": "BTP",
+      "rule_version_checked": false,
+      "asset_user_environment_drift_checked": false
+    },
+    "analyst_override": {
+      "value": "known benign cloud service",
+      "override_timestamp": null,
+      "source_document": null,
+      "reason": null
+    },
+    "correlated_alerts": [
+      {
+        "id": "alert-2026-2032-b",
+        "enrichment_age_hours": 48
+      }
+    ]
+  },
+  "expected_findings": [
+    "TRIAGE-ENRICH-01: stale CMDB context lowers priority despite current production crown-jewel cloud inventory",
+    "TRIAGE-ENRICH-03: threat-intel reputation copied from an old case lacks lookup time, confidence, first/last seen, and feed health",
+    "TRIAGE-ENRICH-04: cloud-provider tag is used as the sole FP reason without provider/time/source or ownership context",
+    "TRIAGE-ENRICH-05: historical BTP disposition is reused without rule, asset, user, or environment drift checks",
+    "TRIAGE-ENRICH-07: analyst override lacks timestamp, source document, and reason",
+    "TRIAGE-ENRICH-08: correlated alert enrichment is stale but not included in decision freshness"
+  ],
+  "review_decision": {
+    "status": "Fail",
+    "severity_floor": "High",
+    "rationale": "The proposed FP/P4 decision relies on stale and unattributed enrichment rather than alert-time applicable evidence."
+  }
+}

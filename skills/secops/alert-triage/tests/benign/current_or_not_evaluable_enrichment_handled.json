@@ -1,0 +1,85 @@
+{
+  "case": "benign_current_or_not_evaluable_enrichment_handled",
+  "skill": "alert-triage",
+  "expected_result": "Pass",
+  "alerts": [
+    {
+      "id": "alert-2026-2032-current",
+      "timestamp": "2026-06-09T04:00:00Z",
+      "rule": "suspicious-admin-token-use",
+      "triage_decision": {
+        "disposition": "needs_investigation",
+        "priority": "P2",
+        "confidence": "high"
+      },
+      "enrichment_provenance": {
+        "asset_criticality": {
+          "source": "edr_inventory",
+          "synced_at": "2026-06-09T03:55:00Z",
+          "applies_to_alert_time": true,
+          "confidence": "high"
+        },
+        "user_context": {
+          "source": "iam_directory",
+          "synced_at": "2026-06-09T03:58:00Z",
+          "privilege_level": "privileged_service_account",
+          "applies_to_alert_time": true,
+          "confidence": "high"
+        },
+        "threat_intel": {
+          "source": "internal-ti",
+          "lookup_at": "2026-06-09T04:03:00Z",
+          "indicator_last_seen": "2026-06-09T03:50:00Z",
+          "feed_health": "healthy",
+          "confidence": "high"
+        },
+        "geoip_asn_provider": {
+          "source": "asn-provider",
+          "lookup_at": "2026-06-09T04:03:00Z",
+          "tag": "cloud_provider",
+          "business_owner": "identity-platform",
+          "used_as_sole_fp_reason": false
+        }
+      }
+    },
+    {
+      "id": "alert-2026-2032-not-evaluable",
+      "timestamp": "2026-06-09T05:00:00Z",
+      "rule": "unusual-login-location",
+      "triage_decision": {
+        "disposition": "needs_investigation",
+        "priority": "P3",
+        "confidence": "low"
+      },
+      "enrichment_provenance": {
+        "asset_context": {
+          "status": "Not Evaluable",
+          "reason": "cmdb_sync_timestamp_missing"
+        },
+        "user_context": {
+          "status": "Not Evaluable",
+          "reason": "hr_feed_unavailable"
+        },
+        "geoip_asn_provider": {
+          "status": "Not Evaluable",
+          "reason": "provider_lookup_unavailable"
+        }
+      },
+      "guardrail": "Missing enrichment lowers confidence and keeps investigation open; it is not used as the sole reason to escalate or close the alert."
+    }
+  ],
+  "covered_gates": [
+    "TRIAGE-ENRICH-01",
+    "TRIAGE-ENRICH-02",
+    "TRIAGE-ENRICH-03",
+    "TRIAGE-ENRICH-04",
+    "TRIAGE-ENRICH-05",
+    "TRIAGE-ENRICH-06",
+    "TRIAGE-ENRICH-07",
+    "TRIAGE-ENRICH-08"
+  ],
+  "review_decision": {
+    "status": "Pass",
+    "rationale": "Current enrichment may support priority when provenance is documented, while unavailable enrichment is explicitly marked Not Evaluable and does not drive BTP/FP closure."
+  }
+}

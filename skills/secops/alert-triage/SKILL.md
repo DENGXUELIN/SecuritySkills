@@ -13,7 +13,7 @@ phase: [operate, respond]
 frameworks: [MITRE-ATT&CK-v16, NIST-SP-800-61-Rev2]
 difficulty: beginner
 time_estimate: "10-20min per alert"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -103,6 +103,32 @@ Connect the alert data with surrounding context to build a picture of what happe
 | Credential Access (TA0006) | Lateral Movement (TA0008) -- were stolen credentials used to move? |
 | Lateral Movement (TA0008) | Collection (TA0009), Exfiltration (TA0010) -- what was the objective? |
 | Command and Control (TA0011) | All tactics -- C2 implies an active intrusion; look for the full chain |
+
+### Phase 2A: Enrichment Freshness and Provenance
+
+Before enrichment lowers priority, supports BTP/FP closure, or drives escalation, validate that the source is current, attributable, and applicable to the alert timestamp. Missing enrichment is not automatically malicious; mark the field `Not Evaluable`, lower confidence, and continue investigation when other evidence is insufficient.
+
+**Required enrichment gates:**
+
+| Gate | Required evidence | False positive prevented |
+|---|---|---|
+| `TRIAGE-ENRICH-01` | Asset criticality, environment, owner, exposure, and sync/observation time from CMDB, EDR, or cloud inventory. | Stale CMDB labels lower priority for a production crown-jewel asset. |
+| `TRIAGE-ENRICH-02` | User role, privilege, account status, employment status, group membership, and directory/HR/IAM sync time. | Current user state is used as proof of alert-time user state after changes. |
+| `TRIAGE-ENRICH-03` | Threat-intel source, lookup time, first/last seen, confidence, expiration, feed health, and alert-time applicability. | Copied IOC reputation from an old case closes a live alert as FP. |
+| `TRIAGE-ENRICH-04` | GeoIP, ASN, VPN, scanner, CDN, and cloud-provider tags include provider, lookup time, confidence, and corroborating ownership/activity context. | Provider tags become the sole BTP/FP reason. |
+| `TRIAGE-ENRICH-05` | Historical disposition is checked against current rule version, tuning status, asset, user, environment, and related-alert context. | Prior BTP/FP is reused after rule or environment drift. |
+| `TRIAGE-ENRICH-06` | Enrichment timestamps are compared to the alert timestamp and to containment/remediation timestamps. | Post-containment asset or user state is treated as alert-time state. |
+| `TRIAGE-ENRICH-07` | Analyst overrides include override timestamp, analyst/source, source document, and reason. | Manual enrichment edits influence disposition without provenance. |
+| `TRIAGE-ENRICH-08` | Correlated incidents use the oldest or maximum-age enrichment across contributing alerts, not only the current alert's enrichment. | Fresh context on one alert hides stale enrichment that triggered the correlation. |
+
+**Finding guidance:**
+
+| Condition | Result |
+|---|---|
+| Priority is lowered using stale or timestamp-less asset/user enrichment | Finding; High when production or privileged scope is affected |
+| BTP/FP closure relies only on provider, scanner, VPN, CDN, GeoIP, ASN, or old case tags | Finding; require corroborating owner/change/activity evidence |
+| Enrichment is missing or cannot be evaluated | Not Evaluable; lower confidence rather than auto-escalating or closing |
+| Source, lookup/sync time, confidence, and alert-time applicability are documented | May support priority, escalation, or BTP/FP decision |
 
 ### Phase 3: Classify
 
@@ -194,7 +220,7 @@ Produce the triage decision as a structured report:
 ```markdown
 ## Alert Triage Report
 **Date:** [YYYY-MM-DD HH:MM UTC]
-**Skill:** alert-triage v1.0.0
+**Skill:** alert-triage v1.0.1
 **Frameworks:** MITRE ATT&CK v16, NIST SP 800-61 Rev 2
 **Analyst:** [Name or AI-assisted]
 
@@ -233,6 +259,17 @@ Produce the triage decision as a structured report:
 - **Lateral:** [Related alerts on other hosts/users]
 - **Threat Intel:** [IOC match results]
 - **Kill Chain Position:** [Where this falls in the attack lifecycle]
+
+### Enrichment Provenance
+| Enrichment | Source | Lookup / Sync Time | Applies to Alert Time? | Confidence | Impact on Decision |
+|------------|--------|--------------------|------------------------|------------|--------------------|
+| Asset criticality/exposure | [CMDB/EDR/cloud inventory] | [timestamp] | [Yes/No/Not Evaluable] | [High/Medium/Low] | [priority/disposition impact] |
+| User context | [Directory/HR/IAM] | [timestamp] | [Yes/No/Not Evaluable] | [High/Medium/Low] | [priority/disposition impact] |
+| Threat intel | [feed/platform] | [timestamp] | [Yes/No/Not Evaluable] | [High/Medium/Low] | [priority/disposition impact] |
+| GeoIP/ASN/provider reputation | [provider/feed] | [timestamp] | [Yes/No/Not Evaluable] | [High/Medium/Low] | [priority/disposition impact] |
+| Historical disposition | [case/ticket/rule version] | [timestamp] | [Yes/No/Not Evaluable] | [High/Medium/Low] | [priority/disposition impact] |
+| Analyst override | [analyst/source document] | [timestamp] | [Yes/No/Not Evaluable] | [High/Medium/Low] | [priority/disposition impact] |
+| Correlated alert enrichment age | [correlation rule/case] | [oldest contributing timestamp] | [Yes/No/Not Evaluable] | [High/Medium/Low] | [priority/disposition impact] |
 
 ### Recommended Actions
 - [ ] [Action 1 -- e.g., isolate host, disable account, block IP]
@@ -318,6 +355,10 @@ Investigating an alert in isolation without checking for activity before and aft
 ### Pitfall 5: Delaying Escalation While Seeking Perfect Information
 
 Waiting for complete certainty before escalating a high-priority alert costs response time. NIST SP 800-61 recommends erring on the side of over-notification. If 20 minutes of investigation has not resolved the disposition and the alert involves a critical asset or privileged account, escalate to Tier 2 or the IR team with your current findings and continue investigation in parallel.
+
+### Pitfall 6: Trusting Enrichment Without Freshness or Provenance
+
+Asset criticality, user privilege, threat-intel reputation, GeoIP/provider tags, analyst overrides, and historical dispositions can drift quickly. Record source, lookup or sync time, confidence, and alert-time applicability before using enrichment to lower priority, close as BTP/FP, or suppress escalation.
 
 ---
 
