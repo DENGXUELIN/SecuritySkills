@@ -350,6 +350,19 @@ spec:
 
 **Finding classification:** Agents using long-lived static credentials is **High**. No JIT credential mechanism for automated systems is **Medium**. Token TTL exceeding 10x task duration is **Medium**.
 
+#### 5.3 Secret-Zero Bootstrap Evidence Gate
+
+Do not credit a system as using short-lived or JIT credentials until the review proves how the workload obtains its first machine credential. Vault, cloud STS, OIDC, and brokered credentials still fail when bootstrap material is paired, over-broad, persistent, or unaudited.
+
+- `SEC-ZERO-01` - Document the bootstrap exchange for each CI/CD agent, bot, Kubernetes workload, AI agent, and deployment job: identity provider, trust boundary, caller identity, target secrets engine, requested role, and first credential material.
+- `SEC-ZERO-02` - Prove paired bootstrap material is separated. Do not store both halves of an AppRole, client credential pair, key pair, recovery token, or broker credential in the same repository secret, CI variable group, Kubernetes Secret, environment file, image layer, or agent profile.
+- `SEC-ZERO-03` - For OIDC or workload identity, require issuer, audience, subject, repository/project, organization, branch/ref, environment, workflow/job, namespace, service account, and runner pool claims to be explicitly bounded where the provider supports them. Wildcard repository, branch, environment, or workflow bindings must be treated as over-broad.
+- `SEC-ZERO-04` - When AppRole or an equivalent bootstrap secret is unavoidable, require response wrapping, one-use or tightly bounded `secret_id`, short TTL, source restrictions, separate delivery channels, and rotation/revocation evidence.
+- `SEC-ZERO-05` - Bind issued credentials to task duration and least privilege: requested scope, policy, lease ID, credential TTL, renewal rules, and revocation on job completion must match the workload's expected runtime.
+- `SEC-ZERO-06` - Verify exchanged credentials are not persisted to logs, artifacts, caches, workspace files, dependency caches, container layers, crash dumps, debug bundles, model/tool transcripts, or CI summaries.
+- `SEC-ZERO-07` - Require audit correlation for automated issuance and revocation: run ID, actor, repository/project, ref, workflow/job, namespace/service account, requested role, requested scope, lease ID, issue timestamp, revoke timestamp, and outcome.
+- `SEC-ZERO-08` - Cap the finding at Not Evaluable when the bootstrap path is unknown; High when paired bootstrap material is stored together or over-broad OIDC claims can mint credentials for untrusted workloads; Medium when TTL, non-persistence, or audit correlation evidence is incomplete.
+
 ---
 
 ## Findings Classification
@@ -388,6 +401,23 @@ spec:
 | DB credentials | Vault dynamic | On-demand | Yes | N/A (dynamic) |
 | API key (Stripe) | AWS SM | 90 days | Yes | 2024-01-15 |
 | TLS cert | cert-manager | 60 days | Yes | Auto |
+
+### Secret-Zero Bootstrap Review
+
+| Workload | Bootstrap Method | Identity Binding | Paired Material Separated | Issued TTL / Scope | Non-Persistence Evidence | Audit Correlation | Status |
+|----------|------------------|------------------|---------------------------|--------------------|--------------------------|------------------|--------|
+| <job/agent> | <OIDC/AppRole/workload identity/broker> | <claims or caller identity> | <yes/no/unknown> | <duration + policy> | <logs/artifacts/caches checked> | <run/actor/lease/revoke> | <Pass/Fail/NE> |
+
+| Gate | Evidence Required | Result | Finding |
+|------|-------------------|--------|---------|
+| SEC-ZERO-01 | Complete bootstrap exchange inventory for automated workloads | <Pass/Fail/NE> | <notes> |
+| SEC-ZERO-02 | Paired bootstrap material separated across trust boundaries | <Pass/Fail/NE> | <notes> |
+| SEC-ZERO-03 | OIDC/workload identity claims bounded to issuer, audience, subject, repo/project, ref, environment, workflow/job, namespace, and service account | <Pass/Fail/NE> | <notes> |
+| SEC-ZERO-04 | AppRole or equivalent fallback uses wrapping, one-use/short TTL material, source restrictions, separate delivery, and revocation | <Pass/Fail/NE> | <notes> |
+| SEC-ZERO-05 | Issued credential TTL, scope, lease, and revocation match the task | <Pass/Fail/NE> | <notes> |
+| SEC-ZERO-06 | Exchanged credentials do not persist in logs, artifacts, caches, files, images, crash dumps, transcripts, or summaries | <Pass/Fail/NE> | <notes> |
+| SEC-ZERO-07 | Issuance and revocation audit records correlate to run, actor, ref, role, scope, lease, and outcome | <Pass/Fail/NE> | <notes> |
+| SEC-ZERO-08 | Status cap applied for unknown, paired, over-broad, persistent, or unaudited bootstrap paths | <Pass/Fail/NE> | <notes> |
 
 ### Findings
 
@@ -441,6 +471,8 @@ spec:
 3. **Using environment variables as the secrets "manager."** Environment variables are better than hardcoded secrets in source, but they are still stored in plaintext in process memory, visible in `/proc/PID/environ` on Linux, and logged by many frameworks on crash. A proper secrets manager (Vault, cloud-native) with sidecar injection or API-based retrieval is the target state.
 
 4. **Ignoring secret sprawl across multiple secrets managers.** Large organizations often have Vault, AWS Secrets Manager, Azure Key Vault, and application-specific secret stores running simultaneously. Without a unified inventory, secrets expire unmonitored and rotation gaps emerge. Maintain a single source of truth for secret metadata (type, owner, rotation schedule, storage location).
+
+5. **Solving rotation but not secret zero.** Dynamic credentials are only as strong as the bootstrap exchange that mints them. Storing both AppRole halves together, allowing broad OIDC claim matches, or writing exchanged tokens into artifacts and logs turns a vault or broker into a credential vending path for untrusted workloads.
 
 ---
 

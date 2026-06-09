@@ -1,0 +1,179 @@
+{
+  "case_id": "secrets_paired_bootstrap_material_persistent_exchange_tokens",
+  "description": "A system claims dynamic credentials because it uses Vault and OIDC, but stores paired bootstrap material together, accepts over-broad OIDC claims, issues long-lived credentials, and persists exchanged credentials into artifacts and caches.",
+  "claimed_status": {
+    "summary": "Compliant because agents use Vault and cloud STS instead of static production credentials.",
+    "basis": [
+      "Vault AppRole is configured",
+      "GitHub OIDC role exists",
+      "tokens expire automatically"
+    ]
+  },
+  "bootstrap_exchanges": [
+    {
+      "workload": "github-actions-release",
+      "bootstrap_method": "vault_approle",
+      "identity_provider": "GitHub Actions repository secrets",
+      "trust_boundary": "fork-capable CI to Vault",
+      "caller_identity": {
+        "repository": "acme/payments-api",
+        "ref": "any",
+        "workflow": "any",
+        "environment": "none"
+      },
+      "paired_material": {
+        "stored_together": true,
+        "storage_scope": "same GitHub repository secret namespace",
+        "material_types": [
+          "role_id",
+          "secret_id"
+        ],
+        "evidence": [
+          "secret inventory shows both bootstrap halves in repository actions secrets"
+        ]
+      },
+      "approle_controls": {
+        "response_wrapping": false,
+        "secret_id_num_uses": "unlimited",
+        "secret_id_ttl_hours": "unlimited",
+        "source_restrictions": "none",
+        "separate_delivery_channels": false,
+        "rotation_evidence": "not_provided"
+      },
+      "issued_credential": {
+        "requested_role": "release-publisher",
+        "policy": "publish-packages-and-create-release",
+        "ttl_hours": 24,
+        "expected_runtime_minutes": 8,
+        "renewable": true,
+        "revocation": "not_documented"
+      },
+      "non_persistence_evidence": {
+        "logs_scanned": false,
+        "artifacts_scanned": false,
+        "caches_scanned": false,
+        "workspace_files_scanned": false,
+        "container_layers_scanned": false,
+        "crash_dumps_scanned": false,
+        "transcripts_scanned": false,
+        "known_persistence": [
+          "exchange response written to workflow artifact named debug-context",
+          "credential environment file cached under generic release-cache key",
+          "debug summary includes credential lease metadata"
+        ]
+      },
+      "audit_correlation": {
+        "run_id": "not_logged",
+        "actor": "not_logged",
+        "ref": "not_logged",
+        "requested_scope": "not_logged",
+        "lease_id": "not_logged",
+        "issue_timestamp": "logged_without_run_binding",
+        "revoke_timestamp": "not_logged",
+        "outcome": "unknown"
+      }
+    },
+    {
+      "workload": "github-actions-cloud-deploy",
+      "bootstrap_method": "github_oidc_to_cloud_sts",
+      "identity_provider": "https://token.actions.githubusercontent.com",
+      "trust_boundary": "all repository workflows to cloud STS",
+      "caller_identity": {
+        "repository": "acme/payments-api",
+        "ref": "refs/pull/*",
+        "workflow": "any",
+        "environment": "none"
+      },
+      "identity_binding": {
+        "issuer": "https://token.actions.githubusercontent.com",
+        "audience": "*",
+        "subject": "repo:acme/payments-api:*",
+        "repository": "acme/payments-api",
+        "ref": "*",
+        "environment": "*",
+        "workflow": "*",
+        "job": "*",
+        "wildcards_allowed": true
+      },
+      "paired_material": {
+        "stored_together": "not_applicable",
+        "evidence": [
+          "OIDC trust policy exists but wildcard claims allow untrusted pull request contexts"
+        ]
+      },
+      "issued_credential": {
+        "requested_role": "cloud-admin-deploy",
+        "policy": "admin",
+        "ttl_hours": 12,
+        "expected_runtime_minutes": 10,
+        "renewable": true,
+        "revocation": "auto-expire only"
+      },
+      "non_persistence_evidence": {
+        "logs_scanned": false,
+        "artifacts_scanned": false,
+        "caches_scanned": false,
+        "workspace_files_scanned": false,
+        "container_layers_scanned": false,
+        "crash_dumps_scanned": false,
+        "transcripts_scanned": false,
+        "known_persistence": [
+          "STS response saved to build-output artifact for troubleshooting",
+          "dependency cache key shared between pull_request and release workflows"
+        ]
+      },
+      "audit_correlation": {
+        "run_id": "cloud-trail-event-only",
+        "actor": "not_bound_to_github_actor",
+        "ref": "not_logged",
+        "requested_scope": "admin",
+        "lease_id": "sts-session-without-workflow-id",
+        "issue_timestamp": "2026-06-08T11:20:00Z",
+        "revoke_timestamp": "not_logged",
+        "outcome": "issued"
+      }
+    }
+  ],
+  "expected_gate_results": {
+    "SEC-ZERO-01": "Fail",
+    "SEC-ZERO-02": "Fail",
+    "SEC-ZERO-03": "Fail",
+    "SEC-ZERO-04": "Fail",
+    "SEC-ZERO-05": "Fail",
+    "SEC-ZERO-06": "Fail",
+    "SEC-ZERO-07": "Fail",
+    "SEC-ZERO-08": "Fail"
+  },
+  "expected_findings": [
+    {
+      "gate": "SEC-ZERO-02",
+      "severity": "High",
+      "finding": "The AppRole role identifier and secret identifier are stored in the same repository secret scope, so compromise of that scope can mint Vault credentials."
+    },
+    {
+      "gate": "SEC-ZERO-03",
+      "severity": "High",
+      "finding": "OIDC trust accepts wildcard audience, subject, branch/ref, environment, workflow, and job claims, allowing untrusted workflows to request privileged credentials."
+    },
+    {
+      "gate": "SEC-ZERO-05",
+      "severity": "Medium",
+      "finding": "Issued credentials live for 12-24 hours for 8-10 minute jobs and are broader than the expected task scope."
+    },
+    {
+      "gate": "SEC-ZERO-06",
+      "severity": "High",
+      "finding": "Exchange responses and credential environment files are written to artifacts, generic caches, and debug summaries."
+    },
+    {
+      "gate": "SEC-ZERO-07",
+      "severity": "Medium",
+      "finding": "Vault and cloud audit events cannot be correlated to run ID, actor, ref, requested scope, lease ID, issue, revoke, and outcome."
+    }
+  ],
+  "expected_assessment": {
+    "severity": "High",
+    "status_cap": "High",
+    "reason": "Dynamic credential claims are not creditable because the bootstrap path is paired, over-broad, persistent, and insufficiently audited."
+  }
+}

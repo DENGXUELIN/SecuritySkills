@@ -1,0 +1,216 @@
+{
+  "case_id": "secrets_bounded_oidc_bootstrap_non_persistent_tokens",
+  "description": "Automated workloads obtain first credentials through bounded OIDC or separated one-use bootstrap flows, keep issued credentials short-lived, and prove tokens do not persist into logs, artifacts, caches, files, images, or transcripts.",
+  "review_scope": {
+    "repositories": [
+      "payments-api",
+      "billing-worker"
+    ],
+    "environments": [
+      "staging",
+      "production"
+    ],
+    "workloads_reviewed": [
+      "github-actions-deploy",
+      "kubernetes-billing-worker",
+      "ai-remediation-agent"
+    ]
+  },
+  "bootstrap_exchanges": [
+    {
+      "workload": "github-actions-deploy",
+      "bootstrap_method": "github_oidc_to_cloud_sts",
+      "identity_provider": "https://token.actions.githubusercontent.com",
+      "trust_boundary": "GitHub Actions hosted runner to cloud STS",
+      "caller_identity": {
+        "repository": "acme/payments-api",
+        "organization": "acme",
+        "ref": "refs/heads/main",
+        "environment": "production",
+        "workflow": "deploy.yml",
+        "job": "deploy",
+        "runner_pool": "github-hosted"
+      },
+      "identity_binding": {
+        "issuer": "https://token.actions.githubusercontent.com",
+        "audience": "sts.cloud.example",
+        "subject": "repo:acme/payments-api:environment:production",
+        "repository": "acme/payments-api",
+        "ref": "refs/heads/main",
+        "environment": "production",
+        "workflow": "deploy.yml",
+        "job": "deploy",
+        "wildcards_allowed": false
+      },
+      "paired_material": {
+        "stored_together": false,
+        "evidence": [
+          "cloud-trust-policy-export-2026-06-08",
+          "github-environment-secret-inventory-2026-06-08"
+        ]
+      },
+      "issued_credential": {
+        "requested_role": "payments-prod-deploy",
+        "policy": "deploy-artifact-and-restart-service",
+        "ttl_minutes": 45,
+        "expected_runtime_minutes": 18,
+        "renewable": false,
+        "revocation": "auto-expire plus post-job session invalidation"
+      },
+      "non_persistence_evidence": {
+        "logs_scanned": true,
+        "artifacts_scanned": true,
+        "caches_scanned": true,
+        "workspace_files_scanned": true,
+        "container_layers_scanned": true,
+        "crash_dumps_scanned": true,
+        "transcripts_scanned": true,
+        "findings": []
+      },
+      "audit_correlation": {
+        "run_id": "gha-run-991244",
+        "actor": "release-bot",
+        "ref": "refs/heads/main",
+        "requested_scope": "deploy-artifact-and-restart-service",
+        "lease_id": "sts-session-2026-06-08-991244",
+        "issue_timestamp": "2026-06-08T09:14:02Z",
+        "revoke_timestamp": "2026-06-08T09:34:21Z",
+        "outcome": "issued_and_expired"
+      },
+      "status": "Pass"
+    },
+    {
+      "workload": "kubernetes-billing-worker",
+      "bootstrap_method": "kubernetes_workload_identity_to_vault",
+      "identity_provider": "kubernetes_service_account_jwt",
+      "trust_boundary": "production namespace service account to Vault Kubernetes auth",
+      "caller_identity": {
+        "cluster": "prod-us-east",
+        "namespace": "billing",
+        "service_account": "billing-worker",
+        "pod_label_selector": "app=billing-worker",
+        "image_digest": "registry.example/billing-worker@sha256:example-prod-image-digest-20260608"
+      },
+      "identity_binding": {
+        "bound_service_account_names": [
+          "billing-worker"
+        ],
+        "bound_namespaces": [
+          "billing"
+        ],
+        "bound_audiences": [
+          "vault"
+        ],
+        "bound_image_digest": true,
+        "wildcards_allowed": false
+      },
+      "paired_material": {
+        "stored_together": false,
+        "evidence": [
+          "vault-kubernetes-auth-role-export-2026-06-08",
+          "k8s-secret-inventory-billing-namespace-2026-06-08"
+        ]
+      },
+      "issued_credential": {
+        "requested_role": "billing-db-readwrite",
+        "policy": "database/creds/billing-worker",
+        "ttl_minutes": 20,
+        "expected_runtime_minutes": 10,
+        "renewable": false,
+        "revocation": "lease revoke on pod termination"
+      },
+      "non_persistence_evidence": {
+        "logs_scanned": true,
+        "artifacts_scanned": "not_applicable",
+        "caches_scanned": true,
+        "workspace_files_scanned": true,
+        "container_layers_scanned": true,
+        "crash_dumps_scanned": true,
+        "transcripts_scanned": "not_applicable",
+        "findings": []
+      },
+      "audit_correlation": {
+        "run_id": "pod-uid-7d65b",
+        "actor": "system:serviceaccount:billing:billing-worker",
+        "ref": "image-digest-sha256-11112222",
+        "requested_scope": "database/creds/billing-worker",
+        "lease_id": "database/creds/billing-worker/lease-48291",
+        "issue_timestamp": "2026-06-08T10:22:01Z",
+        "revoke_timestamp": "2026-06-08T10:34:04Z",
+        "outcome": "issued_and_revoked"
+      },
+      "status": "Pass"
+    },
+    {
+      "workload": "ai-remediation-agent",
+      "bootstrap_method": "brokered_oidc_to_vault",
+      "identity_provider": "internal workload broker",
+      "trust_boundary": "agent orchestrator to vault broker",
+      "caller_identity": {
+        "agent_id": "remediation-agent-prod",
+        "tool_policy": "ticket-comment-and-readonly-repo",
+        "environment": "production",
+        "approval_id": "SECOPS-APPROVAL-2026-06-08"
+      },
+      "identity_binding": {
+        "issuer": "agent-orchestrator",
+        "audience": "vault-broker",
+        "subject": "agent:remediation-agent-prod",
+        "environment": "production",
+        "workflow": "approved-remediation",
+        "wildcards_allowed": false
+      },
+      "paired_material": {
+        "stored_together": false,
+        "evidence": [
+          "broker-policy-export-2026-06-08",
+          "agent-profile-secret-scope-review-2026-06-08"
+        ]
+      },
+      "issued_credential": {
+        "requested_role": "readonly-repo-ticket-commenter",
+        "policy": "read-repo-and-comment-ticket",
+        "ttl_minutes": 15,
+        "expected_runtime_minutes": 6,
+        "renewable": false,
+        "revocation": "broker revokes lease at task completion"
+      },
+      "non_persistence_evidence": {
+        "logs_scanned": true,
+        "artifacts_scanned": true,
+        "caches_scanned": true,
+        "workspace_files_scanned": true,
+        "container_layers_scanned": true,
+        "crash_dumps_scanned": true,
+        "transcripts_scanned": true,
+        "findings": []
+      },
+      "audit_correlation": {
+        "run_id": "agent-task-55410",
+        "actor": "remediation-agent-prod",
+        "ref": "ticket-SEC-2244",
+        "requested_scope": "read-repo-and-comment-ticket",
+        "lease_id": "broker-lease-55410",
+        "issue_timestamp": "2026-06-08T12:00:01Z",
+        "revoke_timestamp": "2026-06-08T12:07:30Z",
+        "outcome": "issued_and_revoked"
+      },
+      "status": "Pass"
+    }
+  ],
+  "expected_gate_results": {
+    "SEC-ZERO-01": "Pass",
+    "SEC-ZERO-02": "Pass",
+    "SEC-ZERO-03": "Pass",
+    "SEC-ZERO-04": "Pass",
+    "SEC-ZERO-05": "Pass",
+    "SEC-ZERO-06": "Pass",
+    "SEC-ZERO-07": "Pass",
+    "SEC-ZERO-08": "Pass"
+  },
+  "expected_assessment": {
+    "severity": "None",
+    "status_cap": "None",
+    "finding": "All reviewed automated workloads have bounded bootstrap identity, separated bootstrap material, short-lived least-privilege issued credentials, non-persistence proof, and issuance/revocation audit correlation."
+  }
+}
