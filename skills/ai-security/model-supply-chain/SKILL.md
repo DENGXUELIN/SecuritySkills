@@ -14,7 +14,7 @@ phase: [build, review, operate]
 frameworks: [OWASP-LLM03-2025, SLSA-v1.0, MITRE-ATLAS]
 difficulty: advanced
 time_estimate: "45-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -130,6 +130,30 @@ Glob: **/config.json
 | Model pulled from unverified third-party source (not the original publisher) | High |
 | No model card or provenance documentation available | Medium |
 | Checksums verified but against values stored in the same repository as the model (self-referential) | Medium |
+
+#### Adapter Composition Evidence Gate
+
+When LoRA, QLoRA, PEFT, prompt adapters, or other adapter/plugin weights are deployed, assess the deployed unit as the complete composition. A signed adapter alone is not enough: model behavior depends on the base model revision, tokenizer/config, quantization, target modules, merge order, runtime framework, and safety evaluation performed after composition.
+
+**Required adapter composition gates:**
+
+| Gate | Required evidence | Fail if |
+|---|---|---|
+| `MSC-COMP-01` | Composition manifest identifies the deployed unit and binds base model source, revision, checksum, license, and model card to each adapter source, revision, checksum, license, training summary, and adapter card. | Base model is `latest`, adapter metadata is missing, or the adapter is reviewed without the deployed base model. |
+| `MSC-COMP-02` | Tokenizer, processor, config, special tokens, chat template, generation config, framework versions, and runtime loader versions are pinned with revisions or checksums. | Tokenizer/config can drift independently from the base or adapter, or framework versions are omitted. |
+| `MSC-COMP-03` | Merge/load parameters are recorded: LoRA/QLoRA/PEFT type, rank, alpha, target modules, adapter weights path, quantization bits/scheme/calibration, merge order, merge script, and tool version. | The same adapter could be loaded into different modules, quantization modes, or merge orders with no auditable record. |
+| `MSC-COMP-04` | Approved compatibility constraints list allowed base-adapter-tokenizer-quantization combinations and disallowed pairs, including model family, architecture, context length, and license constraints. | Any adapter can be hot-loaded into any base model, or architecture/license incompatibilities are not enforced. |
+| `MSC-COMP-05` | Base and adapter trust evidence comes from signatures, attestations, registry digests, or independently computed trusted checksums that are not self-referential to the same compromised source. | Checksums are only copied from the same registry/repo as the artifact, or no independent trust root exists. |
+| `MSC-COMP-06` | The composed bundle has a signed manifest and reproducible merge/load job showing immutable inputs, builder identity, environment, script version, and output digest. | Production serves a manually assembled or mutable composition that cannot be rebuilt from recorded inputs. |
+| `MSC-COMP-07` | Safety, regression, domain, jailbreak, and output-difference evaluations run on the composed deployed unit, not only on the base model or standalone adapter. | Evidence only covers standard benchmarks, base-model tests, or adapter-only metadata. |
+| `MSC-COMP-08` | Promotion binds deployment to the signed composition and includes rollback bundle, canary/monitoring plan, owner approval, and reconstruction evidence. | Rollback points to an unrelated base model, or the deployed composition cannot be reconstructed. |
+
+**Status and severity guidance:**
+
+- Mark adapter deployments as `Not Evaluable` when the deployed composition cannot be reconstructed from immutable manifest inputs.
+- Treat missing composition binding as **High** severity for production or safety-sensitive deployments, even when individual adapter files are signed.
+- Cap confidence at **Low** when safety evaluation is not performed on the exact base-adapter-tokenizer-runtime combination.
+- Escalate to **Critical** if an untrusted adapter can be hot-loaded into a privileged production model path without compatibility checks, approval, or rollback.
 
 ---
 
@@ -382,10 +406,29 @@ Assess whether architectural and procedural controls exist to detect model backd
 |---|---|---|---|---|---|
 | [name] | [source] | [format] | [Yes/No] | [Yes/No] | [Complete/Partial/Missing] |
 
+## Adapter Composition Inventory
+
+| Composition ID | Base Model | Adapter(s) | Tokenizer/Config | Quantization/Merge Order | Signatures/Attestations | Safety Eval | Rollback Bundle | Status |
+|---|---|---|---|---|---|---|---|---|
+| [composition] | [source/revision/checksum] | [source/revision/checksum] | [pinned/missing] | [recorded/missing] | [verified/missing/self-referential] | [composed/base-only/missing] | [available/missing] | [Pass/Fail/Not Evaluable] |
+
+## Adapter Composition Gate Results
+
+| Gate | Evidence Reviewed | Status | Risk |
+|---|---|---|---|
+| `MSC-COMP-01` | [composition manifest base/adapter binding] | [Pass/Fail/Not Evaluable] | [risk] |
+| `MSC-COMP-02` | [tokenizer/config/runtime pinning] | [Pass/Fail/Not Evaluable] | [risk] |
+| `MSC-COMP-03` | [merge/load/quantization parameters] | [Pass/Fail/Not Evaluable] | [risk] |
+| `MSC-COMP-04` | [compatibility constraints and disallowed pairs] | [Pass/Fail/Not Evaluable] | [risk] |
+| `MSC-COMP-05` | [signatures, attestations, or trusted checksums] | [Pass/Fail/Not Evaluable] | [risk] |
+| `MSC-COMP-06` | [signed composition manifest and reproducible job] | [Pass/Fail/Not Evaluable] | [risk] |
+| `MSC-COMP-07` | [composed-unit safety/regression evidence] | [Pass/Fail/Not Evaluable] | [risk] |
+| `MSC-COMP-08` | [deployment binding, rollback, monitoring, reconstruction] | [Pass/Fail/Not Evaluable] | [risk] |
+
 ## Findings
 
 ### Finding [N]: [Title]
-- **Category:** [Provenance | Training Data | Fine-Tuning Pipeline | Inference Dependency | Model Card | Backdoor Detection]
+- **Category:** [Provenance | Adapter Composition | Training Data | Fine-Tuning Pipeline | Inference Dependency | Model Card | Backdoor Detection]
 - **Severity:** [Critical | High | Medium | Low | Informational]
 - **OWASP LLM Category:** LLM03:2025 -- Supply Chain Vulnerabilities
 - **MITRE ATLAS Technique:** [technique ID and name]
@@ -401,6 +444,7 @@ Assess whether architectural and procedural controls exist to detect model backd
 | Domain | Current State | Target State | Gap Severity |
 |---|---|---|---|
 | Model provenance | [description] | [recommendation] | [severity] |
+| Adapter composition | [description] | [recommendation] | [severity] |
 | Training data lineage | [description] | [recommendation] | [severity] |
 | Fine-tuning pipeline | [description] | [recommendation] | [severity] |
 | Inference dependencies | [description] | [recommendation] | [severity] |
@@ -440,6 +484,8 @@ Assess whether architectural and procedural controls exist to detect model backd
 4. **Assuming Hugging Face models are vetted.** Hugging Face Hub is a hosting platform, not a curation service. Any user can upload any model. While Hugging Face has introduced malware scanning and model signing capabilities, the majority of hosted models have no cryptographic provenance. Treat Hugging Face models as untrusted artifacts requiring verification, the same way you treat npm packages.
 
 5. **Evaluating models only on benchmarks.** Standard benchmarks measure general capability, not supply chain integrity. A backdoored model will perform normally on benchmarks by design. Behavioral differential testing with curated, domain-specific test sets that probe for targeted manipulation is required to surface backdoors.
+
+6. **Treating a signed adapter as safe outside its composition.** LoRA, QLoRA, and PEFT adapters materially change model behavior only after they are loaded or merged with a specific base model, tokenizer/config, quantization mode, framework version, and merge order. A valid adapter signature does not prove that the deployed composition is approved, compatible, reproducible, safe, or rollback-ready.
 
 ---
 

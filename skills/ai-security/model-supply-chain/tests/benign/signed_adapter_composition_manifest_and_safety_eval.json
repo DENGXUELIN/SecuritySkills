@@ -1,0 +1,167 @@
+{
+  "fixture": "signed_adapter_composition_manifest_and_safety_eval",
+  "skill": "model-supply-chain",
+  "description": "Benign fixture for a production LoRA composition with pinned base, adapter, tokenizer, quantization, signed bundle provenance, composed-unit safety evaluation, and rollback evidence.",
+  "deployment": {
+    "composition_id": "clinical-summary-v4-lora-20260609",
+    "environment": "production",
+    "owner": "ml-platform",
+    "serving_stack": "text-generation-inference",
+    "promotion_ticket": "MLPROMO-4821"
+  },
+  "composition_manifest": {
+    "manifest_id": "composition-manifest-clinical-summary-v4",
+    "manifest_version": "2026.06.09",
+    "signed": true,
+    "signature": {
+      "type": "sigstore",
+      "issuer": "internal-fulcio",
+      "bundle_ref": "sigstore-bundle-composition-clinical-v4"
+    },
+    "base_model": {
+      "source": "internal-registry/acme-clinical-llm",
+      "revision": "rev-clinical-base-2026-05-30",
+      "checksum": "sha256-example-base-clinical-20260609",
+      "license": "Apache-2.0",
+      "model_card": "model-cards/acme-clinical-llm-v4.md",
+      "attestation": "slsa-attestation-base-clinical-v4"
+    },
+    "adapters": [
+      {
+        "name": "clinical-summarization-lora",
+        "source": "internal-registry/adapters/clinical-summarization-lora",
+        "revision": "rev-adapter-2026-06-01",
+        "checksum": "sha256-example-adapter-clinical-20260609",
+        "license": "Apache-2.0",
+        "adapter_card": "adapter-cards/clinical-summarization-lora.md",
+        "training_summary": "training-summaries/clinical-summarization-lora-2026-06-01.md",
+        "attestation": "slsa-attestation-adapter-clinical-v2"
+      }
+    ],
+    "tokenizer_and_config": {
+      "tokenizer_source": "internal-registry/acme-clinical-tokenizer",
+      "tokenizer_revision": "rev-tokenizer-2026-05-30",
+      "tokenizer_checksum": "sha256-example-tokenizer-clinical-20260609",
+      "special_tokens_revision": "rev-special-tokens-2026-05-30",
+      "chat_template_revision": "rev-chat-template-2026-05-30",
+      "generation_config_revision": "rev-generation-config-2026-06-02",
+      "framework_versions": {
+        "transformers": "4.52.1",
+        "peft": "0.15.2",
+        "bitsandbytes": "0.45.5",
+        "torch": "2.7.0"
+      }
+    },
+    "merge_and_runtime": {
+      "adapter_type": "LoRA",
+      "rank": 16,
+      "alpha": 32,
+      "target_modules": [
+        "q_proj",
+        "k_proj",
+        "v_proj",
+        "o_proj"
+      ],
+      "adapter_weights_path": "registry://adapters/clinical-summarization-lora/rev-adapter-2026-06-01",
+      "quantization": {
+        "mode": "QLoRA",
+        "bits": 4,
+        "scheme": "nf4",
+        "calibration_dataset": "clinical-calibration-snapshot-2026-05"
+      },
+      "merge_order": [
+        "base-model",
+        "clinical-summarization-lora"
+      ],
+      "merge_script": "tools/model_build/merge_lora.py",
+      "merge_script_version": "rev-merge-tool-2026-06-03",
+      "loader_policy": "hot-load-disabled-after-signed-bundle-build"
+    },
+    "compatibility_constraints": {
+      "approved_pairs": [
+        "acme-clinical-llm@rev-clinical-base-2026-05-30 + clinical-summarization-lora@rev-adapter-2026-06-01"
+      ],
+      "disallowed_pairs": [
+        "public-chat-base@latest + clinical-summarization-lora",
+        "acme-clinical-llm@rev-clinical-base-2026-05-30 + finance-sentiment-lora"
+      ],
+      "model_family": "acme-clinical",
+      "architecture": "decoder-only-transformer",
+      "context_length": 8192,
+      "license_check": "passed"
+    }
+  },
+  "reproducible_build": {
+    "builder_identity": "github-actions-oidc:model-bundle-builder",
+    "job_id": "model-bundle-build-20260609-0421",
+    "immutable_inputs": true,
+    "output_bundle_digest": "sha256-example-composed-bundle-clinical-20260609",
+    "rebuild_verification": "matched-output-digest",
+    "registry_digest": "registry-digest-composed-clinical-v4"
+  },
+  "safety_evaluation": {
+    "evaluated_artifact": "clinical-summary-v4-lora-20260609",
+    "matches_deployed_composition": true,
+    "standard_benchmarks": "passed",
+    "domain_regression_suite": "passed",
+    "safety_probe_suite": "passed",
+    "jailbreak_regression": "passed",
+    "known_good_output_diff": "within-approved-threshold",
+    "approval": "safety-review-accepted-2026-06-08"
+  },
+  "deployment_controls": {
+    "deployment_binding": "serving-config pins composition-manifest-clinical-summary-v4",
+    "canary_plan": "5-percent-for-24-hours-with-safety-alerts",
+    "monitoring": "output-drift-and-policy-violation-alerts-enabled",
+    "rollback_bundle": "clinical-summary-v3-signed-rollback-bundle",
+    "reconstruction_test": "passed"
+  },
+  "expected_gate_results": [
+    {
+      "gate": "MSC-COMP-01",
+      "status": "Pass",
+      "evidence": "Manifest binds deployed composition to pinned base and adapter metadata, checksums, licenses, model card, adapter card, and training summary."
+    },
+    {
+      "gate": "MSC-COMP-02",
+      "status": "Pass",
+      "evidence": "Tokenizer, special tokens, chat template, generation config, and framework versions are pinned."
+    },
+    {
+      "gate": "MSC-COMP-03",
+      "status": "Pass",
+      "evidence": "LoRA rank, alpha, target modules, quantization, merge order, adapter path, merge script, and tool version are recorded."
+    },
+    {
+      "gate": "MSC-COMP-04",
+      "status": "Pass",
+      "evidence": "Approved and disallowed composition pairs enforce base-adapter-tokenizer-quantization compatibility."
+    },
+    {
+      "gate": "MSC-COMP-05",
+      "status": "Pass",
+      "evidence": "Base, adapter, and composed bundle have signatures, attestations, registry digests, and trusted checksums."
+    },
+    {
+      "gate": "MSC-COMP-06",
+      "status": "Pass",
+      "evidence": "Signed manifest and reproducible merge job show immutable inputs, builder identity, and matched output digest."
+    },
+    {
+      "gate": "MSC-COMP-07",
+      "status": "Pass",
+      "evidence": "Safety and regression evaluation ran on the exact composed deployed unit."
+    },
+    {
+      "gate": "MSC-COMP-08",
+      "status": "Pass",
+      "evidence": "Deployment binds to the signed composition and includes canary monitoring, rollback bundle, and reconstruction test."
+    }
+  ],
+  "expected_assessment": {
+    "overall_status": "Pass",
+    "risk_rating": "Low",
+    "confidence": "High",
+    "finding": "No adapter composition provenance finding expected."
+  }
+}

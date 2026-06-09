@@ -1,0 +1,134 @@
+{
+  "fixture": "unbound_lora_adapter_hotload_without_composition_manifest",
+  "skill": "model-supply-chain",
+  "description": "Vulnerable fixture for a signed LoRA adapter hot-loaded into an unpinned base model with missing tokenizer, merge, compatibility, safety, signed bundle, and rollback evidence.",
+  "deployment": {
+    "composition_id": "support-bot-prod-lora-latest",
+    "environment": "production",
+    "owner": "customer-support",
+    "serving_stack": "custom-transformers-service",
+    "promotion_ticket": "none"
+  },
+  "observed_configuration": {
+    "base_model": {
+      "source": "public-registry/example-chat-base",
+      "revision": "latest",
+      "checksum": null,
+      "license": "unknown",
+      "model_card": "missing"
+    },
+    "adapter": {
+      "name": "support-tone-lora",
+      "source": "public-registry/community/support-tone-lora",
+      "revision": "main",
+      "checksum": "checksum-copied-from-same-public-registry",
+      "license": "unknown",
+      "adapter_card": "missing",
+      "training_summary": "missing",
+      "signature": "adapter-file-signature-only"
+    },
+    "loader": {
+      "code_path": "app/model_loader.py",
+      "behavior": "hot-loads ADAPTER_NAME from environment at service start",
+      "allowed_adapter_names": "*",
+      "composition_manifest": "missing",
+      "runtime_pin": "requirements allow compatible updates"
+    },
+    "tokenizer_and_config": {
+      "tokenizer_revision": "not-recorded",
+      "special_tokens_revision": "not-recorded",
+      "chat_template_revision": "not-recorded",
+      "generation_config_revision": "not-recorded",
+      "framework_versions": "not-captured"
+    },
+    "merge_and_runtime": {
+      "adapter_type": "LoRA",
+      "rank": "unknown",
+      "alpha": "unknown",
+      "target_modules": "unknown",
+      "quantization": "runtime default",
+      "merge_order": "implicit load order",
+      "merge_script": "not-versioned",
+      "tool_version": "not-recorded"
+    },
+    "compatibility_constraints": {
+      "approved_pairs": "missing",
+      "disallowed_pairs": "missing",
+      "architecture_check": "missing",
+      "license_check": "missing"
+    }
+  },
+  "trust_and_build_evidence": {
+    "base_model_signature": "missing",
+    "adapter_trust_root": "self-referential-public-registry-checksum",
+    "composition_signature": "missing",
+    "composition_bundle_digest": "missing",
+    "reproducible_merge_job": "missing",
+    "builder_identity": "unknown",
+    "immutable_inputs": false
+  },
+  "safety_evaluation": {
+    "evaluated_artifact": "base-model-only",
+    "standard_benchmarks": "passed",
+    "domain_regression_suite": "missing",
+    "safety_probe_suite": "missing",
+    "jailbreak_regression": "missing",
+    "known_good_output_diff": "missing",
+    "matches_deployed_composition": false
+  },
+  "deployment_controls": {
+    "deployment_binding": "service reads base and adapter names from environment",
+    "canary_plan": "missing",
+    "monitoring": "generic latency and error rate only",
+    "rollback_bundle": "base-model-latest",
+    "reconstruction_test": "not-possible"
+  },
+  "expected_gate_results": [
+    {
+      "gate": "MSC-COMP-01",
+      "status": "Fail",
+      "evidence": "No composition manifest; base is latest and adapter card, training summary, license, and trusted checksum are missing."
+    },
+    {
+      "gate": "MSC-COMP-02",
+      "status": "Fail",
+      "evidence": "Tokenizer, special tokens, chat template, generation config, and framework versions are not pinned."
+    },
+    {
+      "gate": "MSC-COMP-03",
+      "status": "Fail",
+      "evidence": "Rank, alpha, target modules, quantization, merge order, merge script, and tool version are undocumented."
+    },
+    {
+      "gate": "MSC-COMP-04",
+      "status": "Fail",
+      "evidence": "No approved or disallowed compatibility pairs; any adapter can be hot-loaded by environment variable."
+    },
+    {
+      "gate": "MSC-COMP-05",
+      "status": "Fail",
+      "evidence": "Adapter checksum is self-referential to the same public registry and base model has no signature."
+    },
+    {
+      "gate": "MSC-COMP-06",
+      "status": "Fail",
+      "evidence": "No signed composed bundle, immutable input list, builder identity, or reproducible merge job."
+    },
+    {
+      "gate": "MSC-COMP-07",
+      "status": "Fail",
+      "evidence": "Safety evidence covers standard benchmarks and the base model only, not the deployed composition."
+    },
+    {
+      "gate": "MSC-COMP-08",
+      "status": "Not Evaluable",
+      "evidence": "Rollback points to a mutable base-model latest alias and the deployed composition cannot be reconstructed."
+    }
+  ],
+  "expected_assessment": {
+    "overall_status": "Fail",
+    "risk_rating": "High",
+    "confidence": "Low",
+    "finding": "Production adapter composition is not provenance-bound, safely evaluated, or rollback-ready."
+  }
+}
