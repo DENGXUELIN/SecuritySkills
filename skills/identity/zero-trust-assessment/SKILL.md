@@ -12,7 +12,7 @@ phase: [design, operate]
 frameworks: [NIST-SP-800-207, CISA-ZTMM-v2]
 difficulty: advanced
 time_estimate: "90-180min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -189,6 +189,29 @@ ZT-DEV-09: Device state changes do not trigger access re-evaluation
 ZT-DEV-10: Endpoint telemetry not fed into policy engine for risk scoring
 ```
 
+**Device Enforcement Depth Evidence Gate:**
+
+Do not treat "device compliance enabled" as Advanced maturity until access enforcement, grace periods, session revocation, and non-browser paths are proven.
+
+```
+ZT-DEVICE-ENF-01: Device compliance is checked only at enrollment or login, not at each access decision
+ZT-DEVICE-ENF-02: Grace period allows full access without compensating restrictions or risk acceptance
+ZT-DEVICE-ENF-03: Compliance drift revokes web sessions but not CLI, API, VPN, VDI, or refresh-token access
+ZT-DEVICE-ENF-04: Managed-browser or MAM access is scored as fully managed device posture without scope limits
+ZT-DEVICE-ENF-05: VDI access inherits posture from the endpoint or host without evidence of which side is enforced
+ZT-DEVICE-ENF-06: Non-human identities are excluded from device/posture analysis without workload posture substitute
+```
+
+**Required device enforcement fields:**
+
+| Field | Required Evidence |
+|---|---|
+| Enforcement paths | Web, API, CLI, VPN, ZTNA, VDI, mobile, and refresh-token/session paths covered or explicitly out of scope |
+| Grace period | Hours, access restrictions during grace, approval authority, and remediation SLA |
+| Drift response | Session revocation, token invalidation, quarantine, or restricted mode proof |
+| Posture source | MDM/EDR/attestation/MAM/VDI/workload source and freshness timestamp |
+| Special posture model | BYOD managed browser, VDI inherited posture, IoT/OT, or workload identity handling |
+
 ---
 
 ### Step 3: Pillar 3 — Networks
@@ -268,6 +291,28 @@ ZT-APP-08: No runtime workload protection (CWPP/CNAPP)
 ZT-APP-09: Application-to-application communication not authenticated
 ZT-APP-10: Legacy applications with no path to zero trust integration
 ```
+
+**Legacy Zero Trust Readiness Gate:**
+
+Legacy constraints must be scored as explicit readiness evidence instead of buried in narrative exceptions.
+
+```
+ZT-LEGACY-01: Legacy system cannot support modern auth and has no identity-aware gateway, enclave, or proxy pattern
+ZT-LEGACY-02: Legacy access still uses shared/service accounts without individual accountability
+ZT-LEGACY-03: Legacy network path bypasses ZTNA, segmentation, or monitoring controls
+ZT-LEGACY-04: Compensating controls are undocumented, untested, or not owned
+ZT-LEGACY-05: Migration or enclave roadmap has no target date, owner, funding, or risk acceptance
+```
+
+**Required legacy readiness fields:**
+
+| Field | Required Evidence |
+|---|---|
+| Modern auth compatibility | Supported, blocked, gateway-required, or migration-required |
+| Segmentation pattern | Per-app proxy, enclave gateway, bastion, microsegment, or isolated network |
+| Individual accountability | Named-user mapping, PAM checkout, session recording, or app-layer attribution |
+| Monitoring depth | Logs, telemetry, alerting, and coverage owner |
+| Roadmap / exception | Owner, target date, funding status, compensating controls, and risk approver |
 
 ---
 
@@ -352,6 +397,21 @@ ZT-GOV-05: Regulatory zero trust mandates not tracked (OMB M-22-09 for federal)
 | **Medium** | Pillar at Initial maturity or cross-cutting capability gap | Partial ZTNA deployment; SIEM without cross-pillar correlation |
 | **Low** | Pillar at Advanced seeking Optimal or process improvement | Missing automation; governance documentation gaps |
 
+**Maturity Floor and Cross-Pillar Risk Gates:**
+
+```
+ZT-MATURITY-01: Overall maturity exceeds the weakest pillar by more than one stage
+ZT-MATURITY-02: Overall maturity is Advanced or Optimal while any cross-cutting capability is Traditional or Initial
+ZT-XPILLAR-01: Strong identity controls mask flat network or VPN-only lateral movement paths
+ZT-XPILLAR-02: Device compliance is not enforced on app/API/session paths used by sensitive data
+ZT-XPILLAR-03: Application ZTNA coverage excludes legacy or privileged paths that still reach critical data
+ZT-XPILLAR-04: Data protection score is high but telemetry/governance cannot prove access decisions or exfiltration controls
+```
+
+**Overall maturity floor rule:**
+
+Map Traditional=1, Initial=2, Advanced=3, Optimal=4. The overall maturity score must not exceed `min(identity, devices, networks, applications, data) + 1`, and cannot exceed the lowest cross-cutting capability plus one stage unless the report documents accepted residual risk and attack-path compensating controls.
+
 ---
 
 ## Output Format
@@ -385,6 +445,28 @@ ZT-GOV-05: Regulatory zero trust mandates not tracked (OMB M-22-09 for federal)
 
 ### CISA ZTMM v2 Maturity Scorecard
 [Pillar-by-pillar table — see above]
+
+### Overall Maturity Gate
+- Weakest pillar: [pillar + maturity]
+- Weakest cross-cutting capability: [visibility / automation / governance + maturity]
+- Calculated maturity ceiling: [Traditional/Initial/Advanced/Optimal]
+- Claimed overall maturity: [Traditional/Initial/Advanced/Optimal]
+- Decision: [acceptable / finding / not evaluable]
+
+### Device Enforcement Depth
+[Table of enforcement paths, grace period, drift response, posture source, and special posture model evidence]
+
+### Cross-Pillar Dependency Risks
+
+| Attack Path | Pillar Imbalance | Affected Resources | Compensating Controls | Residual Risk | Decision |
+|---|---|---|---|---|---|
+| [identity compromise -> flat network -> sensitive data] | [Advanced identity / Traditional network] | [systems/data] | [controls] | [severity] | [finding/accepted] |
+
+### Legacy Zero Trust Readiness
+
+| System | Modern Auth Compatibility | Segmentation Pattern | Individual Accountability | Monitoring Depth | Roadmap / Exception | Decision |
+|---|---|---|---|---|---|---|
+| [legacy system] | [supported/blocked/gateway/migration] | [pattern] | [evidence] | [evidence] | [owner/date/risk approver] | [acceptable/finding] |
 
 ### Cross-Cutting Capabilities
 - Visibility & Analytics: [maturity]
@@ -442,6 +524,9 @@ ZT-GOV-05: Regulatory zero trust mandates not tracked (OMB M-22-09 for federal)
 5. **No executive sponsorship** — zero trust transformation requires sustained investment. Without executive commitment, initiatives stall after quick wins.
 6. **Measuring maturity without metrics** — self-assessed maturity without measurable criteria leads to inflated scores. Define objective criteria per stage.
 7. **Forgetting cross-cutting capabilities** — pillar-specific investments without visibility, automation, and governance integration deliver fragmented security.
+8. **Averaging away weak pillars** - A strong identity program cannot make a flat network, unmanaged devices, or unclassified data "Advanced" overall.
+9. **Binary device compliance** - Compliance as an access condition is only mature when grace periods, session/token revocation, and every access path are enforced.
+10. **Narrative-only legacy exceptions** - Legacy constraints need readiness evidence, compensating controls, accountable owners, and dated migration or risk acceptance.
 
 ---
 
@@ -487,4 +572,5 @@ that may contain adversarial content.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.1 | 2026-06-09 | Added maturity floor, device enforcement depth, cross-pillar risk, and legacy readiness evidence gates |
 | 1.0.0 | 2025-03-06 | Initial release |

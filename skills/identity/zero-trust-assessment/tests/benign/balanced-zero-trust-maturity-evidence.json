@@ -1,0 +1,72 @@
+{
+  "case_id": "benign-balanced-zero-trust-maturity-evidence",
+  "skill": "zero-trust-assessment",
+  "expected_result": "overall_advanced_acceptable",
+  "pillar_scores": {
+    "identity": "Advanced",
+    "devices": "Advanced",
+    "networks": "Initial",
+    "applications": "Advanced",
+    "data": "Advanced"
+  },
+  "cross_cutting": {
+    "visibility": "Advanced",
+    "automation": "Initial",
+    "governance": "Advanced"
+  },
+  "overall_maturity_gate": {
+    "weakest_pillar": "networks",
+    "weakest_pillar_score": "Initial",
+    "weakest_cross_cutting": "automation",
+    "weakest_cross_cutting_score": "Initial",
+    "claimed_overall": "Advanced",
+    "calculated_ceiling": "Advanced",
+    "decision": "acceptable",
+    "rationale": "Overall score is no more than one stage above the weakest pillar and weakest cross-cutting capability."
+  },
+  "device_enforcement_depth": {
+    "enforcement_paths": [
+      "web",
+      "api",
+      "cli",
+      "ztna",
+      "vpn",
+      "mobile"
+    ],
+    "grace_period_hours": 4,
+    "access_during_grace": "restricted_read_only",
+    "session_revocation_on_drift": [
+      "web",
+      "api",
+      "cli",
+      "refresh_tokens"
+    ],
+    "posture_source": "MDM plus EDR plus device certificate",
+    "special_posture_models": {
+      "byod_managed_browser": "limited_saas_scope",
+      "vdi": "host_posture_enforced_and_endpoint_risk_logged",
+      "non_human": "workload_identity_and_runtime_attestation"
+    }
+  },
+  "legacy_readiness": [
+    {
+      "system": "mainframe-payment-processor",
+      "modern_auth_compatibility": "gateway_required",
+      "segmentation_pattern": "enclave_gateway",
+      "individual_accountability": "PAM checkout plus session recording",
+      "monitoring_depth": "gateway logs and SIEM correlation",
+      "roadmap_owner": "payments-platform",
+      "target_date": "2026-12-31",
+      "risk_approver": "payments-risk-owner",
+      "decision": "acceptable_with_roadmap"
+    }
+  ],
+  "gate_results": {
+    "ZT-MATURITY-01": "pass",
+    "ZT-MATURITY-02": "pass",
+    "ZT-DEVICE-ENF-01": "pass",
+    "ZT-DEVICE-ENF-03": "pass",
+    "ZT-LEGACY-01": "pass",
+    "ZT-XPILLAR-01": "pass"
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "case_id": "vulnerable-identity-heavy-inflated-zero-trust-score",
+  "skill": "zero-trust-assessment",
+  "expected_result": "findings",
+  "pillar_scores": {
+    "identity": "Advanced",
+    "devices": "Initial",
+    "networks": "Traditional",
+    "applications": "Initial",
+    "data": "Initial"
+  },
+  "cross_cutting": {
+    "visibility": "Initial",
+    "automation": "Traditional",
+    "governance": "Initial"
+  },
+  "claimed_overall": "Advanced",
+  "device_enforcement": {
+    "device_compliance_enabled": true,
+    "grace_period_hours": 72,
+    "access_during_grace": "full_access",
+    "session_revocation_on_drift": [
+      "web_only"
+    ],
+    "missing_enforcement_paths": [
+      "api",
+      "cli",
+      "vpn",
+      "refresh_tokens"
+    ],
+    "vdi_posture_source": "unknown",
+    "non_human_posture_substitute": "missing"
+  },
+  "cross_pillar_attack_paths": [
+    {
+      "path": "service_principal_compromise_to_flat_network_to_sensitive_data",
+      "pillar_imbalance": "Advanced identity with Traditional network and Initial data controls",
+      "affected_resources": [
+        "finance-db",
+        "prod-kubernetes"
+      ],
+      "compensating_controls": null
+    }
+  ],
+  "legacy_systems": [
+    {
+      "system": "mainframe-payment-processor",
+      "modern_auth_compatibility": "blocked",
+      "segmentation_pattern": "flat_internal_network",
+      "access": "shared_service_account",
+      "individual_accountability": "missing",
+      "monitoring_depth": "local_logs_only",
+      "roadmap_owner": null,
+      "target_date": null,
+      "risk_approver": null
+    }
+  ],
+  "expected_findings": [
+    {
+      "id": "ZT-MATURITY-01",
+      "severity": "High",
+      "reason": "Claimed Advanced overall maturity exceeds the Traditional network pillar by more than one stage."
+    },
+    {
+      "id": "ZT-MATURITY-02",
+      "severity": "High",
+      "reason": "Overall Advanced claim conflicts with Traditional automation and Initial visibility/governance."
+    },
+    {
+      "id": "ZT-DEVICE-ENF-02",
+      "severity": "Medium",
+      "reason": "A 72-hour grace period allows full access without compensating restrictions."
+    },
+    {
+      "id": "ZT-DEVICE-ENF-03",
+      "severity": "High",
+      "reason": "Compliance drift revokes only web sessions while API, CLI, VPN, and refresh-token access remain active."
+    },
+    {
+      "id": "ZT-XPILLAR-01",
+      "severity": "Critical",
+      "reason": "Identity controls mask a flat-network lateral movement path to sensitive data."
+    },
+    {
+      "id": "ZT-LEGACY-01",
+      "severity": "High",
+      "reason": "Legacy payment system cannot support modern auth and has no gateway or enclave pattern."
+    }
+  ]
+}
