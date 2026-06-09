@@ -1,0 +1,53 @@
+{
+  "case": "multi_user_authorization_replay_complete",
+  "skill": "dast-config",
+  "expected_result": "pass",
+  "tool": "OWASP ZAP Automation Framework",
+  "identities": [
+    "unauthenticated",
+    "tenant-a-user",
+    "tenant-a-admin",
+    "tenant-a-peer-user",
+    "tenant-b-user"
+  ],
+  "session_isolation": {
+    "cookie_jars": "per_identity",
+    "browser_contexts": "per_identity",
+    "csrf_tokens": "refreshed_per_identity",
+    "local_storage": "per_identity",
+    "shared_state_detected": false
+  },
+  "authorization_replay": {
+    "horizontal": {
+      "routes": ["GET /api/projects/{projectId}", "PATCH /api/projects/{projectId}"],
+      "peer_object_ids": ["proj-a-owned-by-peer"],
+      "expected_denies_recorded": true
+    },
+    "vertical": {
+      "routes": ["GET /admin/users", "POST /admin/users/{id}/disable"],
+      "lower_privilege_identity": "tenant-a-user",
+      "expected_denies_recorded": true
+    },
+    "tenant": {
+      "routes": ["GET /api/invoices/{invoiceId}"],
+      "cross_tenant_object_ids": ["tenant-b-invoice-771"],
+      "expected_denies_recorded": true
+    }
+  },
+  "coverage": {
+    "openapi_snapshot": "openapi-2026-06-06.json",
+    "object_classes_mapped": ["project", "invoice", "user"],
+    "destructive_routes_excluded": ["DELETE /api/projects/{projectId}"],
+    "manual_follow_up": ["DELETE /api/projects/{projectId} authorization test in seeded disposable tenant"]
+  },
+  "covered_gates": [
+    "DAST-AUTHZ-01",
+    "DAST-AUTHZ-02",
+    "DAST-AUTHZ-03",
+    "DAST-AUTHZ-04",
+    "DAST-AUTHZ-05",
+    "DAST-AUTHZ-06",
+    "DAST-AUTHZ-07",
+    "DAST-AUTHZ-08"
+  ]
+}

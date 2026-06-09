@@ -12,7 +12,7 @@ phase: [build, deploy]
 frameworks: [OWASP-Top-10-2021, OWASP-Testing-Guide-v4.2]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -331,6 +331,48 @@ env:
 
 ---
 
+#### 4.2 Multi-User Authorization Replay Evidence
+
+Authenticated scanning improves reachability, but it does not prove authorization coverage by itself. For broken access control, require replay evidence across distinct users, roles, object owners, and tenants where applicable. A single authenticated crawl can still miss horizontal access control, vertical privilege escalation, object ownership, and tenant isolation.
+
+**What to verify:**
+
+- The DAST plan defines a role/user matrix that includes unauthenticated, ordinary user, peer user, privileged user, and cross-tenant identities when those boundaries exist.
+- Browser contexts, cookie jars, bearer tokens, CSRF/state values, local storage, and session caches are isolated per identity.
+- Peer-object replay tests use object IDs owned by a different user in the same role.
+- Role replay tests send lower-privilege sessions to privileged routes and actions.
+- Cross-tenant replay tests use object IDs from another tenant or organization when the application is multi-tenant.
+- Expected-deny responses are documented per route and identity (`401`, `403`, `404`, redirect to login, or explicit error), not inferred from a generic scan pass.
+- Destructive routes excluded from DAST have manual authorization-test follow-up or documented residual risk.
+
+**Detection methods using allowed tools:**
+
+```
+# Find multi-user, role, and replay configuration
+Grep: "user|role|tenant|authorization|authz|replay|matrix|expected" in **/*zap* **/*dast* **/*.{yaml,yml,json,md}
+Grep: "cookie|csrf|state|session|browserContext|storageState|token" in **/*zap* **/*dast* **/*.{yaml,yml,json,js,ts,py}
+
+# Find object-owner and tenant test data
+Grep: "tenant-a|tenant_b|owner|peer|other_user|admin|standard-user" in **/*.{yaml,yml,json,md,js,ts,py}
+```
+
+**Authorization replay gates:**
+
+| Gate | Evidence Required | Finding Trigger |
+|---|---|---|
+| DAST-AUTHZ-01 | Role/user matrix includes relevant unauthenticated, low-privilege, peer, privileged, and tenant identities. | Report claims broken-access-control coverage from one authenticated identity. |
+| DAST-AUTHZ-02 | Session state is isolated per identity: cookies, bearer tokens, CSRF/state values, browser context, and local storage. | Replay uses shared cookie jars, copied CSRF values, or mixed browser storage. |
+| DAST-AUTHZ-03 | Horizontal replay covers peer-owned object IDs for read and write routes. | Private routes are crawled, but peer-object access is never replayed. |
+| DAST-AUTHZ-04 | Vertical replay covers privileged routes/actions with lower-privilege identities. | Admin paths are reached only with admin credentials. |
+| DAST-AUTHZ-05 | Cross-tenant replay covers tenant-scoped object IDs and route prefixes where multi-tenancy exists. | Same-tenant role checks are treated as tenant-isolation proof. |
+| DAST-AUTHZ-06 | Expected-deny status and response pattern are recorded per route, method, and identity. | Any non-200 or generic scanner pass is treated as authorization evidence. |
+| DAST-AUTHZ-07 | API/OpenAPI/GraphQL route coverage maps object classes to replayed identities and expected-deny assertions. | API scan imports a spec but lacks object-owner or tenant replay evidence. |
+| DAST-AUTHZ-08 | Excluded destructive or state-changing routes list residual authorization risk and manual follow-up. | Destructive routes are excluded with no compensating authorization test. |
+
+**Finding classification:** Single-user authenticated scans claiming authorization coverage are **High**. Shared-session replay that invalidates expected-deny evidence is **High**. Missing cross-tenant replay for tenant-owned APIs is **High**. Missing expected-deny documentation is **Medium**.
+
+---
+
 ### Step 5: CI/CD DAST Integration
 
 #### 5.1 Pipeline Integration Patterns
@@ -519,6 +561,14 @@ DAST tools report findings per-URL, producing hundreds of duplicate alerts for t
 | Active scanning (staging) | Yes/No | <workflow file> |
 | API scanning | Yes/No | <OpenAPI/GraphQL import> |
 | Results deduplication | Yes/No | <dedup method> |
+
+### Authorization Replay Evidence
+
+| Boundary | Identities Tested | Session Isolation | Replay Objects / Routes | Expected Denies | Residual Risk |
+|----------|-------------------|-------------------|--------------------------|-----------------|---------------|
+| Horizontal object ownership | <user A, user B> | <cookie/token/browser isolation> | <route + object IDs> | <status/pattern> | <none/manual follow-up> |
+| Vertical role access | <standard, admin> | <isolation evidence> | <admin routes/actions> | <status/pattern> | <none/manual follow-up> |
+| Tenant isolation | <tenant A, tenant B> | <isolation evidence> | <tenant object IDs/routes> | <status/pattern> | <none/manual follow-up> |
 
 ### Findings
 

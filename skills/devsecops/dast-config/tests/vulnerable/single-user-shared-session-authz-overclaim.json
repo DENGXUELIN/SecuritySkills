@@ -1,0 +1,63 @@
+{
+  "case": "single_user_shared_session_authz_overclaim",
+  "skill": "dast-config",
+  "expected_result": "finding",
+  "tool": "OWASP ZAP Automation Framework",
+  "identities": [
+    "standard-user"
+  ],
+  "report_claims": {
+    "authenticated_scanning": true,
+    "broken_access_control_coverage": "complete"
+  },
+  "session_isolation": {
+    "cookie_jars": "shared",
+    "browser_contexts": "shared",
+    "csrf_tokens": "copied_from_admin_seed",
+    "local_storage": "shared",
+    "shared_state_detected": true
+  },
+  "authorization_replay": {
+    "horizontal": null,
+    "vertical": {
+      "route": "GET /admin/users",
+      "source_identity": "admin-seed",
+      "replay_identity": "standard-user",
+      "response_status": 200,
+      "expected_deny_documented": false
+    },
+    "tenant": null
+  },
+  "coverage": {
+    "openapi_snapshot": "openapi-current.json",
+    "object_classes_mapped": [],
+    "destructive_routes_excluded": ["DELETE /api/users/{id}"],
+    "manual_follow_up": []
+  },
+  "expected_findings": [
+    {
+      "gate": "DAST-AUTHZ-01",
+      "reason": "Only one authenticated identity is configured while the report claims complete broken-access-control coverage."
+    },
+    {
+      "gate": "DAST-AUTHZ-02",
+      "reason": "Shared cookies, browser context, CSRF values, and local storage contaminate replay results."
+    },
+    {
+      "gate": "DAST-AUTHZ-03",
+      "reason": "No peer-owned object replay evidence exists."
+    },
+    {
+      "gate": "DAST-AUTHZ-05",
+      "reason": "Multi-tenant object replay is absent despite tenant-scoped APIs."
+    },
+    {
+      "gate": "DAST-AUTHZ-06",
+      "reason": "Expected-deny status and response pattern are not recorded."
+    },
+    {
+      "gate": "DAST-AUTHZ-08",
+      "reason": "Destructive routes are excluded with no compensating manual authorization test."
+    }
+  ]
+}
