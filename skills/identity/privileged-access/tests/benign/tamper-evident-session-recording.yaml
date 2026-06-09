@@ -1,0 +1,48 @@
+scenario: tamper_evident_session_recording
+expected_result:
+  posture: advanced
+  finding_ids: []
+  notes: Critical privileged paths have retained command or replay evidence, immutable storage, integrity checks, independent review, playback audit, and tested redaction.
+recording_assurance:
+  privileged_paths:
+    - path: pam_brokered_ssh
+      protocol: ssh
+      recording_type: keystroke_and_command_log
+      command_extraction: enabled
+      storage_location: object_storage_worm
+      immutable_retention_days: 365
+      integrity:
+        hash: sha256_recorded
+        signature: pam_archive_signing_key
+        verification_run_id: verify-2026-06-01
+      external_forwarding:
+        siem_metadata: enabled
+        archive_event: enabled
+      reviewer_independence:
+        reviewer_role: security-reviewer
+        session_actor_can_review_own_session: false
+        pam_admin_can_delete_recording: false
+      playback_export_audit:
+        enabled: true
+        fields:
+          - viewer
+          - timestamp
+          - ticket_id
+          - export_reason
+      redaction:
+        tested: true
+        masks:
+          - password_prompts
+          - api_tokens
+          - regulated_identifiers
+    - path: database_admin_console
+      protocol: sql
+      recording_type: database_activity_monitoring
+      command_extraction: enabled
+      sensitive_result_rows_recorded: false
+      storage_location: immutable_siem_archive
+coverage:
+  critical_paths_total: 6
+  critical_paths_recorded: 6
+  compensating_evidence_for_unrecordable_paths: []
+evidence_confidence: high

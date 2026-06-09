@@ -1,0 +1,46 @@
+scenario: local_recording_self_review_no_redaction
+expected_result:
+  posture: fail
+  finding_ids:
+    - PAM-REC-13
+    - PAM-REC-14
+    - PAM-REC-15
+    - PAM-REC-16
+  notes: Session replay exists, but the evidence is mutable, self-reviewable, privacy-unsafe, and missing high-risk privileged paths.
+recording_assurance:
+  privileged_paths:
+    - path: pam_brokered_ssh
+      protocol: ssh
+      recording_type: video_replay
+      command_extraction: disabled
+      storage_location: pam_server_local_disk
+      immutable_retention_days: 0
+      integrity:
+        hash: missing
+        signature: missing
+        verification_run_id: null
+      external_forwarding:
+        siem_metadata: partial
+        archive_event: missing
+      reviewer_independence:
+        reviewer_role: pam_admins
+        session_actor_can_review_own_session: true
+        pam_admin_can_delete_recording: true
+      playback_export_audit:
+        enabled: false
+      redaction:
+        tested: false
+        masks: []
+        recorded_sensitive_examples:
+          - production_api_token_pasted_into_shell
+          - customer_identifier_visible_in_database_console
+coverage:
+  critical_paths_total: 7
+  critical_paths_recorded: 2
+  missing_paths:
+    - cloud_console_admin
+    - database_console
+    - kubernetes_exec
+    - vendor_support_portal
+    - break_glass_console
+evidence_confidence: low
