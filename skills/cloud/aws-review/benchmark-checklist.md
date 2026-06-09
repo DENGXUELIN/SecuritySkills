@@ -405,6 +405,82 @@ aws_securityhub_account
 aws_securityhub_standards_subscription
 ```
 
+### Supplemental -- GuardDuty coverage and protection-plan evidence
+
+Security Hub enablement is not evidence that GuardDuty is deployed or operational. For accounts where GuardDuty is required, collect the following:
+
+**Detector and organization coverage patterns:**
+
+```hcl
+resource "aws_guardduty_detector" "this" {
+  enable = true
+}
+
+resource "aws_guardduty_organization_admin_account" "this" {
+  admin_account_id = var.security_account_id
+}
+
+resource "aws_guardduty_organization_configuration" "this" {
+  detector_id                      = aws_guardduty_detector.this.id
+  auto_enable_organization_members = "ALL"
+}
+```
+
+**Protection-plan patterns:**
+
+```hcl
+resource "aws_guardduty_organization_configuration_feature" "s3" {
+  detector_id = aws_guardduty_detector.this.id
+  name        = "S3_DATA_EVENTS"
+  auto_enable = "ALL"
+}
+
+resource "aws_guardduty_organization_configuration_feature" "runtime" {
+  detector_id = aws_guardduty_detector.this.id
+  name        = "RUNTIME_MONITORING"
+  auto_enable = "ALL"
+}
+
+resource "aws_guardduty_organization_configuration_feature" "lambda" {
+  detector_id = aws_guardduty_detector.this.id
+  name        = "LAMBDA_NETWORK_LOGS"
+  auto_enable = "ALL"
+}
+```
+
+**Finding delivery and suppression patterns:**
+
+```hcl
+resource "aws_cloudwatch_event_rule" "guardduty_findings" {
+  event_pattern = jsonencode({
+    source      = ["aws.guardduty"]
+    "detail-type" = ["GuardDuty Finding"]
+  })
+}
+
+resource "aws_guardduty_publishing_destination" "archive" {
+  detector_id     = aws_guardduty_detector.this.id
+  destination_arn = aws_s3_bucket.guardduty_findings.arn
+  kms_key_arn     = aws_kms_key.guardduty_findings.arn
+}
+
+resource "aws_guardduty_filter" "suppression" {
+  action = "ARCHIVE"
+}
+```
+
+**Review checklist:**
+
+- Account and Region denominator includes every production, regulated, and monitored account/Region.
+- GuardDuty detector evidence is separate from Security Hub evidence.
+- Delegated administrator and organization member coverage are recorded.
+- `auto_enable_organization_members = "ALL"` is present, or existing-account backfill evidence is attached when `NEW` is used.
+- S3, Malware Protection for S3, Runtime Monitoring, Lambda network logs, and EBS malware protection are enabled or explicitly excepted based on workload inventory.
+- Runtime Monitoring includes agent/workload coverage evidence for EKS, ECS/Fargate, and EC2 where applicable.
+- Findings route to SOC, ticketing, EventBridge, Security Hub, or another operational destination and are retained in encrypted durable storage when policy requires.
+- Suppression filters have owner, reason, severity/type scope, expiry/review date, and compensating detection.
+- A sample finding or test event is observed at the destination; otherwise mark the export path `Not Evaluable`.
+
 ---
 
 ## Section 5 -- Networking

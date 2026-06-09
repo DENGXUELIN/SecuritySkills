@@ -1,0 +1,133 @@
+{
+  "fixture": "securityhub_without_guardduty_coverage",
+  "skill": "aws-review",
+  "description": "Vulnerable fixture where Security Hub is enabled but GuardDuty detector coverage, protection plans, finding delivery, runtime agent evidence, and suppression governance are incomplete.",
+  "scope": {
+    "organization_id": "o-example",
+    "delegated_admin_account": "unknown",
+    "in_scope_accounts": [
+      "prod-app",
+      "prod-data",
+      "shared-services",
+      "analytics-prod"
+    ],
+    "in_scope_regions": [
+      "us-east-1",
+      "us-west-2",
+      "eu-west-1"
+    ],
+    "account_region_denominator": "not-reviewed",
+    "exceptions": []
+  },
+  "observed_configuration": {
+    "security_hub_enabled": true,
+    "security_hub_standards_subscription": "cis-aws-foundations",
+    "guardduty_detectors": [
+      {
+        "account": "prod-app",
+        "region": "us-east-1",
+        "enabled": true
+      }
+    ],
+    "organization_auto_enable": "NEW",
+    "existing_account_backfill": "missing",
+    "delegated_admin_configured": "unknown"
+  },
+  "protection_plans": {
+    "s3_data_events": "missing",
+    "malware_protection_for_s3": "missing",
+    "runtime_monitoring": "enabled-in-org-config",
+    "lambda_network_logs": "missing",
+    "ebs_malware_protection": "unknown",
+    "sensitive_workloads": [
+      "customer-upload-s3",
+      "prod-eks-payments",
+      "lambda-order-webhooks"
+    ],
+    "workload_inventory_matched": false
+  },
+  "runtime_monitoring_agent_coverage": {
+    "eks": {
+      "coverage_percent": "unknown",
+      "agent_health": "not-reviewed"
+    },
+    "ecs_fargate": {
+      "coverage_percent": "unknown",
+      "agent_health": "not-reviewed"
+    },
+    "ec2": {
+      "coverage_percent": "unknown",
+      "agent_health": "not-reviewed"
+    }
+  },
+  "finding_delivery": {
+    "eventbridge_rule": "missing",
+    "ticketing_target": "missing",
+    "security_hub_import": "assumed",
+    "s3_export": "missing",
+    "kms_key": "missing",
+    "retention": "unknown",
+    "sample_finding_observed": "missing"
+  },
+  "suppression_filters": [
+    {
+      "name": "archive-crypto-dns",
+      "action": "ARCHIVE",
+      "severity_scope": "unknown",
+      "type_scope": "CryptoCurrency:EC2/BitcoinTool.B!DNS",
+      "owner": "missing",
+      "reason": "noise",
+      "expires": "missing",
+      "last_reviewed": "missing",
+      "compensating_detection": "missing"
+    }
+  ],
+  "expected_gate_results": [
+    {
+      "gate": "AWS-GD-01",
+      "status": "Fail",
+      "evidence": "Account and Region denominator is not reviewed."
+    },
+    {
+      "gate": "AWS-GD-02",
+      "status": "Fail",
+      "evidence": "Only one detector is observed; Security Hub is incorrectly used as coverage proof."
+    },
+    {
+      "gate": "AWS-GD-03",
+      "status": "Fail",
+      "evidence": "Organization auto-enable covers NEW accounts only and existing backfill is missing."
+    },
+    {
+      "gate": "AWS-GD-04",
+      "status": "Fail",
+      "evidence": "Sensitive S3, EKS, and Lambda workloads lack matching protection-plan evidence."
+    },
+    {
+      "gate": "AWS-GD-05",
+      "status": "Not Evaluable",
+      "evidence": "Runtime Monitoring is configured but agent/workload coverage is unknown."
+    },
+    {
+      "gate": "AWS-GD-06",
+      "status": "Fail",
+      "evidence": "Findings do not have verified EventBridge, ticketing, encrypted export, or retention path."
+    },
+    {
+      "gate": "AWS-GD-07",
+      "status": "Fail",
+      "evidence": "Suppression filter archives a high-impact finding type without owner, expiry, review date, or compensating detection."
+    },
+    {
+      "gate": "AWS-GD-08",
+      "status": "Not Evaluable",
+      "evidence": "No sample GuardDuty finding was observed at the destination."
+    }
+  ],
+  "expected_assessment": {
+    "overall_status": "Fail",
+    "risk_rating": "High",
+    "confidence": "Low",
+    "finding": "Security Hub presence is over-credited while GuardDuty coverage and delivery evidence are incomplete."
+  }
+}

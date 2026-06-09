@@ -1,0 +1,130 @@
+{
+  "fixture": "guardduty_complete_org_coverage",
+  "skill": "aws-review",
+  "description": "Benign fixture for organization-wide GuardDuty coverage with documented sandbox exception, workload-relevant protection plans, Runtime Monitoring agent evidence, finding delivery, and suppression review.",
+  "scope": {
+    "organization_id": "o-example",
+    "delegated_admin_account": "security-audit",
+    "in_scope_accounts": [
+      "prod-app",
+      "prod-data",
+      "shared-services"
+    ],
+    "in_scope_regions": [
+      "us-east-1",
+      "us-west-2"
+    ],
+    "exceptions": [
+      {
+        "account": "sandbox-lab",
+        "regions": [
+          "us-east-1"
+        ],
+        "owner": "platform-security",
+        "reason": "isolated lab account with no production data and separate detective controls",
+        "expires": "2026-09-30",
+        "last_reviewed": "2026-06-01"
+      }
+    ]
+  },
+  "guardduty_configuration": {
+    "detectors_enabled": "all-in-scope-accounts-and-regions",
+    "delegated_admin_configured": true,
+    "organization_auto_enable": "ALL",
+    "existing_account_backfill": "completed",
+    "security_hub_enabled": true,
+    "security_hub_used_as_guardduty_proof": false
+  },
+  "protection_plans": {
+    "s3_data_events": "ALL",
+    "malware_protection_for_s3": "enabled-for-customer-upload-buckets",
+    "runtime_monitoring": "ALL",
+    "lambda_network_logs": "ALL",
+    "ebs_malware_protection": "enabled-for-prod-ec2",
+    "workload_inventory_matched": true
+  },
+  "runtime_monitoring_agent_coverage": {
+    "eks": {
+      "coverage_percent": 98,
+      "unsupported_workloads": "two daemonset-exempt nodes with approved exception",
+      "agent_health": "healthy"
+    },
+    "ecs_fargate": {
+      "coverage_percent": 100,
+      "agent_health": "managed"
+    },
+    "ec2": {
+      "coverage_percent": 96,
+      "agent_health": "healthy"
+    }
+  },
+  "finding_delivery": {
+    "eventbridge_rule": "guardduty-finding-to-soc",
+    "ticketing_target": "soc-triage-queue",
+    "security_hub_import": "enabled",
+    "s3_export": "encrypted-guardduty-findings-bucket",
+    "kms_key": "guardduty-findings-cmek",
+    "retention": "365-days-locked",
+    "sample_finding_observed": "guardduty-test-finding-20260609"
+  },
+  "suppression_filters": [
+    {
+      "name": "approved-red-team-dns-finding",
+      "action": "ARCHIVE",
+      "severity_scope": "low",
+      "type_scope": "Recon:EC2/PortProbeUnprotectedPort",
+      "owner": "detection-engineering",
+      "reason": "approved red-team exercise range",
+      "expires": "2026-07-15",
+      "last_reviewed": "2026-06-05",
+      "compensating_detection": "red-team-allowlist-ticket"
+    }
+  ],
+  "expected_gate_results": [
+    {
+      "gate": "AWS-GD-01",
+      "status": "Pass",
+      "evidence": "Account and Region denominator includes all production accounts plus documented sandbox exception."
+    },
+    {
+      "gate": "AWS-GD-02",
+      "status": "Pass",
+      "evidence": "Detectors are enabled in every in-scope account/Region with delegated administrator evidence."
+    },
+    {
+      "gate": "AWS-GD-03",
+      "status": "Pass",
+      "evidence": "Organization auto-enable is ALL and existing-account backfill is complete."
+    },
+    {
+      "gate": "AWS-GD-04",
+      "status": "Pass",
+      "evidence": "S3, malware, runtime, Lambda, and EBS protection plans match workload inventory."
+    },
+    {
+      "gate": "AWS-GD-05",
+      "status": "Pass",
+      "evidence": "Runtime Monitoring agent/workload coverage is recorded for EKS, ECS/Fargate, and EC2."
+    },
+    {
+      "gate": "AWS-GD-06",
+      "status": "Pass",
+      "evidence": "Findings route to SOC queue, Security Hub, EventBridge, and encrypted retained S3 export."
+    },
+    {
+      "gate": "AWS-GD-07",
+      "status": "Pass",
+      "evidence": "Suppression filter has owner, reason, expiry, scope, review date, and compensating detection."
+    },
+    {
+      "gate": "AWS-GD-08",
+      "status": "Pass",
+      "evidence": "Sample GuardDuty test finding was observed at the operational destination."
+    }
+  ],
+  "expected_assessment": {
+    "overall_status": "Pass",
+    "risk_rating": "Low",
+    "confidence": "High"
+  }
+}
