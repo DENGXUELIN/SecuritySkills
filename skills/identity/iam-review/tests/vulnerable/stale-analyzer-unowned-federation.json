@@ -1,0 +1,59 @@
+{
+  "fixture": "stale-analyzer-unowned-federation",
+  "expected_skill_decision": {
+    "decision": "Not Evaluable",
+    "risk_level": "high",
+    "reason": "External access is unowned, unused-permission telemetry is stale for a rare workload, and cross-tenant federation lacks owner, expiry, subject, and audience constraints."
+  },
+  "analyzer_evidence": [
+    {
+      "platform": "aws",
+      "source": "IAM Access Analyzer",
+      "finding_id": "access-analyzer-999",
+      "affected_principal": "arn:aws:iam::111111111111:role/vendor-export",
+      "affected_resource": "arn:aws:s3:::finance-prod-ledger",
+      "external_principal": "arn:aws:iam::999999999999:role/vendor-export",
+      "last_analyzed_at": "2026-03-01T10:00:00Z",
+      "owner_disposition": null,
+      "owner": null,
+      "expiry": null,
+      "condition_constraints": {}
+    },
+    {
+      "platform": "gcp",
+      "source": "IAM Recommender",
+      "recommendation_id": "reco-stale-001",
+      "principal": "serviceAccount:projects/example-project/serviceAccounts/quarterly-report",
+      "recommendation": "remove bigquery.jobs.create",
+      "observation_period_days": 30,
+      "last_audit_log_event": "2026-03-31T23:59:59Z",
+      "workload_pattern": "quarterly_financial_close",
+      "owner_disposition": null
+    },
+    {
+      "platform": "entra",
+      "source": "workload identity federation",
+      "app_id": "11111111-2222-3333-4444-555555555555",
+      "issuer": "https://token.actions.githubusercontent.com",
+      "subject": "repo:example/payments:*",
+      "audiences": [
+        "*"
+      ],
+      "tenant_constraints": [],
+      "approver": null,
+      "expiry": null
+    }
+  ],
+  "corroboration": {
+    "recent_audit_logs_checked": false,
+    "policy_simulation_passed": false,
+    "representative_actions": [],
+    "rollback_owner": null,
+    "break_glass_path": null
+  },
+  "final_recommendation": {
+    "action": "owner_triage_required",
+    "exception_required": true,
+    "exception_review_date": null
+  }
+}

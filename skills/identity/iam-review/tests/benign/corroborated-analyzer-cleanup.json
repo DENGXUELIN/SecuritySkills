@@ -1,0 +1,52 @@
+{
+  "fixture": "corroborated-analyzer-cleanup",
+  "expected_skill_decision": {
+    "decision": "Reduce",
+    "risk_level": "low",
+    "reason": "Analyzer recommendations are fresh, owner-approved, corroborated by audit logs and simulation, and have a rollback owner."
+  },
+  "analyzer_evidence": [
+    {
+      "platform": "aws",
+      "source": "IAM Access Analyzer",
+      "finding_id": "access-analyzer-001",
+      "affected_principal": "arn:aws:iam::111111111111:role/reporting-export",
+      "affected_resource": "arn:aws:s3:::finance-redacted-reports",
+      "external_principal": "arn:aws:iam::222222222222:role/vendor-reader",
+      "last_analyzed_at": "2026-06-08T10:00:00Z",
+      "owner_disposition": "approved_until_expiry",
+      "owner": "finance-platform",
+      "expiry": "2026-07-01",
+      "condition_constraints": {
+        "external_id": "vendor-reporting-prod",
+        "aws_principal_org_id": "o-exampleorg"
+      }
+    },
+    {
+      "platform": "gcp",
+      "source": "IAM Recommender",
+      "recommendation_id": "reco-123",
+      "principal": "serviceAccount:projects/example-project/serviceAccounts/monthly-report",
+      "recommendation": "remove storage.objects.delete",
+      "observation_period_days": 180,
+      "last_audit_log_event": "2026-05-31T23:59:59Z",
+      "workload_pattern": "monthly",
+      "owner_disposition": "approved_removal"
+    }
+  ],
+  "corroboration": {
+    "recent_audit_logs_checked": true,
+    "policy_simulation_passed": true,
+    "representative_actions": [
+      "s3:GetObject",
+      "storage.objects.get"
+    ],
+    "rollback_owner": "identity-platform",
+    "break_glass_path": "privileged-access-request/IAM-ROLLBACK"
+  },
+  "final_recommendation": {
+    "action": "reduce_permission",
+    "exception_required": true,
+    "exception_review_date": "2026-06-30"
+  }
+}
