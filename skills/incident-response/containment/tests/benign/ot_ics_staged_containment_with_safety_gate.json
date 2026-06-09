@@ -1,0 +1,76 @@
+{
+  "case": "benign_ot_ics_staged_containment_with_safety_gate",
+  "skill": "containment",
+  "expected_result": "Pass",
+  "incident": {
+    "summary": "Vendor VPN account used for suspicious remote administration into an OT engineering workstation",
+    "selected_action": "Close vendor VPN ingress, block RDP and SMB from the enterprise zone, preserve required OT control and visibility flows, and monitor the engineering workstation through an approved jump path"
+  },
+  "safety_gate": {
+    "OTICS-SAFE-01_asset_role_dependency_map": {
+      "engineering_workstation": "programming path only",
+      "plc": "controller path preserved",
+      "hmi": "operator visibility preserved",
+      "sis": "independent safety path untouched",
+      "historian": "replication preserved",
+      "jump_host": "approved break-glass path with recording"
+    },
+    "OTICS-SAFE-02_process_state": {
+      "line": "batch-line-4",
+      "state": "stable",
+      "operating_mode": "normal production",
+      "shutdown_window": "available in 45 minutes if needed"
+    },
+    "OTICS-SAFE-03_safety_interlock_operator_visibility": {
+      "sis_status": "healthy",
+      "alarms_visible_on_hmi": true,
+      "operator_confirmation": "shift-supervisor-2026-06-06T22:15Z"
+    },
+    "OTICS-SAFE-04_operations_approval": {
+      "approver": "control-engineer-on-call",
+      "timestamp": "2026-06-06T22:18Z",
+      "decision": "approve staged containment; no controller isolation"
+    },
+    "OTICS-SAFE-05_manual_fallback": {
+      "manual_mode_available": true,
+      "alternate_hmi": "local panel",
+      "fallback_owner": "process-engineer"
+    },
+    "OTICS-SAFE-06_preserve_block_flow_matrix": {
+      "preserve": [
+        "PLC to HMI",
+        "PLC to historian",
+        "SIS alarms to HMI",
+        "OT logging to collector",
+        "NTP within OT zone"
+      ],
+      "block": [
+        "vendor VPN ingress",
+        "RDP from enterprise zone",
+        "SMB from enterprise zone",
+        "known C2 egress"
+      ]
+    },
+    "OTICS-SAFE-07_evidence_continuity": {
+      "historian_continuity": "verified",
+      "security_telemetry": "verified",
+      "backup_status": "verified"
+    },
+    "OTICS-SAFE-08_post_containment_validation_owner": {
+      "owner": "shift-supervisor",
+      "checks": [
+        "process stable",
+        "alarms visible",
+        "controller communication healthy",
+        "historian receiving data",
+        "vendor VPN disabled"
+      ],
+      "timestamp": "2026-06-06T22:30Z"
+    }
+  },
+  "expected_review": {
+    "status": "Pass",
+    "severity_floor": "None",
+    "rationale": "The plan blocks the attacker ingress and remote-admin paths while preserving required OT control, safety, historian, logging, and operator-visibility flows with named operations approval and post-change validation."
+  }
+}

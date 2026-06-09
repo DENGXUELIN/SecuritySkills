@@ -12,7 +12,7 @@ phase: [respond]
 frameworks: [NIST-SP-800-61r2, MITRE-ATT&CK]
 difficulty: intermediate
 time_estimate: "15-30min"
-version: "1.0.1"
+version: "1.0.2"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -57,6 +57,7 @@ Before selecting a containment strategy, gather or confirm:
 - [ ] **Network topology** -- VLANs, subnets, firewall zones, cloud VPCs, segmentation boundaries relevant to the affected systems.
 - [ ] **Evidence preservation status** -- Has volatile evidence been captured? (Reference forensics-checklist.) Containment actions may destroy evidence if not collected first.
 - [ ] **Current containment state** -- What actions, if any, have already been taken?
+- [ ] **OT/ICS safety context** -- If affected assets include PLC, DCS, SIS, HMI, historian, engineering workstation, OT jump host, or vendor remote access, confirm process state, safety interlock status, preserve/block flow needs, fallback mode, and named operations/control-engineering approval before disruptive isolation.
 
 ---
 
@@ -201,6 +202,32 @@ Wiper and destructive malware require a distinct containment approach from ranso
 
 **Key difference from ransomware containment:** Do not attempt to "monitor and observe" a wiper in progress. Every second of observation is data permanently destroyed. Aggressive, immediate containment is always the correct posture for confirmed wiper activity.
 
+### Step 4c: OT/ICS Safety and Operations Gate
+
+OT/ICS containment must protect human safety, environmental safety, process stability, and operator visibility while still blocking the attacker path. Do not treat PLC, DCS, SIS, HMI, historian, engineering workstation, OT jump host, or vendor remote access paths like ordinary IT endpoints.
+
+**Required evidence gates before full isolation, switchport shutdown, controller ACL changes, vendor remote-access changes, or controlled shutdown decisions:**
+
+| Gate | Required evidence | Unsafe false positive prevented |
+|---|---|---|
+| `OTICS-SAFE-01` | Asset role and dependency map for PLC/DCS/SIS/HMI/historian/engineering workstation/jump host/vendor access paths. | Disconnecting a shared path without knowing it carries control or safety visibility. |
+| `OTICS-SAFE-02` | Current process state, operating mode, affected line/unit, and whether the process is stable, startup, shutdown, paused, or abnormal. | Applying IT-style isolation while the process is in a fragile state. |
+| `OTICS-SAFE-03` | Safety interlock, alarm, operator-visibility, and SIS status from operations/control engineering. | Removing visibility or safety monitoring while claiming containment is safe. |
+| `OTICS-SAFE-04` | Named operations/control-engineering approver, timestamp, decision, and emergency override rationale if approval is bypassed. | SOC-only containment decisions on safety-critical assets. |
+| `OTICS-SAFE-05` | Manual-mode, local-control, alternate HMI, or controlled-shutdown fallback if containment affects control paths. | No safe fallback when network changes disrupt process control. |
+| `OTICS-SAFE-06` | Preserve/block flow matrix covering controller, HMI, historian, safety monitoring, logging, time sync, IT ingress, vendor VPN, remote admin, SMB/RDP, and C2 egress. | Blocking required OT flows or leaving the attacker ingress open. |
+| `OTICS-SAFE-07` | OT evidence continuity plan for historian data, security telemetry, backup status, and post-action logging. | Blinding responders or losing process evidence during containment. |
+| `OTICS-SAFE-08` | Post-containment validation owner and checks for process stability, alarm state, controller communication, historian continuity, and approved remote access state. | Assuming the containment was safe without operational validation. |
+
+**Finding guidance:**
+
+| Condition | Result |
+|---|---|
+| A plan shuts down controller/HMI/historian/shared OT network paths without the OT/ICS safety gate | Fail; revise before execution unless immediate life/safety or equipment-damage risk is documented |
+| Vendor remote access remains open without break-glass approval, recording, time limit, and named owner | High |
+| IT ingress and remote administration are blocked while controller/HMI/SIS/historian/logging flows are explicitly preserved and validated | Pass |
+| Process state, safety interlock status, or operations approval is unavailable | Not Evaluable; request operations/control-engineering evidence |
+
 ### Step 5: Containment Validation
 
 After implementing containment, verify effectiveness before proceeding to eradication.
@@ -215,6 +242,9 @@ After implementing containment, verify effectiveness before proceeding to eradic
 | Attacker persistence neutralized | Scan for known persistence mechanisms | No active persistence artifacts |
 | Business services operational (if surgical containment) | Verify critical service health checks | Services responding normally |
 | Evidence preserved | Verify forensic images and memory dumps are intact and hashed | Hash verification passes |
+| OT process stability confirmed (if applicable) | Operator/control-engineering confirmation after containment change | Process remains safe, stable, and visible |
+| Required OT flows preserved (if applicable) | Verify controller, HMI, SIS/alarm, historian, logging, backup, and time-sync paths | Preserve flows remain available |
+| OT attacker ingress blocked (if applicable) | Review vendor VPN, jump host, IT ingress, remote admin, SMB/RDP, and C2 controls | Block flows are denied or explicitly approved break-glass |
 
 **Containment failure indicators:**
 - New C2 connections from previously unknown infrastructure
@@ -256,7 +286,7 @@ Produce the containment plan with these exact sections:
 ```markdown
 ## Containment Plan: [Incident ID]
 **Date:** [YYYY-MM-DD]
-**Skill:** containment v1.0.0
+**Skill:** containment v1.0.2
 **Frameworks:** NIST SP 800-61 Rev 2, MITRE ATT&CK
 **Incident Commander:** [Name]
 
@@ -289,6 +319,19 @@ threat severity and business criticality, and expected impact on operations.]
 |---|---|---|---|
 | [Service] | [Description of disruption] | [Workaround if any] | [Yes/No -- requires escalation] |
 
+### OT/ICS Safety and Operations Gate
+| Field | Evidence |
+|---|---|
+| OT asset role and dependencies | [PLC/DCS/SIS/HMI/historian/engineering workstation/jump host/vendor access/Not applicable] |
+| Process state and operating mode | [Stable/startup/shutdown/paused/abnormal/unknown] |
+| Safety interlock and operator visibility | [Healthy/degraded/unknown/not applicable] |
+| Operations/control engineering approval | [Approver, timestamp, decision, emergency override rationale if any] |
+| Manual fallback or controlled shutdown | [Fallback path, local-control mode, alternate HMI, or shutdown window] |
+| Preserve flows | [Controller/HMI/SIS/historian/logging/backup/time sync] |
+| Block flows | [IT ingress/vendor VPN/remote admin/SMB/RDP/C2/internet egress] |
+| Evidence continuity | [Historian/security telemetry/backup status/logging continuity] |
+| Post-containment validation owner | [Owner and validation checks] |
+
 ### Containment Validation Checklist
 | Check | Result | Timestamp |
 |---|---|---|
@@ -316,6 +359,10 @@ NIST SP 800-61 Rev 2 Section 3.3 defines containment as the first priority after
 - **Evidence must be considered.** NIST explicitly states that containment strategies should account for evidence preservation needs. Some containment actions (shutting down a system, wiping and reimaging) destroy volatile evidence that may be critical for understanding the full scope of compromise.
 
 - **Criteria for strategy selection.** NIST identifies potential damage to resources, need for evidence preservation, service availability, time and resources needed, effectiveness of the strategy, and duration of the solution as the key factors for choosing a containment approach.
+
+### NIST SP 800-82 Rev 3 -- OT Security
+
+NIST SP 800-82 Rev 3 emphasizes that OT systems have safety, reliability, availability, timing, and process-continuity constraints that differ from enterprise IT. For OT/ICS containment, use staged preserve/block decisions and operations/control-engineering approval before disruptive network isolation unless immediate life/safety or equipment-damage risk justifies an emergency override.
 
 ### MITRE ATT&CK -- Mapping Techniques to Containment
 
@@ -376,3 +423,5 @@ This skill processes incident data including attacker-controlled indicators (IP 
 10. **MITRE ATT&CK -- Disk Wipe (T1561)** -- https://attack.mitre.org/techniques/T1561/
 11. **CISA Destructive Malware Guidance** -- https://www.cisa.gov/topics/cyber-threats-and-advisories
 12. **KrebsOnSecurity: Iran-backed wiper attack on Stryker medtech (2026)** -- https://krebsonsystems.com/2026/03/iran-backed-hackers-claim-wiper-attack-on-medtech-firm-stryker/
+13. **NIST SP 800-82 Rev 3** -- Guide to Operational Technology (OT) Security -- https://csrc.nist.gov/pubs/sp/800/82/r3/final
+14. **CISA ICS Recommended Practices** -- https://www.cisa.gov/resources-tools/resources/ics-recommended-practices

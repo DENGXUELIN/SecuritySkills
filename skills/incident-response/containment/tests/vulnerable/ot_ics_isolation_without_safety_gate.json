@@ -1,0 +1,37 @@
+{
+  "case": "vulnerable_ot_ics_isolation_without_safety_gate",
+  "skill": "containment",
+  "expected_result": "Fail",
+  "incident": {
+    "summary": "Suspicious SMB and remote-administration traffic from an engineering workstation in an OT cell",
+    "proposed_action": "Disable the shared switchport carrying engineering workstation, PLC, HMI, historian, and security logging traffic",
+    "asset_roles": {
+      "engineering_workstation": "suspected compromise",
+      "plc_path": "unknown",
+      "hmi_path": "unknown",
+      "historian_path": "unknown",
+      "sis_or_alarm_visibility": "unknown"
+    }
+  },
+  "missing_evidence": {
+    "OTICS-SAFE-01_asset_role_dependency_map": true,
+    "OTICS-SAFE-02_process_state": true,
+    "OTICS-SAFE-03_safety_interlock_operator_visibility": true,
+    "OTICS-SAFE-04_operations_approval": true,
+    "OTICS-SAFE-05_manual_fallback": true,
+    "OTICS-SAFE-06_preserve_block_flow_matrix": true,
+    "OTICS-SAFE-07_evidence_continuity": true,
+    "OTICS-SAFE-08_post_containment_validation_owner": true
+  },
+  "unsafe_effects": [
+    "May remove operator HMI visibility during a running process",
+    "May interrupt historian and security telemetry at the same time containment is applied",
+    "May block engineering access needed for a controlled shutdown or manual fallback",
+    "Does not prove vendor or IT ingress paths are the actual attacker path being blocked"
+  ],
+  "expected_review": {
+    "status": "Fail",
+    "severity_floor": "High",
+    "required_revision": "Stage containment by closing IT ingress/vendor remote access and remote-admin paths while preserving controller, HMI, SIS/alarm, historian, logging, backup, and time-sync flows until operations/control engineering approves any disruptive isolation."
+  }
+}
