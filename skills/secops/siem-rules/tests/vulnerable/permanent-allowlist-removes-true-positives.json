@@ -1,0 +1,59 @@
+{
+  "case": "permanent_allowlist_removes_true_positives",
+  "skill": "siem-rules",
+  "expected_result": "finding",
+  "rule": {
+    "name": "Password Spray Detection",
+    "platform": "sentinel",
+    "attack_technique": "T1110.003",
+    "rule_id": "sentinel-password-spray-001"
+  },
+  "suppression": {
+    "type": "query_filter",
+    "query_fragment": "where IPAddress !in (trusted_networks)",
+    "lookup": "trusted_networks",
+    "scope": {
+      "networks": ["0.0.0.0/0"],
+      "environments": ["prod", "staging", "dev"],
+      "users": ["*"]
+    },
+    "owner": null,
+    "detection_owner": null,
+    "ticket": null,
+    "rationale": "reduce alert noise",
+    "expiry": null,
+    "review_cadence": null
+  },
+  "regression": {
+    "known_true_positive_replay": "failed",
+    "before_count": 12,
+    "after_count": 0,
+    "residual_coverage": null
+  },
+  "expected_findings": [
+    {
+      "gate": "SIEM-SUP-02",
+      "reason": "No owner, detection owner, ticket, rationale review, or approval authority is recorded."
+    },
+    {
+      "gate": "SIEM-SUP-03",
+      "reason": "Suppression scope is effectively global and removes the target population."
+    },
+    {
+      "gate": "SIEM-SUP-04",
+      "reason": "Permanent suppression has no expiry or review cadence."
+    },
+    {
+      "gate": "SIEM-SUP-05",
+      "reason": "Known true-positive replay failed and after-count dropped to zero."
+    },
+    {
+      "gate": "SIEM-SUP-06",
+      "reason": "No residual coverage or compensating detection is documented."
+    },
+    {
+      "gate": "SIEM-SUP-07",
+      "reason": "Lookup changes can broaden suppression without independent review evidence."
+    }
+  ]
+}

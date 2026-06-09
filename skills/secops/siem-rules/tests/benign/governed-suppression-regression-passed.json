@@ -1,0 +1,47 @@
+{
+  "case": "governed_suppression_regression_passed",
+  "skill": "siem-rules",
+  "expected_result": "pass",
+  "rule": {
+    "name": "Impossible Travel Detection",
+    "platform": "sentinel",
+    "attack_technique": "T1078",
+    "rule_id": "sentinel-impossible-travel-001"
+  },
+  "suppression": {
+    "id": "EX-0042",
+    "query_fragment": "where UserPrincipalName != 'svc-vpn-healthcheck'",
+    "scope": {
+      "users": ["svc-vpn-healthcheck"],
+      "apps": ["VPN Gateway Health Probe"],
+      "environments": ["prod"],
+      "tenants": ["tenant-a"]
+    },
+    "owner": "identity-platform",
+    "detection_owner": "soc-detections",
+    "ticket": "CHG-2026-0606",
+    "rationale": "VPN health probe generates impossible-travel pairs from fixed vendor egress nodes.",
+    "expiry": "2026-06-20",
+    "review_cadence": "14d"
+  },
+  "regression": {
+    "known_true_positive_replay": "passed",
+    "expected_benign_suppressed": "passed",
+    "before_count": 4,
+    "after_count": 3,
+    "residual_coverage": [
+      "service-account interactive login alert",
+      "VPN health probe source-IP drift alert"
+    ]
+  },
+  "covered_gates": [
+    "SIEM-SUP-01",
+    "SIEM-SUP-02",
+    "SIEM-SUP-03",
+    "SIEM-SUP-04",
+    "SIEM-SUP-05",
+    "SIEM-SUP-06",
+    "SIEM-SUP-07",
+    "SIEM-SUP-08"
+  ]
+}

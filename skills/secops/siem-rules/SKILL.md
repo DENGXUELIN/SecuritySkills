@@ -12,7 +12,7 @@ phase: [operate]
 frameworks: [MITRE-ATT&CK-v16]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -456,6 +456,45 @@ Suppression:         Enabled, 1 hour
 Entity mapping:      Account -> UserPrincipalName, IP -> IPAddress, Host -> Computer
 ```
 
+### Step 4a: Suppression and Exception Governance
+
+Treat rule suppressions, exclusions, lookup allowlists, and macro filters as detection-control changes. They can be valid tuning controls, but they can also remove the exact true positives the rule was built to catch.
+
+**What to verify before accepting a suppression or exception:**
+
+- Exact rule ID, query fragment, lookup, macro, entity scope, data source, tenant/account, and environment are documented.
+- Detection owner, business owner, change ticket, risk rationale, expiry or review cadence, and approval authority are recorded.
+- Suppression scope is narrow enough that it does not remove the rule's target class, such as all privileged users from an admin-account rule.
+- Known true-positive replay still fires, or residual coverage is documented with another rule and response path.
+- Before/after result counts are captured so tuning does not silently reduce detection to zero.
+- Expired suppressions are automatically disabled, escalated, or reviewed, especially for identity systems, domain controllers, production admin accounts, and internet-facing assets.
+- Lookup tables and macros used for exclusions have change history and owner review, not only query text review.
+- Maintenance windows are time-bounded and tied to specific entities, not broad wildcard patterns.
+
+**Detection methods using allowed tools:**
+
+```
+# Find suppression, exception, and allowlist logic
+Grep: "suppress|suppression|exclude|exception|allowlist|whitelist|trusted|ignore" in **/*.{kql,spl,yaml,yml,json,md}
+Grep: "lookup|macro|inputlookup|watchlist|datatable|externaldata" in **/*.{kql,spl,yaml,yml,json,md}
+Grep: "expiry|expires|review|owner|ticket|residual|regression|true_positive" in **/*.{kql,spl,yaml,yml,json,md}
+```
+
+**Suppression governance gates:**
+
+| Gate | Evidence Required | Finding Trigger |
+|---|---|---|
+| SIEM-SUP-01 | Record rule ID, platform, ATT&CK mapping, exact suppression query fragment, lookup, macro, and data source. | Exception is described only as "trusted network" or "known admin noise." |
+| SIEM-SUP-02 | Record owner, detection owner, approval ticket, risk rationale, and approval authority. | Broad tuning exists without accountable owner or ticket. |
+| SIEM-SUP-03 | Scope suppression to explicit entities, environments, tenants/accounts, apps, and time windows. | Wildcards or broad groups remove the rule's target population. |
+| SIEM-SUP-04 | Set expiry or review cadence with an automated or documented removal path. | Permanent suppressions have no review or expiration. |
+| SIEM-SUP-05 | Replay known true-positive events after tuning and record before/after counts. | Tuning removes all true positives or lacks regression evidence. |
+| SIEM-SUP-06 | Document residual coverage and compensating detections when true-positive volume is intentionally reduced. | Suppression reduces coverage without another alert or response path. |
+| SIEM-SUP-07 | Review lookup/watchlist/macro changes that affect suppression independently from query-code changes. | Lookup updates can silently broaden suppression without review. |
+| SIEM-SUP-08 | Escalate stale suppressions on high-value assets or identity controls as high-risk detection bypass. | Expired maintenance or broad admin exclusions remain active. |
+
+**Finding classification:** Permanent or broad suppressions that remove true-positive coverage are **P2 High**. Expired suppressions on identity systems, domain controllers, or production admin accounts are **P2 High**. Missing owner, ticket, expiry, or true-positive replay evidence is **P3 Medium**.
+
 ### Step 5: Detection Rule Lifecycle Management
 
 **Lifecycle stages:**
@@ -533,6 +572,16 @@ Produce SIEM rule deliverables in this structure:
 | Time window | [Xm/h] | [Why this window] |
 | Frequency | [Xm/h] | [How often to run] |
 | Suppression | [Xh] | [Cooldown period] |
+
+### Suppression / Exception Governance
+| Field | Value |
+|-------|-------|
+| Suppression Scope | [rule ID, query fragment, lookup/macro, entities, environment] |
+| Owner / Approval | [business owner, detection owner, ticket, approver] |
+| Expiry / Review | [date or cadence] |
+| Regression Evidence | [known TP replay, before/after counts] |
+| Residual Coverage | [compensating detections or accepted risk] |
+| Governance Decision | [Accept / Revise / Remove / Escalate] |
 
 ### Entity Mapping
 | Entity Type | Source Field |
