@@ -1,0 +1,66 @@
+{
+  "case_id": "benign-mediated-sidecar-artifact-integrity-complete",
+  "skill": "threat-modeling",
+  "expected_result": "acceptable_with_documented_controls",
+  "architecture": "event-driven service mesh with signed CI artifacts",
+  "flows": [
+    {
+      "flow_id": "DFD-ORDER-EVENT-01",
+      "source": "order-service",
+      "destination": "notification-service",
+      "trust_model": "mediated",
+      "communication_type": "event_bus",
+      "path": [
+        "order-service",
+        "eventbridge-prod-bus",
+        "notification-service"
+      ],
+      "enforcement_point": "eventbridge-prod-bus resource policy and rule filter",
+      "delegation_context": "workload identity only; no end-user impersonation",
+      "authentication": "AWS SigV4 with scoped IAM role",
+      "payload_authorization": "event schema and source account allowlist enforced at bus",
+      "data_classification": "Internal",
+      "end_to_end_decision": "acceptable"
+    },
+    {
+      "flow_id": "DFD-MESH-01",
+      "source": "checkout-service",
+      "destination": "inventory-service",
+      "trust_model": "sidecar",
+      "communication_type": "network",
+      "enforcement_point": "Istio sidecar proxy",
+      "workload_identity": "spiffe://cluster.local/ns/prod/sa/inventory",
+      "mtls_policy": "STRICT",
+      "cross_mesh_trust_domain": "not_applicable",
+      "delegation_context": "end-user claim propagated in signed internal JWT",
+      "end_to_end_decision": "acceptable"
+    },
+    {
+      "flow_id": "DFD-CICD-ARTIFACT-01",
+      "source": "github-actions-build",
+      "destination": "ecr-prod-registry",
+      "trust_model": "direct",
+      "communication_type": "artifact_push",
+      "enforcement_point": "OIDC federated role with repository and branch conditions",
+      "artifact_integrity": {
+        "source_revision": "commit_sha_bound",
+        "provenance_attestation": "slsa-v1",
+        "signature_verification": "cosign_verified",
+        "digest_pinning": true,
+        "tag_immutability": true,
+        "deploy_time_verification": "admission_policy_requires_signed_digest"
+      },
+      "end_to_end_decision": "acceptable"
+    }
+  ],
+  "evidence_gate_results": {
+    "TM-FLOW-01": "pass",
+    "TM-FLOW-02": "pass",
+    "TM-FLOW-03": "pass",
+    "TM-FLOW-04": "pass",
+    "TM-FLOW-05": "not_applicable",
+    "TM-FLOW-06": "not_applicable",
+    "TM-FLOW-07": "pass",
+    "TM-FLOW-08": "pass"
+  }
+}

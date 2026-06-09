@@ -1,0 +1,68 @@
+{
+  "case_id": "vulnerable-point-to-point-model-misses-mediated-local-artifact-risk",
+  "skill": "threat-modeling",
+  "expected_result": "findings",
+  "architecture": "serverless pipeline and sidecar logging modeled as simple network flows",
+  "modeled_flows": [
+    {
+      "flow_id": "DFD-ASYNC-01",
+      "source": "process-orders-lambda",
+      "destination": "update-inventory-lambda",
+      "protocol": "EventBridge plus SQS",
+      "trust_model": "missing",
+      "communication_type": "missing",
+      "modeled_as": "point_to_point",
+      "payload_authorization": "not_evaluated",
+      "finding": "TM-FLOW-03"
+    },
+    {
+      "flow_id": "DFD-SIDECAR-LOG-01",
+      "source": "app-container",
+      "destination": "log-collector-sidecar",
+      "protocol": "shared emptyDir volume",
+      "trust_model": "missing",
+      "communication_type": "network",
+      "isolation_context": "not_evaluated",
+      "data_classification": "Restricted audit events",
+      "finding": "TM-FLOW-05"
+    },
+    {
+      "flow_id": "DFD-CICD-ARTIFACT-01",
+      "source": "ci-runner",
+      "destination": "container-registry",
+      "protocol": "docker push over HTTPS",
+      "artifact_integrity": {
+        "provenance_attestation": "missing",
+        "signature_verification": "missing",
+        "digest_pinning": false,
+        "tag_immutability": false,
+        "deploy_time_verification": "missing"
+      },
+      "oidc_trust_scope": "repository wildcard, branch unrestricted",
+      "finding": "TM-FLOW-07"
+    }
+  ],
+  "expected_findings": [
+    {
+      "id": "TM-FLOW-01",
+      "severity": "Medium",
+      "reason": "Flows lack trust model classification, so mediated and local trust boundaries are not reviewed."
+    },
+    {
+      "id": "TM-FLOW-03",
+      "severity": "High",
+      "reason": "Serverless async path is modeled only as producer and consumer endpoints, missing broker and queue policy boundaries."
+    },
+    {
+      "id": "TM-FLOW-05",
+      "severity": "High",
+      "reason": "Restricted audit events cross a shared volume into a sidecar without pod/container isolation evidence."
+    },
+    {
+      "id": "TM-FLOW-07",
+      "severity": "Critical",
+      "reason": "CI artifact publication lacks provenance, signature, digest immutability, and deploy verification evidence."
+    }
+  ],
+  "reviewer_warning": "Do not flatten event buses, sidecars, shared volumes, or artifact publication into generic network flows. Require trust model, communication type, enforcement point, isolation, delegation, and artifact integrity evidence."
+}
