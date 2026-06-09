@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [CIS-AWS-v3.0.0]
 difficulty: intermediate
 time_estimate: "60-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -99,6 +99,25 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, gre
 
 ---
 
+### Step 6A: AWS Organizations Coverage Evidence
+
+Before describing results as organization-wide, collect evidence that the review covered the AWS Organization and not only a single account export. If the evidence is unavailable, keep the status for organization-wide claims as **Not Evaluable**.
+
+| Gate | Evidence Required | Fail / Not Evaluable When |
+|------|-------------------|---------------------------|
+| `AWS-ORG-COV-01` Account inventory | Management account, account IDs, OU path, account status, environment, owner, and delegated-admin role for every in-scope account | Only one account export is provided, suspended accounts are omitted, or production OUs lack owners |
+| `AWS-ORG-COV-02` OU and SCP attachment map | SCP names, policy IDs, attachment targets, affected OUs/accounts, exception paths, and last effectiveness test | SCPs exist but are unattached, attached to the wrong OU, or untested against representative accounts |
+| `AWS-ORG-COV-03` Organization CloudTrail | Organization trail flag, all regions, opt-in regions, management events, log validation, KMS key, log bucket account, and covered accounts | Trail is account-local, opt-in regions are missing, management events are disabled, or log validation/KMS evidence is absent |
+| `AWS-ORG-COV-04` AWS Config aggregator | Aggregator account, all-account authorization, covered accounts, covered regions, global resource recording, and stale-account handling | Aggregator misses production accounts, opt-in regions, or global resources |
+| `AWS-ORG-COV-05` Delegated security services | Delegated admin, account list, region list, and last verified date for Security Hub, GuardDuty, IAM Access Analyzer, Macie, and Inspector | A service is enabled only in the audit account or has inconsistent delegated-admin scope |
+| `AWS-ORG-COV-06` Control Tower / landing zone drift | Enrolled account list, enabled controls, disabled controls, drift status, excluded OUs, and last drift check | Control Tower is assumed to cover unenrolled or drifted accounts |
+| `AWS-ORG-COV-07` Exception and break-glass accounts | Account ID, OU, owner, reason, approval, expiry/review date, monitoring coverage, and compensating controls | Break-glass, sandbox, acquisition, or excluded accounts bypass guardrails without expiry and monitoring |
+| `AWS-ORG-COV-08` Organization claim decision | Scope label: Single Account, OU-scoped, Organization-wide, or Not Evaluable, with evidence date and reviewer confidence | Report claims organization-wide coverage while any required organization evidence gate is missing |
+
+When the review input lacks live AWS exports, require structured evidence files or screenshots from approved commands such as `organizations list-accounts`, `list-policies-for-target`, `cloudtrail describe-trails`, `configservice describe-configuration-aggregators`, and the delegated admin APIs for each security service. Do not infer coverage from Terraform module names alone.
+
+---
+
 ### Step 7: Compile Assessment Report
 
 Produce the final report using the structure defined in the Output Format section.
@@ -115,6 +134,12 @@ Produce the final report using the structure defined in the Output Format sectio
 | **Low** | Hardening recommendation or defense-in-depth measure | Missing Macie classification, no hardware MFA on root (when virtual MFA exists), missing access analyzer in non-primary regions |
 | **Informational** | Best practice observation, no direct security impact | Naming conventions, tag hygiene, documentation gaps |
 
+**Organization coverage classification:**
+
+- **High:** Organization-wide claim is made while organization CloudTrail, Config aggregator, SCP attachment, delegated security services, or exception-account evidence is incomplete for production accounts.
+- **Medium:** Coverage is OU-scoped or service-specific, but the report labels limitations clearly and identifies missing accounts/regions.
+- **Low:** All organization evidence gates pass, but review cadence or stale suspended-account handling needs improvement.
+
 ---
 
 ## Output Format
@@ -127,6 +152,8 @@ Produce the final report using the structure defined in the Output Format sectio
 - Date: <assessment date>
 - Framework: CIS Amazon Web Services Foundations Benchmark v3.0.0
 - Files reviewed: <list of IaC files>
+- Scope decision: <Single Account / OU-scoped / Organization-wide / Not Evaluable>
+- Organization evidence date: <YYYY-MM-DD or Not Provided>
 
 ### Executive Summary
 - Total CIS recommendations evaluated: <N>/62
@@ -145,6 +172,18 @@ Produce the final report using the structure defined in the Output Format sectio
 | 3 | Logging | X/11 | Y | Z | nn% |
 | 4 | Monitoring | X/16 | Y | Z | nn% |
 | 5 | Networking | X/6 | Y | Z | nn% |
+
+### Organization Coverage Evidence
+
+| Evidence Area | Status | Covered Accounts / Regions | Owner | Last Verified | Limitations |
+|---------------|--------|----------------------------|-------|---------------|-------------|
+| Account Inventory | Pass / Fail / Not Evaluable | <count and OU scope> | <team> | <date> | <gaps> |
+| SCP Attachments | Pass / Fail / Not Evaluable | <targets> | <team> | <date> | <gaps> |
+| Organization CloudTrail | Pass / Fail / Not Evaluable | <accounts/regions> | <team> | <date> | <gaps> |
+| AWS Config Aggregator | Pass / Fail / Not Evaluable | <accounts/regions> | <team> | <date> | <gaps> |
+| Delegated Security Services | Pass / Fail / Not Evaluable | <service/account/region matrix> | <team> | <date> | <gaps> |
+| Control Tower / Landing Zone Drift | Pass / Fail / Not Evaluable | <enrolled accounts/OUs> | <team> | <date> | <gaps> |
+| Exception / Break-glass Accounts | Pass / Fail / Not Evaluable | <accounts> | <team> | <date> | <gaps> |
 
 ### Detailed Findings
 
@@ -200,6 +239,8 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **Assuming default security groups are empty.** AWS default security groups allow all inbound traffic from the same security group and all outbound traffic. CIS 5.4 requires explicitly managing them to have zero rules.
 5. **Overlooking IMDSv2 in launch templates.** CIS 5.6 applies to both `aws_instance` and `aws_launch_template` resources. Checking only direct instance definitions misses auto-scaled instances.
 6. **Counting not-evaluable controls as passing.** If a control cannot be verified from the available IaC (e.g., contact details in CIS 1.1), mark it "Not Evaluable" rather than "Pass."
+7. **Treating one account as the organization.** A hardened audit or workload account does not prove organization governance. Require account inventory, OU scope, SCP attachment, organization CloudTrail, Config aggregator, delegated security service, and exception-account evidence before claiming organization-wide coverage.
+8. **Assuming delegated admin means full coverage.** Security Hub, GuardDuty, Access Analyzer, Macie, and Inspector can have different delegated administrators, regions, and member-account enrollment. Verify each service independently.
 
 ---
 
@@ -231,4 +272,5 @@ Produce the final report using the structure defined in the Output Format sectio
 
 ## Changelog
 
+- **1.0.1** -- Added AWS Organizations coverage evidence gates, organization scope decision output, delegated security service coverage checks, and exception-account evidence requirements.
 - **1.0.0** -- Initial release. Full coverage of CIS Amazon Web Services Foundations Benchmark v3.0.0 sections 1 through 5 (62 recommendations).

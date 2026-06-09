@@ -1,0 +1,72 @@
+{
+  "fixture": "single-account-claimed-organization",
+  "expected_skill_decision": {
+    "decision": "Not Evaluable",
+    "risk_level": "high",
+    "reason": "The report claims organization-wide governance from a single account export while SCP, CloudTrail, Config, delegated admin, and exception-account evidence is missing."
+  },
+  "organization_evidence": {
+    "evidence_date": "2026-06-08",
+    "management_account": null,
+    "log_archive_account": null,
+    "security_tooling_account": null,
+    "scope_decision": "Not Evaluable",
+    "reviewer_confidence": "low"
+  },
+  "account_inventory": [
+    {
+      "account_id": "444444444444",
+      "ou_path": null,
+      "status": "ACTIVE",
+      "environment": "production",
+      "owner": null
+    }
+  ],
+  "scp_attachment_map": {
+    "policies": [
+      {
+        "policy_id": "p-deny-root-user",
+        "attached_to": null,
+        "last_effectiveness_test": null,
+        "exceptions": [
+          "break-glass-account-untracked"
+        ]
+      }
+    ]
+  },
+  "organization_trail": {
+    "is_organization_trail": false,
+    "multi_region": true,
+    "management_events": "read_only",
+    "opt_in_regions_included": false,
+    "log_file_validation": false,
+    "kms_encrypted": false,
+    "covered_accounts": [
+      "444444444444"
+    ]
+  },
+  "config_aggregator": {
+    "all_accounts": false,
+    "all_regions": false,
+    "global_resources_recorded": false,
+    "stale_accounts": [
+      "555555555555"
+    ]
+  },
+  "delegated_admin_services": {
+    "security_hub": "audit_account_only",
+    "guardduty": "not_provided",
+    "access_analyzer": "home_region_only",
+    "macie": "not_enabled",
+    "inspector": "not_provided"
+  },
+  "exception_register": [
+    {
+      "account_id": "999999999999",
+      "reason": "break-glass",
+      "owner": null,
+      "expiry": null,
+      "monitoring": null
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "fixture": "organization-wide-coverage-evidence",
+  "expected_skill_decision": {
+    "decision": "Organization-wide",
+    "risk_level": "low",
+    "reason": "All production accounts, regions, organization trails, Config aggregator scope, delegated security services, and exception accounts have fresh evidence."
+  },
+  "organization_evidence": {
+    "evidence_date": "2026-06-08",
+    "management_account": "111111111111",
+    "log_archive_account": "222222222222",
+    "security_tooling_account": "333333333333",
+    "scope_decision": "Organization-wide",
+    "reviewer_confidence": "high"
+  },
+  "account_inventory": [
+    {
+      "account_id": "444444444444",
+      "ou_path": "/Root/Production/Payments",
+      "status": "ACTIVE",
+      "environment": "production",
+      "owner": "payments-platform"
+    },
+    {
+      "account_id": "555555555555",
+      "ou_path": "/Root/Production/Identity",
+      "status": "ACTIVE",
+      "environment": "production",
+      "owner": "identity-platform"
+    }
+  ],
+  "scp_attachment_map": {
+    "policies": [
+      {
+        "policy_id": "p-deny-root-user",
+        "attached_to": "/Root/Production",
+        "last_effectiveness_test": "2026-06-07",
+        "exceptions": []
+      }
+    ]
+  },
+  "organization_trail": {
+    "is_organization_trail": true,
+    "multi_region": true,
+    "management_events": "all",
+    "opt_in_regions_included": true,
+    "log_file_validation": true,
+    "kms_encrypted": true,
+    "covered_accounts": [
+      "444444444444",
+      "555555555555"
+    ]
+  },
+  "config_aggregator": {
+    "all_accounts": true,
+    "all_regions": true,
+    "global_resources_recorded": true,
+    "stale_accounts": []
+  },
+  "delegated_admin_services": {
+    "security_hub": "all_accounts_all_regions",
+    "guardduty": "all_accounts_all_regions",
+    "access_analyzer": "all_accounts_all_regions",
+    "macie": "production_accounts_all_regions",
+    "inspector": "all_accounts_all_regions"
+  },
+  "exception_register": []
+}
