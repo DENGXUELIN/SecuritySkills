@@ -1,0 +1,64 @@
+{
+  "fixture": "mismatched-apply-local-state-mutable-module",
+  "expected_skill_decision": {
+    "review_decision": "Fail",
+    "risk_level": "critical",
+    "reason": "The applied plan differs from the reviewed commit, apply used auto-approve, state is local and contains secrets, drift exists, and an internet-facing module is pinned to a mutable branch."
+  },
+  "plan_artifact": {
+    "artifact_id": null,
+    "reviewed_commit": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+    "plan_commit": "1111111111111111111111111111111111111111",
+    "workspace": "prod",
+    "variables_file": "local-override.tfvars",
+    "provider_lock_file": null,
+    "module_refs": [
+      "git::https://example.invalid/network.git?ref=main",
+      "registry.terraform.io/terraform-aws-modules/rds/aws//?version=>=6.0.0"
+    ],
+    "ci_run_id": null,
+    "plan_hash": null
+  },
+  "apply_record": {
+    "actor": "developer-17",
+    "timestamp": "2026-06-08T03:14:15Z",
+    "environment": "prod",
+    "approval_ticket": null,
+    "applied_plan_hash": "sha256:ffffffffeeeeeeeeddddddddccccccccbbbbbbbbaaaaaaaa9999999988888888",
+    "auto_approve": true
+  },
+  "state_backend": {
+    "type": "local",
+    "path": "terraform.tfstate",
+    "encryption": "none",
+    "locking": "none",
+    "access_policy": "repository-readers",
+    "audit_logs": "none",
+    "retention_days": null,
+    "state_contains_secrets": true,
+    "secret_fields": [
+      "database_password",
+      "provider_token"
+    ]
+  },
+  "drift_report": {
+    "last_refresh": "2026-05-15T00:00:00Z",
+    "drift_detected": true,
+    "unmanaged_resources": [
+      "aws_security_group_rule.console_added_ssh_0_0_0_0",
+      "aws_iam_policy.manual_admin_policy"
+    ],
+    "owner_disposition": null
+  },
+  "provenance": {
+    "providers_pinned": false,
+    "provider_checksums_verified": false,
+    "modules_pinned_to_immutable_refs": false,
+    "break_glass": {
+      "used": true,
+      "owner": null,
+      "expiry": null,
+      "post_apply_reconciliation": null
+    }
+  }
+}

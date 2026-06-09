@@ -1,0 +1,57 @@
+{
+  "fixture": "verified-plan-apply-state-provenance",
+  "expected_skill_decision": {
+    "review_decision": "Pass",
+    "risk_level": "low",
+    "reason": "The reviewed commit, saved plan, apply record, remote state controls, drift report, provider lock file, and module refs are traceable and current."
+  },
+  "plan_artifact": {
+    "artifact_id": "tfplan-prod-20260608-001",
+    "reviewed_commit": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+    "plan_commit": "4b825dc642cb6eb9a060e54bf8d69288fbee4904",
+    "workspace": "prod",
+    "variables_file": "env/prod.tfvars",
+    "provider_lock_file": ".terraform.lock.hcl",
+    "module_refs": [
+      "git::https://example.invalid/network.git?ref=8c2f1a7d4e3b9f0a11223344556677889900abcd",
+      "registry.terraform.io/terraform-aws-modules/rds/aws//?version=6.8.0"
+    ],
+    "ci_run_id": "gha-9001",
+    "plan_hash": "sha256:1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff"
+  },
+  "apply_record": {
+    "actor": "platform-release-bot",
+    "timestamp": "2026-06-08T03:14:15Z",
+    "environment": "prod",
+    "approval_ticket": "CHG-2026-0618",
+    "applied_plan_hash": "sha256:1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff",
+    "auto_approve": false
+  },
+  "state_backend": {
+    "type": "s3",
+    "bucket": "example-prod-terraform-state",
+    "encryption": "SSE-KMS",
+    "locking": "dynamodb",
+    "access_policy": "least_privilege_platform_ci",
+    "audit_logs": "cloudtrail-data-events-enabled",
+    "retention_days": 365,
+    "state_contains_secrets": false
+  },
+  "drift_report": {
+    "last_refresh": "2026-06-08T03:30:00Z",
+    "drift_detected": false,
+    "unmanaged_resources": [],
+    "owner_disposition": "current"
+  },
+  "provenance": {
+    "providers_pinned": true,
+    "provider_checksums_verified": true,
+    "modules_pinned_to_immutable_refs": true,
+    "break_glass": {
+      "used": false,
+      "owner": null,
+      "expiry": null,
+      "post_apply_reconciliation": "not_required"
+    }
+  }
+}

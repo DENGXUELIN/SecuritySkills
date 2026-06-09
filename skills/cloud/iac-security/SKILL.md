@@ -13,7 +13,7 @@ phase: [build, review]
 frameworks: [OWASP-IaC-Security, SLSA-v1.0, CIS-Benchmarks]
 difficulty: intermediate
 time_estimate: "45-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -56,6 +56,7 @@ The OWASP IaC Security Cheat Sheet categorizes common IaC vulnerabilities. SLSA 
 - Access to module registries or module source references
 - Variable definition files and environment-specific overrides
 - State file references (for understanding current deployment, if available)
+- Saved plan/apply/state/provenance evidence for production reviews: commit SHA, workspace, variable set, provider lock file, module refs, CI run, plan hash, apply actor, state backend controls, and drift report
 
 ---
 
@@ -101,7 +102,37 @@ For detailed tool-specific rule sets, detection patterns, vulnerable code exampl
 
 ---
 
-### Step 10: Compile Assessment Report
+### Step 10: Plan, Apply, State, and Provenance Evidence
+
+Source-code scanning is necessary but not sufficient for production sign-off. IaC risk also depends on which generated plan was approved, who applied it, which workspace and variables were used, where state is stored, whether drift exists, and whether modules/providers are immutable.
+
+For production or privileged-resource changes, require the following gates:
+
+| Gate | Required evidence | Fail / Not Evaluable condition |
+|------|-------------------|--------------------------------|
+| `IAC-PLAN-01` | Saved plan artifact with hash and review timestamp. | Reviewer sees only source files or a console screenshot. |
+| `IAC-PLAN-02` | Plan is tied to reviewed commit SHA, workspace, variable set, provider lock file, module refs, and CI run. | Plan was generated locally, with unknown variables, or from a different commit. |
+| `IAC-PLAN-03` | Apply record includes actor, timestamp, environment, approval, change ticket, and matching plan hash. | Apply used `-auto-approve`, a different plan, or unknown workspace/variables. |
+| `IAC-PLAN-04` | Drift report includes last refresh/plan time, unmanaged resources, console changes, and owner disposition. | Manual drift exists after approval or drift status is unknown. |
+| `IAC-STATE-01` | State backend has encryption, locking, least-privilege access, audit logs, retention, and recovery controls. | State is local, unencrypted, unlocked, committed, or broadly accessible. |
+| `IAC-STATE-02` | State secret exposure is reviewed, scoped, and remediated with rotation where needed. | State contains secrets but access controls, retention, and rotation are not documented. |
+| `IAC-PROV-01` | Provider and module provenance is pinned to immutable versions, lock checksums, tags, or commit SHAs. | Modules or providers are pinned to mutable branches/ranges without lock evidence. |
+| `IAC-PROV-02` | Break-glass apply path has owner, expiry, scope, rollback, and post-apply reconciliation. | Emergency changes are permanent, ownerless, or not reconciled to IaC. |
+
+**Classification rule:** Treat production applies with mismatched reviewed/applied plans as **High**; **Critical** when mismatch or local state exposes credentials, privileged IAM, or internet-facing data stores. Mark the review **Not Evaluable** when plan hash, variable set, workspace, apply record, state backend controls, or drift status cannot be proven.
+
+#### Plan / Apply / State Evidence Matrix
+
+| Area | Evidence artifact | Status | Gap / risk | Owner / due date |
+|------|-------------------|--------|------------|------------------|
+| Plan artifact | `<commit/workspace/plan hash/CI run>` | `Pass/Fail/Not Evaluable` | `<gap>` | `<owner/date>` |
+| Apply record | `<actor/approval/timestamp/plan hash>` | `Pass/Fail/Not Evaluable` | `<gap>` | `<owner/date>` |
+| State backend | `<backend/encryption/locking/access/audit>` | `Pass/Fail/Not Evaluable` | `<gap>` | `<owner/date>` |
+| Drift | `<last refresh/unmanaged resources/owner disposition>` | `Pass/Fail/Not Evaluable` | `<gap>` | `<owner/date>` |
+| Provenance | `<provider lock/module refs/checksums>` | `Pass/Fail/Not Evaluable` | `<gap>` | `<owner/date>` |
+| Break-glass | `<owner/expiry/scope/rollback/reconcile>` | `Pass/Fail/Not Evaluable` | `<gap>` | `<owner/date>` |
+
+### Step 11: Compile Assessment Report
 
 Produce the final report using the structure defined in the Output Format section.
 
@@ -169,6 +200,9 @@ Produce the final report using the structure defined in the Output Format sectio
 - State encryption: <encrypted / unencrypted>
 - State locking: <enabled / disabled>
 - Lock file committed: <yes / no>
+- Plan traceability: <commit/workspace/variables/provider lock/module refs/CI run>
+- Apply traceability: <actor/approval/timestamp/plan hash/change ticket>
+- Drift status: <current / drifted / not evaluable>
 
 ### Prioritized Remediation Plan
 
@@ -200,6 +234,7 @@ Produce the final report using the structure defined in the Output Format sectio
 | Build integrity | IaC plans generated in CI, not applied manually |
 | Provenance | State files track who applied what changes |
 | Dependencies | Provider and module versions locked, lock file committed |
+| Verification | Generated plan is traceable to source revision, dependencies, environment, and apply record |
 
 ### Checkov / tfsec / KICS Rule Equivalents
 
@@ -230,6 +265,10 @@ This skill applies checks equivalent to the following high-impact rules:
 5. **Confusing `aws_s3_bucket_acl` with `aws_s3_bucket_public_access_block`.** The public access block overrides ACLs. Check both, but the access block is the stronger control.
 6. **Terraform state file secrets.** Even when variables are marked `sensitive`, they may appear in plaintext in the state file. Verify state encryption and access controls.
 7. **Provider-specific encryption defaults.** Some providers encrypt by default (e.g., AWS S3 since January 2023). Know the defaults before flagging missing explicit encryption configuration.
+8. **Reviewing source without the generated plan.** Variables, workspaces, provider defaults, and module versions can change the effective deployment. Require a saved plan artifact for production reviews.
+9. **Assuming remote state is secure by default.** S3, GCS, Azure Storage, Terraform Cloud, and Pulumi Cloud still need encryption, access controls, locking, audit logging, and retention review.
+10. **Ignoring drift after approval.** Console changes after plan approval can invalidate the reviewed configuration. Compare deployed state with the reviewed plan before declaring pass.
+11. **Trusting mutable module references.** A branch or loose version range can change after approval. Pin privileged or internet-facing modules to immutable tags or commit SHAs and verify dependency lock checksums.
 
 ---
 
@@ -259,10 +298,14 @@ This skill applies checks equivalent to the following high-impact rules:
 - KICS (Keeping Infrastructure as Code Secure): https://docs.kics.io/
 - cfn-nag Rules: https://github.com/stelligent/cfn_nag
 - Terraform Security Best Practices: https://developer.hashicorp.com/terraform/cloud-docs/recommended-practices
+- Terraform State Sensitive Data: https://developer.hashicorp.com/terraform/language/state/sensitive-data
+- Terraform Dependency Lock File: https://developer.hashicorp.com/terraform/language/files/dependency-lock
+- Terraform Saved Plan Files: https://developer.hashicorp.com/terraform/cli/commands/plan
 - AWS Security Best Practices in IAM: https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html
 
 ---
 
 ## Changelog
 
+- **1.0.1** -- Added plan/apply/state/provenance evidence gates, traceability output fields, drift and break-glass checks, and fixture-backed examples for verified versus mismatched production IaC applies.
 - **1.0.0** -- Initial release. Coverage of eight security domains across Terraform, CloudFormation, Pulumi, and Bicep with Checkov/tfsec/KICS rule equivalents.
