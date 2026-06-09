@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [ISO/IEC-27001:2022, ISO/IEC-27002:2022]
 difficulty: intermediate
 time_estimate: "90-180min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -244,6 +244,23 @@ Use the following maturity scoring:
 **A.5.36 Compliance with policies, rules, and standards for information security** — Regularly reviewed.
 **A.5.37 Documented operating procedures** — Documented and available to personnel.
 
+##### A.5.23 Cloud Services Evidence Gate
+
+Do not mark A.5.23 conforming only because a provider appears in a supplier register or has a current SOC 2 / ISO certificate. Cloud service evidence must prove both provider assurance and the customer-managed side of shared responsibility across acquisition, use, monitoring, change, continuity, and exit.
+
+| Gate | Evidence Required | Finding Trigger |
+|---|---|---|
+| ISO-A523-01 | Cloud service register includes owner, purpose, business process, criticality, data classification, region/residency, and in-scope entities. | Service appears only in a supplier list or invoice export with no ISMS scope mapping. |
+| ISO-A523-02 | Shared responsibility matrix maps provider controls, customer controls, and inherited controls to implemented evidence. | Provider attestation is treated as covering IAM, logging, encryption, backup, or network controls the customer must configure. |
+| ISO-A523-03 | Supplier assurance pack includes report date, scope, bridge letter or period gap handling, complementary user entity controls, and subservice organizations. | Current certificate exists, but report scope, carved-out subservice organizations, or user entity controls are not reviewed. |
+| ISO-A523-04 | Customer configuration evidence covers IAM, privileged access, logging, encryption, key management, backup, network exposure, and administrative activity review. | SaaS or cloud platform is accepted without configuration exports, screenshots, policy evidence, or owner attestation. |
+| ISO-A523-05 | Data lifecycle evidence covers collection, processing, retention, deletion, backup restore, and cross-region replication for classified data. | Region, retention, deletion, or backup behavior is unknown for personal, regulated, or business-critical data. |
+| ISO-A523-06 | Security advisory and provider-change review process tracks notices, critical updates, service deprecations, and customer action dates. | Provider changes are not reviewed for impact on SoA, risks, contracts, or operational controls. |
+| ISO-A523-07 | Exit and portability plan is tested or tabletoped with export format, notice period, data deletion confirmation, fallback service, and owner. | Exit plan is a contract clause only, with no tested export, restoration, deletion, or continuity evidence. |
+| ISO-A523-08 | SoA traceability records applicability, exclusions, residual risk owner, and corrective actions for A.5.23 gaps. | Cloud services are excluded from scope without risk-based justification or residual-risk acceptance. |
+
+False-positive guard: a managed SaaS service without infrastructure-as-code can still conform when customer-side evidence is provided through admin exports, configuration screenshots, access reviews, audit logs, contract terms, and owner attestations. The issue is missing evidence, not the absence of IaC.
+
 #### 4.2 People Controls (A.6.1 - A.6.8)
 
 **A.6.1 Screening** — Background verification checks on candidates.
@@ -396,6 +413,12 @@ Classify each finding using the following severity levels:
 | A.5.1 | Policies for information security | Yes | 3 | [gap] | [H/M/L] |
 | ... | ... | ... | ... | ... | ... |
 
+#### A.5.23 Cloud Services Evidence
+
+| Service | Owner | Data Class | Region/Residency | Shared Responsibility Evidence | Customer Config Evidence | Exit Tested | Finding |
+|---------|-------|------------|-------------------|--------------------------------|--------------------------|-------------|---------|
+| ... | ... | ... | ... | ... | ... | yes/no | ... |
+
 ### A.6 People Controls (8 controls)
 [same table format]
 
@@ -512,6 +535,8 @@ Each control in ISO 27002:2022 is tagged with five attributes:
 4. **Neglecting the 11 new controls introduced in the 2022 revision.** Organizations transitioning from 2013 often miss that controls like A.5.7 (Threat intelligence), A.5.23 (Cloud services security), A.8.9 (Configuration management), A.8.11 (Data masking), A.8.12 (Data leakage prevention), and A.8.16 (Monitoring activities) require explicit consideration in the SoA even if determined not applicable.
 
 5. **Scope exclusions without adequate justification.** Excluding organizational units, locations, or controls from ISMS scope requires documented justification demonstrating the exclusion does not affect the organization's ability or responsibility to provide information security. Auditors will challenge poorly justified exclusions.
+
+6. **Treating provider certificates as complete cloud-services evidence.** ISO 27001 A.5.23 also needs customer-side shared-responsibility evidence: service ownership, configuration exports, access reviews, logging, backup/restore, data lifecycle, provider-change review, and tested exit readiness.
 
 ---
 

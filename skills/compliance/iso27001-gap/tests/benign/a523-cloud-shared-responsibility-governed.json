@@ -1,0 +1,33 @@
+{
+  "id": "iso27001-a523-benign-cloud-governed-001",
+  "skill": "iso27001-gap",
+  "skill_version": "1.0.1",
+  "control": "A.5.23",
+  "scenario": "Cloud service has provider assurance and customer-managed shared responsibility evidence",
+  "expected_result": "Assess A.5.23 as conforming or observation-level only, not as a gap based solely on cloud service use.",
+  "cloud_service_register": {
+    "service": "managed-crm-saas",
+    "owner": "sales-operations",
+    "purpose": "customer relationship management",
+    "business_process": "sales pipeline and account support",
+    "criticality": "high",
+    "data_classification": "confidential-customer-data",
+    "region_residency": "eu-primary-us-support-approved",
+    "isms_scope": "included"
+  },
+  "evidence": {
+    "ISO-A523-01": "service register maps owner, purpose, data class, criticality, region, and ISMS scope",
+    "ISO-A523-02": "shared responsibility matrix maps provider platform controls and customer IAM/logging/export responsibilities",
+    "ISO-A523-03": "supplier assurance pack includes current report, bridge letter, complementary user entity controls, and reviewed subservice organizations",
+    "ISO-A523-04": "admin export shows SSO enforced, MFA required for admins, audit logging enabled, encryption settings reviewed, and backup policy owned",
+    "ISO-A523-05": "retention, deletion, region, and restore evidence are tied to the classified data inventory",
+    "ISO-A523-06": "provider advisory register tracks service-change notices with customer action owners and due dates",
+    "ISO-A523-07": "exit tabletop validated CSV export, API export, fallback process, deletion request path, and continuity owner",
+    "ISO-A523-08": "SoA entry links A.5.23 applicability, residual risk owner, and no open major gaps"
+  },
+  "output_expectations": [
+    "A.5.23 Cloud Services Evidence table is populated for the service.",
+    "Provider certificate is recorded as supplier assurance only, not as a substitute for customer controls.",
+    "No finding is raised merely because infrastructure-as-code evidence is absent for SaaS."
+  ]
+}

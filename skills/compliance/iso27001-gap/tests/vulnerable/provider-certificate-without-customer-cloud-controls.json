@@ -1,0 +1,47 @@
+{
+  "id": "iso27001-a523-vulnerable-provider-cert-only-001",
+  "skill": "iso27001-gap",
+  "skill_version": "1.0.1",
+  "control": "A.5.23",
+  "scenario": "Provider certificate is accepted as complete cloud-services evidence while customer-managed controls are untested",
+  "expected_result": "Flag A.5.23 gaps for missing shared responsibility, customer configuration, data lifecycle, and exit readiness evidence.",
+  "claimed_evidence": {
+    "service": "cloud-data-warehouse",
+    "supplier_inventory_status": "active",
+    "provider_certificate": "current ISO 27001 certificate",
+    "soc_report": "available but scope not reviewed",
+    "customer_statement": "provider is certified, so A.5.23 is covered"
+  },
+  "missing_evidence": [
+    "ISO-A523-01 owner, purpose, region, data classification, criticality, and ISMS scope mapping",
+    "ISO-A523-02 shared responsibility matrix for provider and customer controls",
+    "ISO-A523-03 report scope, bridge letter, subservice organization review, and user entity controls",
+    "ISO-A523-04 customer IAM, privileged access, logging, encryption, key management, backup, and network exposure evidence",
+    "ISO-A523-05 retention, deletion, backup restore, replication, and residency evidence for classified data",
+    "ISO-A523-06 security advisory and provider-change review process",
+    "ISO-A523-07 tested exit, portability, deletion confirmation, and fallback service evidence",
+    "ISO-A523-08 SoA residual risk owner and corrective action traceability"
+  ],
+  "risk_indicators": [
+    "administrators are local accounts outside SSO",
+    "audit log export is not enabled",
+    "backup restore has never been tested",
+    "data export format is unknown",
+    "subservice organizations are carved out of the supplier report",
+    "no owner is assigned for provider security advisories"
+  ],
+  "should_flag": [
+    {
+      "gate_id": "ISO-A523-02",
+      "finding": "Provider assurance does not prove customer-managed IAM, logging, backup, network exposure, or key management controls."
+    },
+    {
+      "gate_id": "ISO-A523-07",
+      "finding": "Exit readiness is contractual only; no tested export, fallback path, or deletion evidence exists."
+    },
+    {
+      "gate_id": "ISO-A523-08",
+      "finding": "The Statement of Applicability marks A.5.23 conforming without traceable residual-risk acceptance."
+    }
+  ]
+}
