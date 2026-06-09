@@ -1,0 +1,63 @@
+{
+  "scenario": "clean_controller_replacement_inherits_quarantine",
+  "skill": "containment",
+  "expected_result": "do_not_flag_containment_failure",
+  "incident": {
+    "id": "IR-2026-2043-benign",
+    "techniques": [
+      "T1190"
+    ],
+    "containment_action": "quarantine_compromised_pod_pause_rollout_and_restore_from_clean_digest",
+    "business_service": "payments-api"
+  },
+  "controller_rehydration_evidence": [
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-01",
+      "status": "pass",
+      "evidence": "durable_owner=kubernetes/deployment payments/payments-api; replacement_mechanism=replicaset; source=kubectl rollout history 2026-06-09T04:12:00Z"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-02",
+      "status": "pass",
+      "evidence": "rollout paused before deleting affected pod; controller admission policy sends suspect replacements to quarantine namespace"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-03",
+      "status": "pass",
+      "evidence": "old digest sha256:badbadbad denied; replacement digest sha256:clean-reviewed-build signed by release pipeline REL-8841"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-04",
+      "status": "pass",
+      "evidence": "network policy qp-2043 selects namespace=payments and app=payments-api, not old pod IP"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-05",
+      "status": "pass",
+      "evidence": "replacement service account payments-api-contained has read-only vault path and rotated token secret payments-api-20260609"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-06",
+      "status": "pass",
+      "evidence": "OPA admission, service mesh egress policy, audit sidecar, and namespace network policy inherited by replacement pod"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-07",
+      "status": "pass",
+      "evidence": "blue/green rollback target blue-20260601 is blocked; failover route us-east-2 points to clean digest sha256:clean-reviewed-build"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-08",
+      "status": "pass",
+      "evidence": "memory capture ticket FOR-7721 completed before deletion; rehydration test showed new pod inherited quarantine and no C2 egress"
+    }
+  ],
+  "runtime_observations": {
+    "new_workload_started": true,
+    "replacement_artifact_verified_clean": true,
+    "replacement_inherits_quarantine": true,
+    "suspect_digest_blocked": true,
+    "c2_connections_after_containment": 0
+  },
+  "why_this_should_pass": "A replacement pod was created by a durable controller, but the controller was paused, the suspect digest was blocked, the replacement used a signed clean digest, and stable namespace/label controls forced the replacement into quarantine."
+}

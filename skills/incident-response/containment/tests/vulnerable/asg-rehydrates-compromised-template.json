@@ -1,0 +1,90 @@
+{
+  "scenario": "asg_rehydrates_compromised_template_after_instance_quarantine",
+  "skill": "containment",
+  "expected_result": "flag_containment_failure",
+  "incident": {
+    "id": "IR-2026-2043-vulnerable",
+    "techniques": [
+      "T1190",
+      "T1021"
+    ],
+    "containment_action": "detach_and_quarantine_single_instance",
+    "business_service": "prod-api"
+  },
+  "cloud_controller": {
+    "provider": "aws",
+    "durable_owner": "autoscaling-group/prod-api-asg",
+    "desired_capacity": 6,
+    "suspended_processes": [],
+    "health_check_replacement_enabled": true,
+    "launch_template": {
+      "id": "lt-0badc0de",
+      "version": 17,
+      "ami_id": "ami-compromised-webshell-present",
+      "user_data_sha256": "4b2c0000sameascompromised",
+      "instance_profile": "prod-api-write-admin"
+    },
+    "replacement_instance": {
+      "id": "i-0newc0de",
+      "security_groups": [
+        "sg-prod-api-public-egress"
+      ],
+      "subnet": "prod-public-a"
+    },
+    "rollback_and_failover": {
+      "blue_green_rollback_version": "lt-0badc0de:17",
+      "regional_failover_template": "lt-0badc0de:17",
+      "dns_weight_shift_allowed": true
+    }
+  },
+  "controller_rehydration_evidence": [
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-01",
+      "status": "fail",
+      "evidence": "response plan documents only instance i-0badc0de and does not name prod-api-asg or launch template lt-0badc0de:17"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-02",
+      "status": "fail",
+      "evidence": "ASG launch/terminate/health-check processes remain active and desired capacity remains 6"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-03",
+      "status": "fail",
+      "evidence": "replacement uses same compromised AMI and user-data hash as quarantined host"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-04",
+      "status": "fail",
+      "evidence": "quarantine security group was attached only to i-0badc0de, while new ASG instances keep sg-prod-api-public-egress"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-05",
+      "status": "fail",
+      "evidence": "replacement keeps prod-api-write-admin instance profile and stale bootstrap secret path"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-06",
+      "status": "fail",
+      "evidence": "WAF and egress logging are bound to old target group membership; replacement joins public target group without quarantine tag"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-07",
+      "status": "fail",
+      "evidence": "blue/green rollback and regional failover both point to launch template lt-0badc0de:17"
+    },
+    {
+      "gate_id": "CONTROLLER-REHYDRATE-08",
+      "status": "fail",
+      "evidence": "instance detached before memory capture, but ASG immediately launched i-0newc0de from suspect template"
+    }
+  ],
+  "runtime_observations": {
+    "affected_instance_quarantined": true,
+    "controller_rehydration_blocked": false,
+    "replacement_artifact_verified_clean": false,
+    "replacement_inherits_quarantine": false,
+    "c2_connections_after_containment": 3
+  },
+  "why_this_should_fail": "Host isolation alone is insufficient because the Auto Scaling Group can immediately recreate the workload from the same compromised AMI, user-data script, and privileged instance profile without inheriting quarantine controls."
+}

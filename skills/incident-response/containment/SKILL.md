@@ -12,7 +12,7 @@ phase: [respond]
 frameworks: [NIST-SP-800-61r2, MITRE-ATT&CK]
 difficulty: intermediate
 time_estimate: "15-30min"
-version: "1.0.1"
+version: "1.0.2"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -25,7 +25,7 @@ argument-hint: "[target-file-or-directory]"
 > **Frameworks:** NIST SP 800-61 Rev 2 (Containment, Eradication, and Recovery), MITRE ATT&CK Enterprise Matrix
 > **Role:** SOC Analyst, Security Engineer
 > **Time:** 15-30 min
-> **Output:** Containment plan with short-term and long-term actions, business impact trade-off analysis, ATT&CK-mapped countermeasures, and rollback criteria
+> **Output:** Containment plan with short-term and long-term actions, business impact trade-off analysis, ATT&CK-mapped countermeasures, controller/replacement-path gates, and rollback criteria
 
 ---
 
@@ -57,6 +57,7 @@ Before selecting a containment strategy, gather or confirm:
 - [ ] **Network topology** -- VLANs, subnets, firewall zones, cloud VPCs, segmentation boundaries relevant to the affected systems.
 - [ ] **Evidence preservation status** -- Has volatile evidence been captured? (Reference forensics-checklist.) Containment actions may destroy evidence if not collected first.
 - [ ] **Current containment state** -- What actions, if any, have already been taken?
+- [ ] **Controller and replacement path** -- For elastic or cloud-native workloads, identify the durable owner that can recreate affected assets: Kubernetes Deployment/ReplicaSet/Job/CronJob, Auto Scaling Group, launch template, AMI, user-data script, container image digest, serverless function version or alias, admission policy, health check, service mesh policy, and multi-region failover route.
 
 ---
 
@@ -74,6 +75,7 @@ NIST SP 800-61 Rev 2 (Section 3.3.1) identifies the following criteria for conta
 | **Resource requirements** | Does the containment strategy require resources not currently available? | Choose strategies executable with available tools and personnel |
 | **Duration** | How long will containment need to remain in place? | Long-duration containment must be sustainable without degrading business operations |
 | **Effectiveness** | Will this containment action actually prevent further attacker activity? | Partial containment that the attacker can bypass wastes time and tips off the adversary |
+| **Controller rehydration** | Can automation recreate the affected workload from a suspect artifact or outside the quarantine scope? | Elastic workloads require controller-level gates, not only pod/instance isolation |
 
 **Containment decision matrix:**
 
@@ -109,6 +111,16 @@ Short-term containment aims to stop the immediate threat with minimal preparatio
 | **DNS sinkholing** | Redirect malicious domains to controlled IP via internal DNS | C2 communication via domain names | Ineffective if attacker uses direct IP communication |
 | **Cloud security group lockdown** | Remove all inbound/outbound rules except management access | Cloud instance compromise | May disrupt dependent services |
 | **VPN/remote access revocation** | Disable VPN accounts, revoke remote access tokens | Compromised remote access credentials | Disrupts legitimate remote users on same system |
+
+**Cloud-native controller and replacement-path strategies:**
+
+| Strategy | Method | Use When | Validation |
+|----------|--------|----------|------------|
+| **Suspend or quarantine the controller** | Pause Kubernetes rollout, suspend CronJob, stop ASG launch/replace processes, lower desired capacity, disable serverless trigger, or route traffic away from a suspect alias | The controller can recreate a compromised pod, instance, job, or function faster than responders can inspect it | No new workload starts from the suspect owner, or every replacement is born inside quarantine |
+| **Quarantine by stable selector** | Apply network, service mesh, security group, or IAM boundary to namespace, labels, ASG, launch template, function alias, or service account instead of a single ephemeral IP or pod ID | Asset identities are short-lived or health checks replace isolated hosts | Replacement workloads inherit quarantine controls automatically |
+| **Block suspect deployable artifacts** | Deny compromised image digests, AMI IDs, launch template versions, user-data hashes, function package digests, or CI/CD release IDs in admission and deployment policy | The runtime asset was isolated but the artifact can still rehydrate the compromise | Deployment attempts using the suspect artifact fail closed or route to quarantine |
+| **Verify clean replacement path** | Review provenance, signature, digest, bootstrap script, secret mounts, instance profile, service account, and configuration drift before restoring capacity | Business service must continue through surgical containment | Replacement uses a known-good artifact, scoped identity, and inherited policy |
+| **Gate rollback and failover routes** | Check blue/green, canary, autoscaling, multi-region, DNS, load balancer, and serverless alias rollback paths for the same vulnerable artifact or missing controls | Traffic can move to an older or alternate environment during containment | Failover targets and rollback versions are clean, monitored, and explicitly approved |
 
 **Credential revocation strategies:**
 
@@ -205,6 +217,21 @@ Wiper and destructive malware require a distinct containment approach from ranso
 
 After implementing containment, verify effectiveness before proceeding to eradication.
 
+#### Cloud-Native Controller and Replacement Path Gate
+
+For elastic workloads, containment is not complete until the durable controller and every replacement path are also controlled. Record these checks even when the immediate pod, VM, or function instance is already isolated.
+
+| Gate ID | Required Evidence | Pass Condition | Failure Signal |
+|---------|-------------------|----------------|----------------|
+| `CONTROLLER-REHYDRATE-01` | Durable workload owner and replacement mechanism: Deployment, ReplicaSet, Job, CronJob, ASG, launch template, AMI, function version/alias, health check, or failover route | Owner and replacement mechanism are named with source system and timestamp | Only an ephemeral pod name, instance ID, IP, or container ID is documented |
+| `CONTROLLER-REHYDRATE-02` | Controller pause, quarantine, desired-capacity change, trigger disablement, or scoped replacement policy | Controller cannot create an uncontained replacement from suspect state | Autoscaler, rollout, job, or serverless trigger remains able to recreate the workload outside quarantine |
+| `CONTROLLER-REHYDRATE-03` | Artifact provenance for image digest, AMI, launch template, user-data hash, function package, or release ID | Suspect artifact is blocked, and replacement artifact is verified clean | Same compromised artifact, mutable tag, stale AMI, or unreviewed package remains deployable |
+| `CONTROLLER-REHYDRATE-04` | Stable-selector quarantine scope: namespace, labels, ASG, function alias, security group, service account, route, or policy ID | New workload identities inherit network, identity, and service-mesh controls | Quarantine matches only old pod IP, host IP, instance ID, or one process |
+| `CONTROLLER-REHYDRATE-05` | Replacement identity, service account, instance profile, secret mount, token, and credential rotation evidence | Replacement starts with least-privilege identity and no inherited compromised secret | Replacement keeps broad write/admin profile or stale mounted secrets |
+| `CONTROLLER-REHYDRATE-06` | Admission, runtime, security group, egress, service mesh, WAF, and logging policy inheritance evidence | Replacement has the same or stricter controls than the quarantined asset | Replacement bypasses policy because labels, namespace, SG, or alias changed |
+| `CONTROLLER-REHYDRATE-07` | Rollback, blue/green, canary, multi-region, DNS, and load-balancer route review | Failover and rollback targets do not point to suspect artifacts or weaker policy | Traffic can shift to a vulnerable region, old version, or unmanaged template |
+| `CONTROLLER-REHYDRATE-08` | Evidence-preservation decision, controller-suspension owner, rehydration test result, and rollback approval | Volatile evidence risk is accepted, owner-approved, and validated by test or observation | Deleting or restarting the asset destroys evidence while leaving the controller active |
+
 **Validation checklist:**
 
 | Check | Method | Expected Result |
@@ -215,12 +242,15 @@ After implementing containment, verify effectiveness before proceeding to eradic
 | Attacker persistence neutralized | Scan for known persistence mechanisms | No active persistence artifacts |
 | Business services operational (if surgical containment) | Verify critical service health checks | Services responding normally |
 | Evidence preserved | Verify forensic images and memory dumps are intact and hashed | Hash verification passes |
+| Controller rehydration blocked or clean | Validate `CONTROLLER-REHYDRATE-01` through `CONTROLLER-REHYDRATE-08` for every durable owner and failover path | Controllers cannot recreate compromised assets, or replacements prove clean and inherit quarantine |
 
 **Containment failure indicators:**
 - New C2 connections from previously unknown infrastructure
 - New compromised accounts appearing after credential reset
 - Attacker activity from systems outside the containment perimeter
 - New persistence mechanisms deployed after containment actions
+- Kubernetes controllers, Auto Scaling Groups, serverless triggers, health checks, or failover automation recreate affected workloads from the same compromised artifact.
+- Replacement workloads start outside quarantine because controls were scoped to ephemeral pod IPs, instance IDs, node names, or mutable tags instead of stable owners and selectors.
 
 If containment fails, escalate to full network isolation and engage external incident response support.
 
@@ -233,6 +263,7 @@ Define conditions under which containment actions should be rolled back or modif
 | Containment causes unacceptable business disruption exceeding incident impact | Reduce to surgical containment with enhanced monitoring | Incident Commander + Business Owner |
 | Forensic investigation requires attacker communication to continue (controlled observation) | Relax network blocks under monitored conditions with legal approval | Incident Commander + Legal + CISO |
 | Containment action was applied to wrong scope (false positive) | Remove containment controls from unaffected systems | Incident Commander |
+| Controller or failover automation will recreate suspect workload if service is restored | Keep controller paused, block suspect artifacts, or restore only through clean replacement path | Incident Commander + Service Owner + Cloud Platform Owner |
 | Eradication complete and validated | Phase out containment controls in stages with monitoring | Incident Commander + Security Team |
 
 ---
@@ -256,7 +287,7 @@ Produce the containment plan with these exact sections:
 ```markdown
 ## Containment Plan: [Incident ID]
 **Date:** [YYYY-MM-DD]
-**Skill:** containment v1.0.0
+**Skill:** containment v1.0.2
 **Frameworks:** NIST SP 800-61 Rev 2, MITRE ATT&CK
 **Incident Commander:** [Name]
 
@@ -275,9 +306,9 @@ threat severity and business criticality, and expected impact on operations.]
 | Containment effectiveness | [Assessment] | [High/Medium/Low] |
 
 ### Short-Term Containment Actions
-| Action | Target | ATT&CK Technique Countered | Status | Owner | ETA |
-|---|---|---|---|---|---|
-| [Action] | [System/Account/Network] | [T-code] | [Planned/In Progress/Complete] | [Name] | [Time] |
+| Action | Target | Controller / Replacement Path | ATT&CK Technique Countered | Status | Owner | ETA |
+|---|---|---|---|---|---|---|
+| [Action] | [System/Account/Network] | [Deployment/ASG/Function/Image digest/Failover route or N/A] | [T-code] | [Planned/In Progress/Complete] | [Name] | [Time] |
 
 ### Long-Term Containment Actions
 | Action | Target | Duration | Status | Owner |
@@ -289,10 +320,15 @@ threat severity and business criticality, and expected impact on operations.]
 |---|---|---|---|
 | [Service] | [Description of disruption] | [Workaround if any] | [Yes/No -- requires escalation] |
 
+### Controller / Replacement Path Evidence
+| Gate | Controller or Artifact | Evidence | Result |
+|---|---|---|---|
+| CONTROLLER-REHYDRATE-[ID] | [Deployment/ASG/Function/AMI/Image digest/Route] | [Policy ID, launch template, digest, query result, log, or ticket] | [Pass/Fail/Pending] |
+
 ### Containment Validation Checklist
-| Check | Result | Timestamp |
-|---|---|---|
-| [Validation item] | [Pass/Fail/Pending] | [timestamp] |
+| Check | Result | Evidence | Timestamp |
+|---|---|---|---|
+| [Validation item] | [Pass/Fail/Pending] | [Log, query result, ticket, snapshot, or policy ID] | [timestamp] |
 
 ### Rollback Conditions
 [Document specific conditions under which containment will be modified or rolled back]
@@ -348,6 +384,10 @@ Disconnecting a business-critical production system from the network stops the a
 
 Implementing containment actions without verifying they work is a common failure mode. Firewall rules may not apply to the correct interface or direction. DNS sinkholes may not affect systems using hardcoded DNS servers. Credential resets may not invalidate existing Kerberos tickets. After every containment action, validate effectiveness through monitoring -- confirm that the specific attacker activity the action was intended to block has actually stopped.
 
+### Pitfall 5: Treating an Ephemeral Asset as the Containment Boundary
+
+Deleting a pod, detaching one instance, or blocking one serverless invocation can look successful while the controller recreates the same compromised workload from a launch template, mutable image tag, function package, or rollback route. Containment must follow the durable owner and deployable artifact. Otherwise a replacement can inherit the vulnerable image, broad instance profile, stale secret, or weaker policy outside the original quarantine.
+
 ---
 
 ## 8. Prompt Injection Safety Notice
@@ -376,3 +416,11 @@ This skill processes incident data including attacker-controlled indicators (IP 
 10. **MITRE ATT&CK -- Disk Wipe (T1561)** -- https://attack.mitre.org/techniques/T1561/
 11. **CISA Destructive Malware Guidance** -- https://www.cisa.gov/topics/cyber-threats-and-advisories
 12. **KrebsOnSecurity: Iran-backed wiper attack on Stryker medtech (2026)** -- https://krebsonsystems.com/2026/03/iran-backed-hackers-claim-wiper-attack-on-medtech-firm-stryker/
+13. **Kubernetes Workload Management** -- https://kubernetes.io/docs/concepts/workloads/controllers/
+14. **AWS Auto Scaling: Suspend and Resume Processes** -- https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-suspend-resume-processes.html
+
+---
+
+## 10. Version History
+
+- **v1.0.2** -- Adds controller/replacement-path evidence gates for ephemeral cloud rehydration, stable-selector quarantine, clean replacement validation, and rollback/failover review.
