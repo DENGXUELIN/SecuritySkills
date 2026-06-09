@@ -1,0 +1,66 @@
+{
+  "fixture": "privilege-adding-abac-fail-open",
+  "expected_skill_decision": {
+    "decision": "ABAC Fail Open",
+    "risk_level": "high",
+    "reason": "The target migration adds unapproved production approval access, reintroduces SoD conflicts after a role merge, excludes service accounts, and permits access when required ABAC attributes are missing."
+  },
+  "migration_evidence": {
+    "policy_version": "rbac-abac-v2.3.0",
+    "simulation_date": "2026-06-08",
+    "pilot_cohort": null,
+    "rollback_owner": null,
+    "rollback_trigger": null
+  },
+  "access_diff": {
+    "users_tested": 120,
+    "roles_tested": 18,
+    "permission_deltas": [
+      {
+        "user_group": "payments-analyst",
+        "permission": "payments.approve.production",
+        "before": "deny",
+        "after": "allow",
+        "grant_source": "role:payments-operations-merged",
+        "owner_approved": false
+      }
+    ],
+    "unapproved_privilege_additions": [
+      "payments.approve.production"
+    ]
+  },
+  "historical_replay": {
+    "request_window_days": 7,
+    "requests_replayed": 250,
+    "false_denies": 31,
+    "false_denies_dispositioned": false,
+    "critical_workflow_denials": 4
+  },
+  "constraint_regression": {
+    "static_sod_passed": false,
+    "dynamic_sod_passed": false,
+    "cardinality_passed": true,
+    "prerequisite_roles_passed": false,
+    "violations": [
+      "payment-initiation plus payment-approval after role merge"
+    ]
+  },
+  "special_identities": {
+    "service_accounts_included": false,
+    "machine_identities_included": false,
+    "break_glass_included": false,
+    "exceptions_expiring": false
+  },
+  "abac_attribute_failure_tests": {
+    "missing_attribute_decision": "allow",
+    "stale_attribute_decision": "allow",
+    "conflicting_attribute_decision": "allow",
+    "authoritative_pip_required": false
+  },
+  "policy_evaluation_logs": {
+    "trace_ids_present": false,
+    "input_attributes_logged": false,
+    "policy_version_logged": false,
+    "obligations_logged": false
+  }
+}

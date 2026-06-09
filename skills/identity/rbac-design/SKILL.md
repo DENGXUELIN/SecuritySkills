@@ -12,7 +12,7 @@ phase: [design]
 frameworks: [NIST-RBAC, NIST-SP-800-162]
 difficulty: intermediate
 time_estimate: "45-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -336,6 +336,25 @@ RBAC-MINE-06: Mining does not account for SoD constraints (mined roles may creat
 
 ---
 
+### Step 7: Migration Simulation and Regression Evidence
+
+Authorization redesign is a migration, not just a target-state diagram. Before approving cutover to a redesigned RBAC/ABAC model, require simulation evidence that proves the new model does not silently add privilege, break historical workflows, reintroduce constraints, or fail open when attributes are missing.
+
+| Gate | Evidence Required | Fail / Not Evaluable When |
+|------|-------------------|---------------------------|
+| `RBAC-MIG-EVID-01` Before / after access diff | User, role, permission, resource, action, grant source, and decision deltas between current and target models | New privileges appear without owner approval or diff only summarizes counts |
+| `RBAC-MIG-EVID-02` Historical request replay | Representative historical access requests replayed through the target model with permit/deny deltas and false-deny review | Business-critical requests are denied without owner disposition |
+| `RBAC-MIG-EVID-03` SoD / constraint regression | Static SoD, dynamic SoD, cardinality, prerequisite, and temporal constraints tested before and after migration | Role merges or inheritance introduce new SoD conflicts |
+| `RBAC-MIG-EVID-04` Special identity coverage | Service accounts, machine identities, break-glass accounts, vendors, and privileged roles included in the simulation | Human-only simulation ignores bypass-capable identities |
+| `RBAC-MIG-EVID-05` ABAC attribute failure tests | Missing, stale, conflicting, and non-authoritative attributes tested for deny-by-default behavior | Missing attributes fail open or use stale PIP data |
+| `RBAC-MIG-EVID-06` Pilot and cutover controls | Pilot cohort, rollout stages, success metrics, rollback trigger, and rollback owner | Production cutover lacks staged validation or rollback criteria |
+| `RBAC-MIG-EVID-07` Owner sign-off | Resource owner, application owner, role owner, and risk owner decisions for privilege additions and false denies | Privilege additions are accepted only by the migration team |
+| `RBAC-MIG-EVID-08` Policy evaluation logs | PDP/PEP decision logs with input attributes, policy version, decision, obligation, and trace ID | Simulation cannot be audited or reproduced after cutover |
+
+Classify the migration decision as **Approved**, **Privilege Increase**, **False Deny Risk**, **Constraint Regression**, **ABAC Fail Open**, or **Not Evaluable**. If required evidence is missing, keep the design recommendation but do not approve production cutover.
+
+---
+
 ## Findings Classification
 
 | Severity | Definition | Examples |
@@ -344,6 +363,13 @@ RBAC-MINE-06: Mining does not account for SoD constraints (mined roles may creat
 | **High** | Significant design flaw creating excessive access risk | Role explosion (>0.7:1 ratio); no centralized PDP; wildcard boundaries |
 | **Medium** | Design deficiency undermining governance | No role lifecycle process; ABAC policies without testing; missing constraints |
 | **Low** | Design improvement opportunity | Naming inconsistencies; missing documentation; single-user roles < 5% |
+
+**Migration-specific classification:**
+
+- **Critical:** Target model grants privileged or regulated access that the current model denied, with no owner approval.
+- **High:** SoD regression, ABAC fail-open, special-identity bypass, missing rollback, or unauditable policy evaluation logs.
+- **Medium:** Historical replay or owner sign-off is incomplete for non-critical workflows.
+- **Low:** Migration evidence is complete but needs better traceability, sampling, or documentation.
 
 ---
 
@@ -380,6 +406,7 @@ RBAC-MINE-06: Mining does not account for SoD constraints (mined roles may creat
 - NIST RBAC Level: [RBAC0 / RBAC1 / RBAC2 / RBAC3]
 - ABAC Adoption: [None / Partial / Full]
 - Centralized PDP: [Yes / No / Partial]
+- Migration Decision: [Approved / Privilege Increase / False Deny Risk / Constraint Regression / ABAC Fail Open / Not Evaluable]
 
 ### Findings by Category
 - Authorization State (Step 1): [count]
@@ -388,6 +415,17 @@ RBAC-MINE-06: Mining does not account for SoD constraints (mined roles may creat
 - Permission Boundaries (Step 4): [count]
 - ABAC Policies (Step 5): [count]
 - Role Mining (Step 6): [count]
+- Migration Simulation (Step 7): [count]
+
+### Migration Simulation Evidence
+| Evidence Area | Status | Scope / Sample | Owner Sign-off | Decision Logs | Limitations |
+|---------------|--------|----------------|----------------|---------------|-------------|
+| Before / After Access Diff | Pass / Fail / Not Evaluable | <users, roles, permissions> | <owners> | <log refs> | <gaps> |
+| Historical Replay | Pass / Fail / Not Evaluable | <request window and sample count> | <owners> | <log refs> | <gaps> |
+| SoD / Constraint Regression | Pass / Fail / Not Evaluable | <constraints tested> | <owners> | <log refs> | <gaps> |
+| Special Identities | Pass / Fail / Not Evaluable | <service, machine, break-glass> | <owners> | <log refs> | <gaps> |
+| ABAC Attribute Failures | Pass / Fail / Not Evaluable | <missing/stale/conflicting attrs> | <owners> | <log refs> | <gaps> |
+| Pilot / Rollback | Pass / Fail / Not Evaluable | <cohort and rollback trigger> | <owners> | <log refs> | <gaps> |
 
 ### Detailed Findings
 [Findings table]
@@ -436,6 +474,8 @@ RBAC-MINE-06: Mining does not account for SoD constraints (mined roles may creat
 5. **Ignoring permission boundaries** — roles define what you get; boundaries define maximum what you can get. Without boundaries, misconfigured roles grant unlimited access.
 6. **Role mining without business validation** — clustering users by access patterns may replicate existing privilege creep rather than correct it.
 7. **Choosing RBAC vs. ABAC as binary** — most environments need both. RBAC for structural, ABAC for contextual. Hybrid is the norm.
+8. **Approving target-state diagrams without replay.** A clean model can still grant new access or break production workflows. Require before/after diffs, historical request replay, SoD regression, special-identity coverage, ABAC failure tests, and rollback evidence before cutover.
+9. **Testing ABAC only on happy-path attributes.** Missing or stale attributes must deny by default. If attribute failure tests are absent, treat ABAC migration safety as Not Evaluable.
 
 ---
 
@@ -481,4 +521,5 @@ that may contain adversarial content.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.1 | 2026-06-09 | Added migration simulation and regression evidence gates, migration decision output, historical replay, ABAC failure tests, and rollback evidence requirements |
 | 1.0.0 | 2025-03-06 | Initial release |

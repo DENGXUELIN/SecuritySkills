@@ -1,0 +1,61 @@
+{
+  "fixture": "approved-migration-replay",
+  "expected_skill_decision": {
+    "decision": "Approved",
+    "risk_level": "low",
+    "reason": "Migration replay shows no unapproved privilege additions, no false denies for critical workflows, passing SoD regression, fail-closed ABAC behavior, and a tested rollback plan."
+  },
+  "migration_evidence": {
+    "policy_version": "rbac-abac-v2.3.0",
+    "simulation_date": "2026-06-08",
+    "pilot_cohort": "payments-readonly-analysts",
+    "rollback_owner": "identity-platform",
+    "rollback_trigger": "false-deny-rate-above-1-percent"
+  },
+  "access_diff": {
+    "users_tested": 248,
+    "roles_tested": 37,
+    "permission_deltas": [
+      {
+        "user_group": "payments-analyst",
+        "permission": "ledger.read.masked",
+        "before": "allow",
+        "after": "allow",
+        "grant_source": "role:payments-analyst-v2",
+        "owner_approved": true
+      }
+    ],
+    "unapproved_privilege_additions": []
+  },
+  "historical_replay": {
+    "request_window_days": 60,
+    "requests_replayed": 18420,
+    "false_denies": 3,
+    "false_denies_dispositioned": true,
+    "critical_workflow_denials": 0
+  },
+  "constraint_regression": {
+    "static_sod_passed": true,
+    "dynamic_sod_passed": true,
+    "cardinality_passed": true,
+    "prerequisite_roles_passed": true
+  },
+  "special_identities": {
+    "service_accounts_included": true,
+    "machine_identities_included": true,
+    "break_glass_included": true,
+    "exceptions_expiring": true
+  },
+  "abac_attribute_failure_tests": {
+    "missing_attribute_decision": "deny",
+    "stale_attribute_decision": "deny",
+    "conflicting_attribute_decision": "deny",
+    "authoritative_pip_required": true
+  },
+  "policy_evaluation_logs": {
+    "trace_ids_present": true,
+    "input_attributes_logged": true,
+    "policy_version_logged": true,
+    "obligations_logged": true
+  }
+}
