@@ -1,0 +1,71 @@
+{
+  "fixture": "healthy-telemetry-rule-path",
+  "technique": {
+    "id": "T1059.001",
+    "name": "PowerShell",
+    "data_component": "Command Execution"
+  },
+  "expected_skill_decision": {
+    "coverage_decision": "Operational",
+    "finding_state": "healthy",
+    "reason": "Telemetry, parser fields, deployed rule health, suppression scope, validation samples, and retention are all evidenced."
+  },
+  "sigma_mapping": {
+    "product": "windows",
+    "category": "process_creation",
+    "backend": "microsoft_sentinel",
+    "target_table": "SecurityEvent",
+    "converted_rule_hash": "sha256:1111222233334444555566667777888899990000aaaabbbbccccddddeeeeffff"
+  },
+  "telemetry_health": {
+    "connector": "WindowsSecurityEvents",
+    "enabled": true,
+    "last_successful_fetch": "2026-06-08T23:58:00Z",
+    "most_recent_event": "2026-06-08T23:57:35Z",
+    "last_seen_within_minutes": 5
+  },
+  "parser_mapping": {
+    "parser_version": "2026.06.08",
+    "fields_used_by_rule": {
+      "CommandLine": "ProcessCommandLine",
+      "Image": "NewProcessName",
+      "ParentImage": "ParentProcessName",
+      "User": "SubjectUserName"
+    },
+    "positive_sample_has_all_fields": true,
+    "negative_sample_has_all_fields": true
+  },
+  "rule_deployment": {
+    "rule_id": "sentinel-t1059-001-encoded-powershell",
+    "enabled": true,
+    "mode": "production",
+    "schedule": "PT5M",
+    "last_run": "2026-06-08T23:55:00Z",
+    "last_run_status": "Succeeded",
+    "alert_destination": "soc-tier1-queue"
+  },
+  "suppression_scope": {
+    "exceptions": [
+      {
+        "owner": "endpoint-platform",
+        "reason": "SCCM client maintenance scripts",
+        "expiry": "2026-07-01",
+        "affected_entities": [
+          "sccm-prod-01"
+        ],
+        "suppressed_volume_percent": 4
+      }
+    ],
+    "hides_all_matching_events": false
+  },
+  "validation_samples": {
+    "positive_replay_alerted": true,
+    "negative_replay_suppressed": true,
+    "last_validation": "2026-06-08T22:10:00Z"
+  },
+  "retention": {
+    "hot_searchable_days": 45,
+    "investigation_window_days": 30,
+    "meets_window": true
+  }
+}

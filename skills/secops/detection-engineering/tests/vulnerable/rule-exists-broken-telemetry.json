@@ -1,0 +1,71 @@
+{
+  "fixture": "rule-exists-broken-telemetry",
+  "technique": {
+    "id": "T1059.001",
+    "name": "PowerShell",
+    "data_component": "Command Execution"
+  },
+  "expected_skill_decision": {
+    "coverage_decision": "Not Evaluable",
+    "finding_state": "high_detection_gap",
+    "reason": "The Sigma rule exists, but required telemetry is stale, parser fields drifted, the deployed rule is disabled, suppressions hide all matching test events, and retention is shorter than the investigation window."
+  },
+  "sigma_mapping": {
+    "product": "windows",
+    "category": "process_creation",
+    "backend": "microsoft_sentinel",
+    "target_table": "SecurityEvent",
+    "converted_rule_hash": "sha256:aaaabbbbccccddddeeeeffff1111222233334444555566667777888899990000"
+  },
+  "telemetry_health": {
+    "connector": "WindowsSecurityEvents",
+    "enabled": true,
+    "last_successful_fetch": "2026-05-27T02:00:00Z",
+    "most_recent_event": "2026-05-27T01:58:20Z",
+    "last_seen_within_minutes": 17280
+  },
+  "parser_mapping": {
+    "parser_version": "2026.06.08",
+    "fields_used_by_rule": {
+      "CommandLine": "missing_after_parser_change",
+      "Image": "process.executable",
+      "ParentImage": "missing_after_parser_change",
+      "User": "user.name"
+    },
+    "positive_sample_has_all_fields": false,
+    "negative_sample_has_all_fields": false
+  },
+  "rule_deployment": {
+    "rule_id": "sentinel-t1059-001-encoded-powershell",
+    "enabled": false,
+    "mode": "test_only",
+    "schedule": "PT5M",
+    "last_run": "2026-06-01T12:00:00Z",
+    "last_run_status": "Failed",
+    "alert_destination": null
+  },
+  "suppression_scope": {
+    "exceptions": [
+      {
+        "owner": null,
+        "reason": "temporary noise reduction",
+        "expiry": null,
+        "affected_entities": [
+          "endpoint-management-*"
+        ],
+        "suppressed_volume_percent": 100
+      }
+    ],
+    "hides_all_matching_events": true
+  },
+  "validation_samples": {
+    "positive_replay_alerted": false,
+    "negative_replay_suppressed": true,
+    "last_validation": null
+  },
+  "retention": {
+    "hot_searchable_days": 7,
+    "investigation_window_days": 30,
+    "meets_window": false
+  }
+}

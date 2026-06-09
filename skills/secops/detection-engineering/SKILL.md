@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [MITRE-ATT&CK-v16, Sigma, Palantir-ADS]
 difficulty: advanced
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -58,6 +58,7 @@ Before beginning, gather or confirm:
 - [ ] **Existing detection coverage:** Current rules, known gaps, previous false positive history for similar detections.
 - [ ] **Detection priority:** Is this for a known active threat, proactive coverage expansion, or compliance requirement?
 - [ ] **Organizational naming conventions:** Rule ID format, severity taxonomy, and tagging standards used by the detection engineering team.
+- [ ] **Telemetry and rule-health evidence:** Current collector health, most recent event timestamp, parser field mapping, deployed rule status, suppression scope, and retention window for the claimed ATT&CK coverage.
 
 If the ATT&CK technique is provided but other context is missing, proceed with conservative assumptions (Windows enterprise environment, Sysmon + Windows Security logs available) and note assumptions in the output.
 
@@ -85,6 +86,25 @@ ATT&CK Technique Analysis:
 - Sub-techniques:     [.001 PowerShell, .002 AppleScript, .003 Windows Command Shell, ...]
 - Detection Scope:    [Sub-technique specific | Parent technique broad]
 ```
+
+### Step 1.5: Telemetry Readiness and Rule Health Evidence
+
+Do not count a Sigma rule as operational ATT&CK coverage until the required telemetry path and deployed rule health are proven. A rule that exists in version control but has stale logs, broken field mappings, disabled analytics, failing scheduled runs, overbroad suppressions, or insufficient retention provides only theoretical coverage.
+
+For every claimed detection coverage row, capture:
+
+| Gate | Required evidence | Fail / Not Evaluable condition |
+|------|-------------------|--------------------------------|
+| `DET-HEALTH-01` | ATT&CK data component and Sigma `logsource` are mapped to the backend table/index. | Technique is marked covered without a concrete telemetry source. |
+| `DET-HEALTH-02` | Collector/connector health includes enabled state, last successful fetch, and most recent event timestamp. | Required telemetry is stale, disabled, or has unknown `last_seen`. |
+| `DET-HEALTH-03` | Parser and field mapping proves every field used by the rule exists in current normalized events. | Sigma conversion targets fields that no longer exist or are empty after parser drift. |
+| `DET-HEALTH-04` | Deployed SIEM rule ID, enabled status, version/hash, schedule, and last-run result are recorded. | Rule exists only in source control, is disabled, test-only, or failing scheduled runs. |
+| `DET-HEALTH-05` | Suppressions/exceptions have owner, reason, expiry, affected entities, and volume impact. | Exceptions are ownerless, expired, or suppress all matching events. |
+| `DET-HEALTH-06` | Positive and negative samples prove the rule fires and does not fire as expected after backend conversion. | Only Sigma syntax validation exists; no backend sample/replay evidence. |
+| `DET-HEALTH-07` | Retention and searchable lookback meet the detection and investigation window. | Retention is shorter than schedule/lookback or archive is not searchable. |
+| `DET-HEALTH-08` | Coverage decision is explicit: Operational, Theoretical, Partial, Broken, or Not Evaluable. | Coverage dashboard shows covered without evidence status or owner. |
+
+**Classification rule:** Mark coverage **Theoretical** when a rule exists but telemetry or deployment health is not verified. Mark it **Not Evaluable** when the required data component, parser mapping, rule status, suppression effect, or retention cannot be proven. Escalate to **High** when a high-priority ATT&CK technique is claimed as covered but the log source is stale, the rule is disabled, parser drift breaks all matching fields, or suppressions hide all matching events.
 
 ### Step 2: Detection Logic Design
 
@@ -389,6 +409,11 @@ Produce detection engineering deliverables in this structure:
 | Target Coverage | [Operational / Robust] |
 | Validation Method | [Atomic Red Team test ID / manual test procedure] |
 
+### Telemetry and Rule Health Matrix
+| Technique | Data Component | Sigma Logsource | Backend Target | Last Event | Parser Fields Proven | Rule Status / Last Run | Suppression Scope | Retention | Coverage Decision |
+|-----------|----------------|-----------------|----------------|------------|----------------------|------------------------|-------------------|-----------|-------------------|
+| [T1059.001] | [Command Execution] | [windows/process_creation] | [Sentinel SecurityEvent / Splunk index] | [timestamp] | [CommandLine, Image, ParentImage] | [enabled/success/failure] | [owner/expiry/effect] | [days] | [Operational/Theoretical/Not Evaluable] |
+
 ### Deployment Notes
 - **Target SIEM:** [Platform]
 - **Converted Query:** [KQL/SPL/EQL equivalent if requested]
@@ -494,6 +519,10 @@ Detection rules are not write-once artifacts. Log sources change, environments e
 
 Overly broad or incorrect ATT&CK mappings undermine coverage analysis. A rule that detects a specific PowerShell obfuscation technique should map to T1059.001 (PowerShell) and potentially T1027 (Obfuscated Files or Information), not to the parent T1059 alone. Use sub-technique IDs when the detection is specific to a sub-technique. Validate mappings against the ATT&CK technique definition and procedure examples.
 
+### Pitfall 6: Counting Rules Without Live Telemetry or Rule Health
+
+A rule in a repository is not the same as deployed detection coverage. Connector failures, parser drift, renamed fields, disabled analytics rules, short retention, or broad suppressions can make a correct Sigma rule silent in production. Require current telemetry and rule-health evidence before reporting coverage as Operational or Robust.
+
 ---
 
 ## 8. Prompt Injection Safety Notice
@@ -522,3 +551,12 @@ This skill processes user-supplied content that may include log samples, detecti
 10. **MITRE Cyber Analytics Repository (CAR)** -- https://car.mitre.org/
 11. **Detection Engineering Maturity Model** -- Kyle Bailey, https://kyle-bailey.medium.com/detection-engineering-maturity-matrix-f4f3181a5cc7
 12. **Sigma Rule Creation Guide (SigmaHQ)** -- https://sigmahq.io/docs/guide/rules.html
+13. **MITRE ATT&CK Data Components** -- https://attack.mitre.org/datacomponents/
+14. **Sigma Rules Specification** -- https://sigmahq.io/sigma-specification/specification/sigma-rules-specification.html
+15. **Microsoft Sentinel Health Tables Reference** -- https://learn.microsoft.com/en-us/azure/sentinel/health-table-reference
+
+---
+
+## Changelog
+
+- **1.0.1** -- Added telemetry readiness and deployed rule-health evidence gates, coverage output fields, parser/suppression/retention checks, and fixture-backed healthy versus broken telemetry examples.
