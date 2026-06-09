@@ -1,0 +1,72 @@
+{
+  "case_id": "vulnerable-expired-guest-and-unattributed-shared-admin",
+  "skill": "access-review",
+  "expected_result": "findings",
+  "review_date": "2026-06-09",
+  "external_guest": {
+    "identity_id": "guest_contractor_billing_export_092",
+    "system": "billing_exports_prod",
+    "entitlements": [
+      "prod_billing_export_reader",
+      "export_job_runner"
+    ],
+    "sponsor_id": "former_sponsor_finance_manager_031",
+    "sponsor_status": "terminated",
+    "business_relationship_expiry": "2025-12-31",
+    "access_package_expiry": "2026-01-31",
+    "review_campaign_included": true,
+    "review_decision": "approve",
+    "idp_interactive_last_seen": "2026-01-05T08:00:00Z",
+    "app_audit_last_seen": "2026-06-05T03:22:10Z",
+    "delegated_api_token_active": true,
+    "nested_group_paths_reviewed": []
+  },
+  "shared_account": {
+    "account_id": "shared_prod_admin",
+    "systems": [
+      "production_database",
+      "production_kubernetes"
+    ],
+    "nominal_owner": "platform_operations",
+    "pam_checkout_required": false,
+    "session_recording": "missing",
+    "command_logging": "shared_account_only",
+    "last_individual_user": "unknown",
+    "post_use_review": "missing",
+    "credential_rotation_after_use": "missing",
+    "included_in_sod_review": false
+  },
+  "expected_findings": [
+    {
+      "id": "AR-EXT-02",
+      "severity": "Critical",
+      "reason": "External guest sponsor is terminated while production billing export access remains active."
+    },
+    {
+      "id": "AR-EXT-03",
+      "severity": "Critical",
+      "reason": "Business relationship and access package expired before the review date."
+    },
+    {
+      "id": "AR-EXT-06",
+      "severity": "High",
+      "reason": "Delegated API token remains active after approval of the guest account."
+    },
+    {
+      "id": "AR-SHARED-01",
+      "severity": "Critical",
+      "reason": "Shared production admin account has a team owner but no individual checkout evidence."
+    },
+    {
+      "id": "AR-SHARED-03",
+      "severity": "Critical",
+      "reason": "No session recording or per-user command attribution is retained."
+    },
+    {
+      "id": "AR-SHARED-05",
+      "severity": "High",
+      "reason": "Break-glass style shared use lacks post-use review and credential rotation."
+    }
+  ],
+  "reviewer_warning": "Do not treat campaign inclusion or a team owner as sufficient evidence. Require sponsor status, expiry, delegated access review, checkout, session or command logs, and post-use controls."
+}

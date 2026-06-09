@@ -1,0 +1,53 @@
+{
+  "case_id": "benign-sponsor-owned-timebounded-external-access",
+  "skill": "access-review",
+  "expected_result": "no_finding",
+  "review_date": "2026-06-09",
+  "identity": {
+    "id": "guest_vendor_analyst_017",
+    "type": "external_guest",
+    "system": "sales_reporting_prod",
+    "entitlements": [
+      "salesforce_readonly_reporting"
+    ]
+  },
+  "sponsor_evidence": {
+    "sponsor_id": "sponsor_sales_ops_manager_004",
+    "sponsor_status": "active",
+    "sponsor_team": "sales_operations",
+    "last_sponsor_attestation": "2026-06-01",
+    "business_relationship_expiry": "2026-09-30",
+    "access_package_expiry": "2026-06-30",
+    "next_revalidation_trigger": "contract_end_or_package_expiry"
+  },
+  "activity_evidence": {
+    "idp_interactive_last_seen": "2026-06-02T10:15:00Z",
+    "app_audit_last_seen": "2026-06-02T10:18:00Z",
+    "non_interactive_token_last_seen": null,
+    "delegated_app_consents_reviewed": true,
+    "nested_group_paths_reviewed": [
+      "access_package_q2_vendor_readonly"
+    ]
+  },
+  "review_decision": {
+    "campaign": "2026-Q2-external-access-review",
+    "certifier_role": "application_owner",
+    "decision": "approve",
+    "rationale": "Active sponsor, valid contract, current access package expiry, read-only scope, and recent activity evidence are present.",
+    "framework_mapping": [
+      "NIST SP 800-53 AC-2(j)",
+      "CIS Controls v8 5.1",
+      "CIS Controls v8 6.1"
+    ]
+  },
+  "evidence_gate_results": {
+    "AR-EXT-01": "pass",
+    "AR-EXT-02": "pass",
+    "AR-EXT-03": "pass",
+    "AR-EXT-04": "pass",
+    "AR-EXT-05": "pass",
+    "AR-EXT-06": "pass",
+    "AR-EXT-07": "pass",
+    "AR-EXT-08": "not_applicable"
+  }
+}

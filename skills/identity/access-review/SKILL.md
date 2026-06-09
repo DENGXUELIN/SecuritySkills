@@ -12,7 +12,7 @@ phase: [operate]
 frameworks: [CIS-Controls-v8, NIST-SP-800-53-AC]
 difficulty: intermediate
 time_estimate: "45-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -125,6 +125,32 @@ AR-SCOPE-06: Guest/external accounts not included in review scope
 | External / guest accounts | Quarterly (90 days) | AC-2 |
 | Break-glass / emergency accounts | Monthly (30 days) | AC-6(1) |
 
+**External Access Sponsor and Expiry Evidence Gate:**
+
+For every external, guest, vendor, contractor, partner, or federated non-employee identity, review inclusion is not sufficient evidence. Require proof that the identity is still business-owned, time-bounded, and active in an approved access path.
+
+```
+AR-EXT-01: Guest/external identity has no active sponsor or business owner
+AR-EXT-02: Sponsor is terminated, transferred, inactive, or outside the owning business unit
+AR-EXT-03: Contract, statement of work, vendor relationship, or access package expired
+AR-EXT-04: No recent activity evidence from both IdP and target application logs
+AR-EXT-05: External identity is nested through groups/access packages not visible to the certifier
+AR-EXT-06: Delegated app consent, API token, mobile token, or non-interactive access remains active after guest review approval
+AR-EXT-07: Guest access is renewed without revalidation trigger, expiry date, or reviewer authority
+AR-EXT-08: External identity has privileged, production, or regulated-data access without stronger sponsor approval and shorter review cadence
+```
+
+**Required external access evidence:**
+
+| Evidence Field | Required Proof | Finding if Missing |
+|---|---|---|
+| Sponsor status | Active employee/manager record, owning team, and last sponsor attestation | AR-EXT-01 / AR-EXT-02 |
+| Business relationship expiry | Contract/SOW end date, vendor access package expiry, or exception expiry | AR-EXT-03 |
+| Access path inventory | Direct grants, nested IdP groups, access packages, app roles, delegated consents, API tokens | AR-EXT-05 / AR-EXT-06 |
+| Recent activity evidence | Interactive sign-in, non-interactive token use, app audit log, and last data access where available | AR-EXT-04 |
+| Revalidation trigger | Next review date or trigger on sponsor change, contract end, package expiry, or inactivity | AR-EXT-07 |
+| Elevated external approval | Resource owner and risk owner approval for privileged or regulated-data access | AR-EXT-08 |
+
 ---
 
 ### Step 2: Entitlement Review and Certification
@@ -188,6 +214,29 @@ AR-ORPH-08: Test/temporary accounts promoted to production without lifecycle man
 | **GCP** | Admin Activity logs, Policy Analyzer | Last authentication event, unused IAM bindings |
 | **Okta / IdP** | System Log, user lifecycle status | Suspended vs. deprovisioned, last authentication timestamp |
 | **SaaS apps** | SCIM sync status, app-native audit logs | Users not synced from IdP, local accounts outside federation |
+
+**Shared and Break-Glass Account Attribution Evidence Gate:**
+
+A team owner or named account custodian is not enough for shared, emergency, break-glass, legacy, or operational accounts. Require evidence that each use can be attributed to an individual and reviewed after use.
+
+```
+AR-SHARED-01: Shared account has a team owner but no individual checkout or approver evidence
+AR-SHARED-02: PAM checkout is not required for interactive use, privileged commands, or secret retrieval
+AR-SHARED-03: Session recording, command logging, or audit correlation is missing or not retained
+AR-SHARED-04: Last user is unknown, overwritten, or only recorded as the shared account name
+AR-SHARED-05: Break-glass use lacks post-use review, credential rotation, and incident/change ticket linkage
+AR-SHARED-06: Shared account is excluded from SoD, privileged access, or activity review because it has a nominal owner
+```
+
+**Required shared-account evidence:**
+
+| Evidence Field | Required Proof | Finding if Missing |
+|---|---|---|
+| Account purpose and custodian | Business purpose, accountable owner, allowed systems, and expiry/review cadence | AR-ORPH-04 |
+| Individual checkout | PAM checkout, approval, actor identity, start/end time, and reason code | AR-SHARED-01 / AR-SHARED-02 |
+| Per-use telemetry | Session recording, command/audit logs, source device, and target resource correlation | AR-SHARED-03 / AR-SHARED-04 |
+| Post-use controls | Review decision, credential rotation, session termination, and ticket/incident linkage | AR-SHARED-05 |
+| SoD and activity inclusion | Explicit inclusion in SoD checks, privileged access reports, and high-risk activity sampling | AR-SHARED-06 |
 
 ---
 
@@ -307,6 +356,17 @@ AR-ENF-08: No metrics or reporting on review completion rates and outcomes
 | **Medium** | Governance deficiency increasing risk over time | Rubber-stamped certifications; role explosion; reviews not on cadence |
 | **Low** | Process improvement opportunity | Inconsistent role naming; documentation gaps; review SLA slightly exceeded |
 
+**External and shared-account severity calibration:**
+
+| Context | Severity | Rationale |
+|---|---|---|
+| External identity with expired sponsor/contract and production or regulated-data access | **Critical** | Current business relationship no longer justifies access to high-impact systems |
+| Shared privileged account without per-user attribution on production systems | **Critical** | No accountable individual for privileged actions or forensic reconstruction |
+| Guest access with inactive sponsor but read-only low-sensitivity application access | **High** | External access remains active after ownership failure |
+| Shared operational account with PAM checkout but missing post-use review or rotation | **High** | Attribution exists, but abuse or emergency access may persist |
+| External access with valid sponsor but missing non-interactive token review | **Medium** | Interactive access may be reviewed while delegated/API access persists |
+| Fully sponsored, time-bounded external access with current activity and reviewer evidence | **Low / No Finding** | Document as reviewed evidence, not as an external-account risk |
+
 ---
 
 ## Output Format
@@ -348,6 +408,8 @@ AR-ENF-08: No metrics or reporting on review completion rates and outcomes
 - Review Scope & Cadence (Step 1): [count]
 - Entitlement Certification (Step 2): [count]
 - Orphaned Accounts (Step 3): [count]
+- External Access Sponsor & Expiry (Step 1): [count]
+- Shared Account Attribution (Step 3): [count]
 - Role Explosion (Step 4): [count]
 - Segregation of Duties (Step 5): [count]
 - Enforcement & Evidence (Step 6): [count]
@@ -363,6 +425,18 @@ AR-ENF-08: No metrics or reporting on review completion rates and outcomes
 
 ### Framework Compliance Mapping
 [Map each finding to NIST SP 800-53 AC controls and CIS Controls v8]
+
+### External Access Evidence
+
+| Identity | Sponsor Status | Business Expiry | Access Package Expiry | Last Activity Source | Delegated/API Access Reviewed | Next Revalidation | Decision |
+|---|---|---|---|---|---|---|---|
+| [guest/vendor/partner identity] | [active/inactive/unknown] | [date/none] | [date/none] | [IdP/app/token log] | [yes/no/not applicable] | [date/trigger] | [approve/revoke/modify] |
+
+### Shared Account Attribution Evidence
+
+| Account | Purpose | Checkout Evidence | Individual User Evidence | Session/Command Evidence | Post-Use Review | Rotation Evidence | Decision |
+|---|---|---|---|---|---|---|---|
+| [shared/break-glass account] | [purpose] | [PAM/ticket/none] | [actor id/source] | [recording/log/correlation] | [review/ticket/none] | [rotated/not rotated] | [approve/revoke/modify] |
 ```
 
 ---
@@ -401,6 +475,8 @@ See the mapping table in the Framework Quick Reference section above for sub-con
 5. **Role explosion masking risk** — When roles proliferate, reviewers cannot meaningfully assess what permissions a role grants. Pair reviews with role rationalization.
 6. **SoD analysis done manually** — Manual SoD checks do not scale and miss cross-system conflicts. Implement conflict rules in IGA tooling.
 7. **Evidence not retained** — Reviews happen but evidence is not preserved for the audit window. Configure IGA tools to retain decisions and timestamps.
+8. **Treating external review inclusion as ownership proof** - A guest can be in the campaign while the sponsor, contract, access package, delegated consent, or app-local token is stale.
+9. **Treating a team-owned shared account as attributable** - A team owner does not prove who used the account. Require checkout, session/command evidence, and post-use review.
 
 ---
 
@@ -443,4 +519,5 @@ This skill processes identity and entitlement data that may contain adversarial 
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.1 | 2026-06-09 | Added external guest sponsor/expiry and shared-account attribution evidence gates with output evidence tables |
 | 1.0.0 | 2025-03-06 | Initial release |
