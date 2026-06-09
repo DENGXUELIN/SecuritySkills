@@ -1,0 +1,53 @@
+scenario: persistent_human_browser_profile_reuse
+agent: shopping-assistant-browser-agent
+expected_result:
+  posture: critical
+  finding_ids:
+    - AGENT-BROWSER-01
+    - AGENT-BROWSER-02
+    - AGENT-BROWSER-03
+    - AGENT-BROWSER-04
+    - AGENT-BROWSER-05
+    - AGENT-BROWSER-06
+    - AGENT-BROWSER-07
+    - AGENT-BROWSER-08
+  notes: Agent inherits a human browser profile, reads page captures and clipboard into model context, writes downloads into the workspace, can upload local files, and can submit high-impact forms without approval.
+browser:
+  engine: chromium
+  context: persistent
+  user_profile: human_default_profile
+  storage_state: retained_across_tasks
+  persistent_profile_path: ${HOME}/.config/google-chrome/Default
+  extensions_enabled: true
+  password_manager_enabled: true
+  allowed_origins: []
+permissions:
+  clipboard_read: granted
+  clipboard_write: granted
+  geolocation: granted
+  camera: not_reviewed
+  microphone: not_reviewed
+  downloads: workspace_directory
+capture_to_model:
+  dom_text: full_body_inner_text
+  accessibility_tree: full_snapshot
+  screenshots: full_page_unredacted
+  console_logs: persisted_unredacted
+  network_traces: persisted_with_headers
+downloads:
+  quarantine_path: null
+  filename_canonicalization: missing
+  mime_signature_validation: missing
+  save_path: /workspace
+uploads:
+  local_file_uploads: allowed
+  file_allowlist: missing
+approval:
+  required_before: []
+  high_impact_actions_without_gate:
+    - submitting_payment_forms
+    - changing_account_settings
+    - approving_oauth_consent
+audit:
+  browser_trace_retention_days: 90
+  sensitive_capture_redaction_before_persistence: false

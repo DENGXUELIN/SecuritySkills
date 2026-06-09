@@ -14,7 +14,7 @@ phase: [design, build, review]
 frameworks: [OWASP-Agentic-AI, NIST-AI-RMF-1.0]
 difficulty: advanced
 time_estimate: "60-120min"
-version: "1.0.2"
+version: "1.0.3"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -78,6 +78,7 @@ Before beginning the assessment, gather the following. If any item is unavailabl
 |---|---|---|
 | Agent architecture diagram | Design docs, README, infrastructure code | Maps trust boundaries, delegation chains, tool surface |
 | Tool/function definitions | Code files defining tool schemas, OpenAPI specs, MCP server configs | Determines what each agent can do and with what parameters |
+| Browser automation configuration | Playwright/Selenium/browser-use setup, storage state, profile directories, permissions, download/upload handlers | Determines whether UI agents inherit ambient web authority or leak DOM/screenshot/clipboard data |
 | Permission/IAM configuration | Cloud IAM, role definitions, service account configs, .env files | Reveals whether least-privilege is enforced |
 | Human approval gate implementation | Workflow code, UI code, approval service configs | Determines if HITL is architecturally sound or bypassable |
 | Agent identity and credential management | Auth middleware, secret managers, token configs | Exposes credential scope and rotation practices |
@@ -205,6 +206,66 @@ Evaluate whether the agent architecture is designed from the ground up around le
 | No token budget or execution time limit enforced | High |
 | Agent can query any database table regardless of task scope | Medium |
 | No resource limits at container/infrastructure level | Medium |
+
+---
+
+### Step 2.1 -- Browser Agent and UI Automation Boundary
+
+Browser-control agents are a distinct tool boundary because UI automation can act through authenticated web sessions even when no explicit API tool exists for that site. Review browser agents separately from generic network or file-system tools.
+
+**What to look for in code and configuration:**
+
+- **Profile ownership and lifetime:** Does the agent launch an ephemeral context, a dedicated service-account profile, or a human user's persistent browser profile?
+- **Storage-state handling:** Are cookies, local storage, IndexedDB, password-manager state, and extensions discarded or scoped after each task?
+- **Origin allowlists:** Are browser navigation and form submissions restricted to expected domains?
+- **Browser permissions:** Are clipboard, geolocation, camera, microphone, notifications, and downloads denied by default or explicitly justified?
+- **Model-ingestion redaction:** Are DOM text, accessibility trees, screenshots, console logs, network traces, and browser traces redacted before model ingestion and audit persistence?
+- **Downloads and uploads:** Are downloads quarantined, canonicalized, type-checked, and scanned when needed? Is local-file upload blocked or gated by human approval?
+- **High-impact UI actions:** Are payment, transfer, deletion, account-setting, OAuth consent, public posting, and file upload actions gated before click/submit execution?
+
+**Detection methods using allowed tools:**
+
+```
+# Find persistent browser profiles and storage state reuse
+Grep: "launchPersistentContext|userDataDir|user_data_dir|storageState|storage_state|Default/Profile" in **/*.{py,ts,js}
+
+# Find browser permission grants and downloads/uploads
+Grep: "grantPermissions|permissions|clipboard|geolocation|camera|microphone|acceptDownloads|setInputFiles|upload" in **/*.{py,ts,js}
+
+# Find page capture paths that may feed model context or logs
+Grep: "screenshot|accessibility.snapshot|innerText|textContent|content\\(|trace|console|network" in **/*.{py,ts,js}
+
+# Find approval gates around high-impact browser actions
+Grep: "click|submit|approve|require_approval|payment|transfer|delete|oauth|consent" in **/*.{py,ts,js}
+```
+
+**Browser agent evidence matrix:**
+
+| Evidence field | Secure state | Finding if absent |
+|---|---|---|
+| Profile isolation | Ephemeral or dedicated service-account profile | Agent reuses a human user's authenticated browser profile |
+| Storage lifetime | Cookies/storage discarded or task-scoped | Persistent ambient sessions survive across tasks |
+| Origin scope | Navigation and submit actions allowlisted | Agent can browse or submit to arbitrary origins |
+| Permission grants | Clipboard/geolocation/camera/mic denied unless justified | Browser permissions granted broadly |
+| DOM/screenshot redaction | Sensitive fields masked before model/log ingestion | Page captures can expose tokens, PII, payment data, or one-time codes |
+| Downloads | Quarantined path, canonical filename, type validation, scan when needed | Untrusted downloads saved into workspace or executable paths |
+| Uploads | Explicit approval and file allowlist | Agent can upload arbitrary local files through file inputs |
+| High-impact actions | HITL gate before payment, deletion, account changes, OAuth consent, or public posting | Browser click/submit can cause irreversible external actions |
+
+**Finding IDs:**
+
+| Finding ID | Condition | Severity |
+|---|---|---|
+| AGENT-BROWSER-01 | Agent runs in a human user's persistent browser profile or default profile | Critical |
+| AGENT-BROWSER-02 | Cookies, local storage, IndexedDB, extensions, or password-manager state persist across unrelated tasks without scope control | High |
+| AGENT-BROWSER-03 | Browser navigation or form submission lacks origin allowlisting | High |
+| AGENT-BROWSER-04 | Clipboard, geolocation, camera, microphone, or notification permissions are granted without task-specific justification | High |
+| AGENT-BROWSER-05 | DOM, accessibility tree, screenshot, console, network, or trace data reaches the model or logs without pre-ingestion redaction | High |
+| AGENT-BROWSER-06 | Downloads from untrusted pages are saved outside quarantine or without filename/type validation | Medium |
+| AGENT-BROWSER-07 | Agent can upload local files without explicit human approval and file allowlist | High |
+| AGENT-BROWSER-08 | High-impact browser actions can be clicked or submitted without HITL approval | Critical |
+
+False-positive guardrail: unauthenticated public browsing in an ephemeral context with denied permissions, origin scope, redacted captures, quarantined downloads, blocked uploads, and approval gates for side effects should not be reported as Critical solely because it uses a browser.
 
 ---
 
@@ -515,6 +576,7 @@ Glob: **/security_architecture*
 |---|---|---|---|
 | Permission Model | [rating] | [one-line summary] | [priority] |
 | Least-Privilege Design | [rating] | [one-line summary] | [priority] |
+| Browser Agent Boundary | [rating] | [profile isolation, storage lifetime, permission grants, redaction, downloads/uploads, high-impact actions] | [priority] |
 | HITL Gate Placement | [rating] | [one-line summary] | [priority] |
 | Blast Radius Containment | [rating] | [one-line summary] | [priority] |
 | Audit Trail Completeness | [rating] | [one-line summary] | [priority] |
@@ -587,3 +649,4 @@ Glob: **/security_architecture*
 12. Sequential Tool Attack Chains and Context Amnesia in Agentic AI (2026) -- arXiv:2603.12644
 13. Confused-Deputy Attacks and Cascading Failures in Long-Horizon Agent Workflows (2026) -- arXiv:2603.12230
 14. fabraix/playground -- Open-source AI agent red-team exploit library for validating agent permission boundaries and tool-use attack surface -- https://github.com/fabraix/playground
+15. Playwright BrowserContext API -- https://playwright.dev/docs/api/class-browsercontext

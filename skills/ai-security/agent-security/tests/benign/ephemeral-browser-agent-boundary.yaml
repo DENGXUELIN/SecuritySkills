@@ -1,0 +1,44 @@
+scenario: ephemeral_browser_agent_boundary
+agent: travel-research-browser-agent
+expected_result:
+  posture: acceptable_with_monitoring
+  finding_ids: []
+  notes: Ephemeral public-browsing context has scoped origins, denied browser permissions, redacted captures, quarantined downloads, blocked uploads, and approval gates for high-impact actions.
+browser:
+  engine: chromium
+  context: ephemeral
+  user_profile: none
+  storage_state: discarded_after_task
+  persistent_profile_path: null
+  extensions_enabled: false
+  password_manager_enabled: false
+  allowed_origins:
+    - https://airline.example
+    - https://hotel.example
+permissions:
+  clipboard_read: denied
+  clipboard_write: denied
+  geolocation: denied
+  camera: denied
+  microphone: denied
+  downloads: quarantine_directory
+redaction:
+  dom_text: strip_hidden_inputs_tokens_and_cookies
+  accessibility_tree: mask_entered_values
+  screenshots: mask_password_inputs_payment_fields_and_one_time_codes
+  network_traces: redact_authorization_cookie_and_set_cookie_headers
+downloads:
+  quarantine_path: /tmp/agent-downloads
+  filename_canonicalization: enabled
+  mime_signature_validation: enabled
+uploads:
+  local_file_uploads: blocked_by_default
+approval:
+  required_before:
+    - submitting_payment_forms
+    - changing_account_settings
+    - uploading_local_files
+    - approving_oauth_consent
+audit:
+  browser_trace_retention_days: 7
+  sensitive_capture_redaction_before_persistence: true
