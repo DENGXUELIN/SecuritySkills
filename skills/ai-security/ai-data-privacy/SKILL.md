@@ -13,7 +13,7 @@ phase: [design, build, review, operate]
 frameworks: [NIST-AI-RMF-1.0, OWASP-LLM02-2025]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -78,6 +78,7 @@ Before beginning the assessment, gather the following. If any item is unavailabl
 | Data retention policies | Internal governance docs, code configs | Determines how long AI-processed data persists |
 | Logging configuration | Application code, infrastructure configs | Reveals what prompt/completion data is captured |
 | Training/fine-tuning data documentation | Data pipeline docs, dataset cards | Identifies personal data in training corpus |
+| Deletion propagation map | DSAR workflow, data catalog, vector DB, logs, backups, provider settings | Proves erasure reaches AI-derived stores |
 | Consent management implementation | Frontend code, API code, database schemas | Shows how user consent is captured and enforced |
 | Data classification scheme | Governance documentation | Defines sensitivity levels applied to AI data flows |
 | Regulatory requirements | Compliance documentation, legal counsel input | Identifies applicable data protection obligations |
@@ -237,6 +238,58 @@ Grep: "backup|snapshot|archive" in **/*.{yaml,yml,json,toml}
 | Backup systems retain AI data beyond primary retention period | Medium |
 | No automated purge mechanism for expired AI data | Medium |
 | Audit logs contain full prompt/completion text with no redaction | Low |
+
+---
+
+### Step 3a -- AI Data Deletion Propagation
+
+Verify that deletion requests and consent withdrawal propagate beyond the primary application record. AI systems often create derived personal data in embeddings, vector indexes, cached RAG chunks, prompt/completion logs, training snapshots, fine-tuning artifacts, model checkpoints, analytics exports, backups, and provider-hosted retention stores.
+
+**What to look for in code and configuration:**
+
+- DSAR or deletion endpoints that delete the user profile but do not enumerate AI-derived stores.
+- Source document deletion that does not tombstone or delete vector rows, cached chunks, embedding replicas, or search indexes.
+- Consent withdrawal that blocks future ingestion but does not flag existing training snapshots, fine-tuning datasets, model artifacts, or evaluation datasets for exclusion, retraining, unlearning, or documented residual risk.
+- Prompt/completion logs, analytics exports, warehouse tables, and BI datasets retaining personal data after primary deletion.
+- Backup and disaster-recovery systems retaining deleted AI data without restore-time deletion replay or documented legal basis.
+- Third-party LLM provider retention settings that are not verified separately from first-party retention controls.
+- Legal holds that override deletion without scope, authority, expiry, and evidence of segregation from normal processing.
+
+**Detection methods using allowed tools:**
+
+```
+# Find deletion and DSAR flows
+Grep: "delete|erasure|forget|dsar|data_subject|right_to_delete|withdraw" in **/*.{py,ts,js,yaml,yml,json,md}
+Grep: "vector|embedding|chunk|rag|index|pgvector|pinecone|weaviate|qdrant|milvus" in **/*.{py,ts,js,yaml,yml,json,md}
+
+# Find derived AI stores and retention surfaces
+Grep: "prompt_log|completion_log|conversation|analytics|warehouse|export|snapshot|checkpoint|fine_tune|finetune" in **/*.{py,ts,js,yaml,yml,json,md}
+Grep: "backup|restore|legal_hold|hold|provider_retention|zero_data_retention" in **/*.{py,ts,js,yaml,yml,json,md}
+```
+
+**Deletion propagation gates:**
+
+| Gate | Evidence Required | Finding Trigger |
+|---|---|---|
+| AI-DEL-01 | Source-to-derived data map covers primary records, source documents, embeddings, vector indexes, prompt/completion logs, analytics exports, training snapshots, model artifacts, backups, and providers. | DSAR deletes only the primary application record. |
+| AI-DEL-02 | Deletion workflow deletes or tombstones embeddings, cached chunks, vector rows, replicas, and search indexes tied to the source subject or document. | Source data is deleted while retrievable chunks or embeddings remain. |
+| AI-DEL-03 | Training and fine-tuning datasets record subject/document lineage and exclusion status after erasure or consent withdrawal. | Opted-out data remains in training snapshots with no retrain, unlearning, or exclusion decision. |
+| AI-DEL-04 | Prompt/completion logs, conversation history, analytics tables, and BI exports have deletion or redaction proof tied to the request. | Logs and exports retain personal data beyond primary deletion. |
+| AI-DEL-05 | Backups define retention, restore-time deletion replay, and evidence that deleted subjects are not reintroduced on restore. | Backups can restore deleted AI data without replaying erasure. |
+| AI-DEL-06 | Third-party provider retention, zero-data-retention settings, and deletion APIs are verified for each LLM or embedding provider. | Provider-side retention is assumed from first-party deletion controls. |
+| AI-DEL-07 | Legal hold exceptions record scope, authority, expiry, segregation, and user-facing or compliance rationale. | Legal hold blocks deletion without documented limits. |
+| AI-DEL-08 | Output reports residual privacy risk and operational decision: deleted, tombstoned, re-index required, retrain/unlearning required, legal hold, or not feasible. | Report marks deletion complete without derived-store evidence or residual-risk decision. |
+
+**What constitutes a finding:**
+
+| Condition | Severity |
+|---|---|
+| DSAR endpoint deletes primary records but leaves retrievable AI-derived personal data | High |
+| Consent withdrawal does not propagate to training snapshots or fine-tuning datasets | High |
+| Provider-hosted AI data retention is assumed rather than verified | High |
+| Backups can reintroduce deleted AI data with no restore-time erasure replay | Medium |
+| Legal hold lacks scope, authority, expiry, or segregation evidence | Medium |
+| Deletion report lacks residual-risk decision for derived AI stores | Medium |
 
 ---
 
@@ -408,10 +461,16 @@ Grep: "consent_check|is_consented|has_consent|filter_consented|exclude_opted_out
 [Description or reference to diagram showing personal data flows through AI components:
 user input -> prompt assembly -> LLM API -> completion -> output -> logging/storage]
 
+## Deletion Propagation Evidence
+
+| Store / Artifact | Derived From | Deletion Proof | Residual Decision | Evidence Reference |
+|---|---|---|---|---|
+| [primary DB / vector DB / logs / training snapshot / backup / provider] | [source subject/document] | [deleted/tombstoned/redacted/re-indexed] | [complete / legal hold / retrain needed / not feasible] | [ticket, export, hash, provider record] |
+
 ## Findings
 
 ### Finding [N]: [Title]
-- **Category:** [Training Data | Prompt/Completion PII | Data Retention | Memorization | EU AI Act | Consent]
+- **Category:** [Training Data | Prompt/Completion PII | Data Retention | Deletion Propagation | Memorization | EU AI Act | Consent]
 - **Severity:** [Critical | High | Medium | Low | Informational]
 - **OWASP LLM Category:** LLM02:2025 -- Sensitive Information Disclosure
 - **NIST AI RMF Function:** [GOVERN | MAP | MEASURE | MANAGE] [subcategory]
@@ -430,6 +489,7 @@ user input -> prompt assembly -> LLM API -> completion -> output -> logging/stor
 | Training data privacy | [Yes/Partial/No] | [description] | [severity] |
 | PII in prompts/completions | [Yes/Partial/No] | [description] | [severity] |
 | Data retention | [Yes/Partial/No] | [description] | [severity] |
+| Deletion propagation | [Yes/Partial/No] | [description] | [severity] |
 | Memorization risk | [Yes/Partial/No] | [description] | [severity] |
 | EU AI Act compliance | [Yes/Partial/No/N/A] | [description] | [severity] |
 | Consent management | [Yes/Partial/No] | [description] | [severity] |

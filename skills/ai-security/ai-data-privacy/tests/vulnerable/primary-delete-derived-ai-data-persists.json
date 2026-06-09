@@ -1,0 +1,85 @@
+{
+  "case": "primary_delete_derived_ai_data_persists",
+  "skill": "ai-data-privacy",
+  "expected_result": "finding",
+  "request": {
+    "type": "dsar_erasure",
+    "subject_reference": "subject-5190",
+    "ticket": "DSAR-2026-0607"
+  },
+  "implemented_control": {
+    "dsar_endpoint": "/privacy/delete",
+    "primary_store_delete": true,
+    "status_report": "complete"
+  },
+  "derived_stores": {
+    "vector_store": {
+      "system": "pgvector",
+      "source_document_deleted": true,
+      "embedding_rows_remaining": 18,
+      "cached_chunks_retrievable": true,
+      "reindex_completed": false
+    },
+    "prompt_logs": {
+      "retained": true,
+      "redaction_completed": false
+    },
+    "training_snapshots": {
+      "contains_subject_data": true,
+      "exclusion_status": "missing",
+      "retrain_or_unlearning_decision": null
+    },
+    "analytics_exports": {
+      "contains_subject_data": true,
+      "delete_proof": null
+    },
+    "backups": {
+      "retention_days": 90,
+      "restore_time_erasure_replay": false
+    },
+    "provider_retention": {
+      "embedding_provider_verified": false,
+      "llm_provider_verified": false
+    },
+    "legal_hold": {
+      "applies": true,
+      "scope": null,
+      "authority": null,
+      "expiry": null
+    }
+  },
+  "expected_findings": [
+    {
+      "gate": "AI-DEL-01",
+      "reason": "Deletion report does not map derived AI stores."
+    },
+    {
+      "gate": "AI-DEL-02",
+      "reason": "Vector rows and cached chunks remain retrievable after source deletion."
+    },
+    {
+      "gate": "AI-DEL-03",
+      "reason": "Training snapshot retains opted-out subject data without exclusion or retraining decision."
+    },
+    {
+      "gate": "AI-DEL-04",
+      "reason": "Prompt logs and analytics exports retain personal data without redaction proof."
+    },
+    {
+      "gate": "AI-DEL-05",
+      "reason": "Backups can restore deleted AI data without erasure replay."
+    },
+    {
+      "gate": "AI-DEL-06",
+      "reason": "Provider-side retention and deletion settings are not verified."
+    },
+    {
+      "gate": "AI-DEL-07",
+      "reason": "Legal hold lacks scope, authority, and expiry."
+    },
+    {
+      "gate": "AI-DEL-08",
+      "reason": "Status is marked complete despite unresolved derived-store residual risk."
+    }
+  ]
+}

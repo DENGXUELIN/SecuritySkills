@@ -1,0 +1,44 @@
+{
+  "case": "deletion_propagation_complete",
+  "skill": "ai-data-privacy",
+  "expected_result": "pass",
+  "request": {
+    "type": "dsar_erasure",
+    "subject_reference": "subject-7421",
+    "ticket": "DSAR-2026-0606"
+  },
+  "source_to_derived_map": {
+    "primary_records": ["users", "support_messages"],
+    "rag_sources": ["support-doc-884"],
+    "vector_rows": ["vec-884-001", "vec-884-002"],
+    "prompt_logs": ["conversation-991"],
+    "training_snapshots": ["support-sft-2026-05"],
+    "analytics_exports": ["warehouse.prompt_events_2026_06"],
+    "backups": ["backup-set-2026-06-06"],
+    "providers": ["embedding-provider-a", "llm-provider-b"]
+  },
+  "propagation": {
+    "primary_records": "deleted",
+    "vector_rows": "tombstoned_and_reindexed",
+    "cached_chunks": "deleted",
+    "prompt_logs": "redacted",
+    "training_snapshots": "excluded_from_next_fine_tune",
+    "model_artifacts": "retrain_not_required_low_frequency_with_dpia_note",
+    "analytics_exports": "redacted",
+    "backups": "restore_time_erasure_replay_documented",
+    "provider_retention": "zero_data_retention_evidence_recorded"
+  },
+  "legal_hold": {
+    "applies": false
+  },
+  "covered_gates": [
+    "AI-DEL-01",
+    "AI-DEL-02",
+    "AI-DEL-03",
+    "AI-DEL-04",
+    "AI-DEL-05",
+    "AI-DEL-06",
+    "AI-DEL-07",
+    "AI-DEL-08"
+  ]
+}
