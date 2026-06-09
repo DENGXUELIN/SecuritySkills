@@ -1,0 +1,56 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:7f8f8c34-1ad7-4a5a-9e0f-1290-vulnerable",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-06-06T01:00:00Z",
+    "tools": [
+      {
+        "vendor": "Example",
+        "name": "manifest-sbom",
+        "version": "0.9.0"
+      }
+    ],
+    "component": {
+      "type": "application",
+      "name": "app-api",
+      "version": "1.4.2",
+      "bom-ref": "pkg:generic/app-api@1.4.2"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "package-lock-only-dependency",
+      "version": "2.0.0",
+      "purl": "pkg:npm/package-lock-only-dependency@2.0.0"
+    }
+  ],
+  "properties": [
+    {
+      "name": "release.artifact",
+      "value": "registry.example.com/app/api@sha256:prod123"
+    },
+    {
+      "name": "sbom.subject",
+      "value": "app-api 1.4.2 source manifest"
+    },
+    {
+      "name": "declared.scope",
+      "value": "source"
+    },
+    {
+      "name": "vex.subject",
+      "value": "app-api 1.4.1"
+    },
+    {
+      "name": "expected.findings",
+      "value": "SBOM-BIND-01,SBOM-BIND-03,SBOM-BIND-04,SBOM-BIND-08,SBOM-BIND-09"
+    },
+    {
+      "name": "binding.confidence",
+      "value": "Weak"
+    }
+  ]
+}

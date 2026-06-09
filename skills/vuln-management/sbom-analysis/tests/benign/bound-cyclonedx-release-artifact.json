@@ -1,0 +1,76 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.5",
+  "serialNumber": "urn:uuid:7f8f8c34-1ad7-4a5a-9e0f-1290-benign",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-06-06T08:42:00Z",
+    "tools": [
+      {
+        "vendor": "CycloneDX",
+        "name": "cdxgen",
+        "version": "10.1.0"
+      }
+    ],
+    "component": {
+      "type": "container",
+      "name": "api",
+      "version": "1.4.2",
+      "bom-ref": "pkg:oci/registry.example.com/app/api@sha256:prod123",
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "prod123boundartifact0000000000000000000000000000000000000000000000"
+        }
+      ]
+    }
+  },
+  "formulation": [
+    {
+      "components": [
+        {
+          "type": "application",
+          "name": "api-source",
+          "version": "1.4.2",
+          "bom-ref": "git:app-api@release-1.4.2"
+        }
+      ],
+      "properties": [
+        {
+          "name": "slsa.buildRun",
+          "value": "ci/run/8842"
+        },
+        {
+          "name": "source.revision",
+          "value": "release-1.4.2"
+        },
+        {
+          "name": "declared.scope",
+          "value": "container"
+        }
+      ]
+    }
+  ],
+  "components": [
+    {
+      "type": "library",
+      "name": "express",
+      "version": "4.18.3",
+      "purl": "pkg:npm/express@4.18.3"
+    }
+  ],
+  "properties": [
+    {
+      "name": "SBOM-BIND-01",
+      "value": "pass"
+    },
+    {
+      "name": "binding.confidence",
+      "value": "Strong"
+    },
+    {
+      "name": "vex.subject.match",
+      "value": "Matches"
+    }
+  ]
+}
