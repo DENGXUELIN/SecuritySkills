@@ -12,7 +12,7 @@ phase: [operate]
 frameworks: [CIS-Controls-v8, NIST-SP-800-53-AC]
 difficulty: intermediate
 time_estimate: "45-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -156,6 +156,46 @@ AR-CERT-08: Delegated reviews without accountability (certifier delegates but is
 | Approval rate per certifier | > 95% with > 50 entitlements | Flag for management review |
 | Time to certify | < 2 minutes per decision batch | Flag as potential non-review |
 | No revocations across multiple cycles | 3+ consecutive cycles | Escalate to compliance team |
+
+---
+
+### Step 2.5: Effective Access Expansion for Nested and Dynamic Groups
+
+**Objective:** Certify the access a user actually has, not only direct grants exported by the application.
+
+Direct entitlement exports are incomplete when access flows through IdP groups, nested groups, dynamic group rules, SCIM mappings, external IdP groups, app-local groups, or break-glass activation paths. Build an effective-access graph before certifiers approve or revoke access.
+
+**What to look for:**
+
+```
+AR-EFF-01: Certification packet lacks an effective-access path from user to entitlement
+AR-EFF-02: Nested group expansion is missing, truncated, circular, or deeper than the documented review limit
+AR-EFF-03: Dynamic group rule lacks owner, source attributes, rule expression, last evaluation time, and sample membership evidence
+AR-EFF-04: SCIM or external IdP group mapping to application roles is not included in the review
+AR-EFF-05: Attribute drift after certification can change dynamic group membership without recertification
+AR-EFF-06: Guest, partner, or vendor users inherit access through an external group not visible to the certifier
+AR-EFF-07: Break-glass or emergency groups are excluded from normal membership evidence without activation, owner, and alert evidence
+AR-EFF-08: Missing expansion evidence is counted as approved instead of Not Evaluable
+```
+
+**Effective-access evidence fields:**
+
+| Field | Purpose |
+|---|---|
+| Subject | User, service account, guest, or external principal being reviewed |
+| Direct grants | App-local roles, direct groups, direct IAM roles, or explicit assignments |
+| Indirect paths | Nested groups, dynamic groups, SCIM mappings, external IdP groups, app groups, and break-glass paths |
+| Rule evidence | Dynamic rule expression, owner, source HR/IdP attributes, last evaluation time, and sample membership |
+| Mapping evidence | Upstream IdP group, SCIM connector, downstream application role, last sync, and owner |
+| Cycle/depth result | Maximum nesting depth reviewed, circular path detection, and unresolved paths |
+| Drift controls | Attribute-change trigger, delta review, certification freshness, and post-certification membership changes |
+| Decision | Approve / Revoke / Modify / Not Evaluable with certifier and rationale |
+
+**Severity guidance:**
+
+- Mark as **High** when privileged, production, financial, or regulated access is certified from direct grants only while nested/dynamic/external paths can still grant the same role.
+- Mark as **Medium** when expansion exists but dynamic rule freshness, SCIM sync time, group owner, or cycle/depth evidence is incomplete.
+- Mark as `Not Evaluable` when effective-access paths cannot be expanded far enough to prove what the certifier approved.
 
 ---
 
@@ -303,8 +343,8 @@ AR-ENF-08: No metrics or reporting on review completion rates and outcomes
 | Severity | Definition | Examples |
 |---|---|---|
 | **Critical** | Immediate unauthorized access risk or active SoD violation in financial/production systems | Terminated employee with active admin access; SoD conflict on payment systems |
-| **High** | Significant privilege excess or governance gap with exploitation potential | Orphaned service accounts with production access; no access review process exists |
-| **Medium** | Governance deficiency increasing risk over time | Rubber-stamped certifications; role explosion; reviews not on cadence |
+| **High** | Significant privilege excess or governance gap with exploitation potential | Orphaned service accounts with production access; no access review process exists; privileged access certified without effective-access expansion |
+| **Medium** | Governance deficiency increasing risk over time | Rubber-stamped certifications; role explosion; reviews not on cadence; dynamic group rule freshness missing |
 | **Low** | Process improvement opportunity | Inconsistent role naming; documentation gaps; review SLA slightly exceeded |
 
 ---
@@ -347,10 +387,30 @@ AR-ENF-08: No metrics or reporting on review completion rates and outcomes
 ### Findings by Category
 - Review Scope & Cadence (Step 1): [count]
 - Entitlement Certification (Step 2): [count]
+- Effective Access Expansion (Step 2.5): [count]
 - Orphaned Accounts (Step 3): [count]
 - Role Explosion (Step 4): [count]
 - Segregation of Duties (Step 5): [count]
 - Enforcement & Evidence (Step 6): [count]
+
+### Effective Access Expansion Matrix
+
+| Subject | Entitlement | Direct Grants | Indirect Paths | Rule / Mapping Evidence | Cycle / Depth Result | Drift Control | Decision |
+|---|---|---|---|---|---|---|---|
+| <user/group> | <role/permission> | <none/list> | <nested/dynamic/scim/external/break-glass> | <owner/rule/sync/evaluation evidence> | <clear/circular/truncated> | <trigger/review/missing> | <Approve/Revoke/Modify/Not Evaluable> |
+
+### Effective Access Gate Results
+
+| Gate | Evidence Reviewed | Status | Risk |
+|---|---|---|---|
+| `AR-EFF-01` | <user-to-entitlement effective-access path> | <Pass/Fail/Not Evaluable> | <risk> |
+| `AR-EFF-02` | <nested group expansion depth and cycle result> | <Pass/Fail/Not Evaluable> | <risk> |
+| `AR-EFF-03` | <dynamic group rule owner, source attributes, expression, evaluation time> | <Pass/Fail/Not Evaluable> | <risk> |
+| `AR-EFF-04` | <SCIM and external IdP mapping evidence> | <Pass/Fail/Not Evaluable> | <risk> |
+| `AR-EFF-05` | <attribute drift controls and post-certification changes> | <Pass/Fail/Not Evaluable> | <risk> |
+| `AR-EFF-06` | <guest, partner, or vendor inherited access visibility> | <Pass/Fail/Not Evaluable> | <risk> |
+| `AR-EFF-07` | <break-glass group membership, activation, and alerting evidence> | <Pass/Fail/Not Evaluable> | <risk> |
+| `AR-EFF-08` | <missing expansion evidence and Not Evaluable rationale> | <Pass/Fail/Not Evaluable> | <risk> |
 
 ### Detailed Findings
 [Findings table]
@@ -401,6 +461,7 @@ See the mapping table in the Framework Quick Reference section above for sub-con
 5. **Role explosion masking risk** — When roles proliferate, reviewers cannot meaningfully assess what permissions a role grants. Pair reviews with role rationalization.
 6. **SoD analysis done manually** — Manual SoD checks do not scale and miss cross-system conflicts. Implement conflict rules in IGA tooling.
 7. **Evidence not retained** — Reviews happen but evidence is not preserved for the audit window. Configure IGA tools to retain decisions and timestamps.
+8. **Certifying direct grants only** — Nested groups, dynamic rules, SCIM mappings, and external IdP groups can preserve access after direct assignments are removed. Certify effective access paths, not just exported direct roles.
 
 ---
 
@@ -422,6 +483,9 @@ This skill processes identity and entitlement data that may contain adversarial 
 - NIST SP 800-53 Rev. 5, Security and Privacy Controls for Information Systems and Organizations — AC family: https://csrc.nist.gov/publications/detail/sp/800-53/rev-5/final
 - CIS Controls v8, Controls 5 and 6: https://www.cisecurity.org/controls/v8
 - NIST SP 800-162, Guide to Attribute Based Access Control (ABAC) Definition and Considerations: https://csrc.nist.gov/publications/detail/sp/800-162/final
+- Microsoft Entra ID dynamic membership rules: https://learn.microsoft.com/en-us/entra/identity/users/groups-dynamic-membership
+- Okta group rules: https://help.okta.com/en-us/content/topics/users-groups-profiles/usgp-about-group-rules.htm
+- SCIM protocol overview: https://scim.cloud/
 - IGA Market Guide (Gartner) — for tooling context on access certification platforms
 - ISACA, Segregation of Duties in IT Environments: https://www.isaca.org
 
@@ -443,4 +507,5 @@ This skill processes identity and entitlement data that may contain adversarial 
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.1 | 2026-06-09 | Add effective-access expansion gates for nested groups, dynamic group rules, SCIM/external IdP mappings, cycle/depth checks, drift controls, and Not Evaluable handling. |
 | 1.0.0 | 2025-03-06 | Initial release |

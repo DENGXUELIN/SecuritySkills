@@ -1,0 +1,110 @@
+{
+  "fixture": "effective_access_expansion_complete",
+  "skill": "access-review",
+  "description": "Benign fixture where a certification packet includes direct grants, nested and dynamic group paths, SCIM mapping, owner evidence, cycle checks, and drift controls before access is approved.",
+  "review_campaign": {
+    "name": "q2-finance-saas-admin-review",
+    "period": "2026-Q2",
+    "systems": [
+      "finance-saas"
+    ],
+    "certifier": "finance-it-owner"
+  },
+  "subject": {
+    "user": "alex.chen@example.com",
+    "employment_status": "active",
+    "department": "Finance",
+    "user_type": "employee"
+  },
+  "entitlement": {
+    "application": "finance-saas",
+    "role": "billing-admin",
+    "risk": "privileged-financial"
+  },
+  "direct_grants": [],
+  "effective_access_paths": [
+    {
+      "path": [
+        "Okta dynamic group: finance-active-users",
+        "Entra group: finance-billing-admins",
+        "SCIM mapping: finance-saas billing-admin"
+      ],
+      "dynamic_rule": "department == Finance and employment_status == active",
+      "rule_owner": "finance-it",
+      "source_attributes": [
+        "HRIS.department",
+        "HRIS.employment_status"
+      ],
+      "last_evaluated": "2026-06-01T10:00:00Z",
+      "sample_membership_observed": true,
+      "scim_last_sync": "2026-06-01T10:05:00Z",
+      "downstream_role_owner": "finance-platform",
+      "mapping_approved": true
+    }
+  ],
+  "cycle_and_depth": {
+    "max_depth_reviewed": 4,
+    "cycles_detected": false,
+    "truncated_paths": []
+  },
+  "drift_controls": {
+    "attribute_change_trigger": "HRIS delta triggers group reevaluation and access review exception queue",
+    "post_certification_change_review": "enabled",
+    "last_drift_test": "2026-05-28"
+  },
+  "break_glass": {
+    "groups_in_scope": [
+      "finance-breakglass-admins"
+    ],
+    "current_members": 0,
+    "activation_approval": "required",
+    "alerting": "enabled"
+  },
+  "expected_gate_results": [
+    {
+      "gate": "AR-EFF-01",
+      "status": "Pass",
+      "evidence": "Certification packet includes user-to-entitlement effective-access path."
+    },
+    {
+      "gate": "AR-EFF-02",
+      "status": "Pass",
+      "evidence": "Nested group expansion is complete to depth 4 with no cycles."
+    },
+    {
+      "gate": "AR-EFF-03",
+      "status": "Pass",
+      "evidence": "Dynamic group rule owner, attributes, expression, evaluation time, and sample membership are present."
+    },
+    {
+      "gate": "AR-EFF-04",
+      "status": "Pass",
+      "evidence": "SCIM mapping from upstream group to downstream role is included and current."
+    },
+    {
+      "gate": "AR-EFF-05",
+      "status": "Pass",
+      "evidence": "Attribute drift triggers reevaluation and exception review."
+    },
+    {
+      "gate": "AR-EFF-06",
+      "status": "Pass",
+      "evidence": "No external IdP group is hidden from the certifier."
+    },
+    {
+      "gate": "AR-EFF-07",
+      "status": "Pass",
+      "evidence": "Break-glass group is in scope with zero current members, approval, and alerting."
+    },
+    {
+      "gate": "AR-EFF-08",
+      "status": "Pass",
+      "evidence": "No missing expansion evidence is counted as approved."
+    }
+  ],
+  "expected_assessment": {
+    "overall_status": "Pass",
+    "risk_rating": "Low",
+    "confidence": "High"
+  }
+}

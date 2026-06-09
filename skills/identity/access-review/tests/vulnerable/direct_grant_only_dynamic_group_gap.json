@@ -1,0 +1,124 @@
+{
+  "fixture": "direct_grant_only_dynamic_group_gap",
+  "skill": "access-review",
+  "description": "Vulnerable fixture where a review revokes direct admin access but misses nested and dynamic group paths that still grant the same SaaS administrator role.",
+  "review_campaign": {
+    "name": "q2-finance-saas-admin-review",
+    "period": "2026-Q2",
+    "systems": [
+      "finance-saas"
+    ],
+    "certifier": "line-manager-only"
+  },
+  "subject": {
+    "user": "pat.rivera@example.com",
+    "employment_status": "transferred",
+    "department": "Marketing",
+    "user_type": "employee"
+  },
+  "entitlement": {
+    "application": "finance-saas",
+    "role": "billing-admin",
+    "risk": "privileged-financial"
+  },
+  "direct_grants": [
+    {
+      "role": "billing-admin",
+      "decision": "revoke",
+      "enforced": true
+    }
+  ],
+  "missed_effective_access_paths": [
+    {
+      "path": [
+        "Okta dynamic group: finance-active-users",
+        "Entra nested group: legacy-finance-admins",
+        "SCIM mapping: finance-saas billing-admin"
+      ],
+      "dynamic_rule": "department was Finance at last sync",
+      "rule_owner": "unknown",
+      "source_attributes": [
+        "stale HRIS.department"
+      ],
+      "last_evaluated": "unknown",
+      "sample_membership_observed": false,
+      "scim_last_sync": "unknown",
+      "downstream_role_owner": "unknown"
+    },
+    {
+      "path": [
+        "partner IdP group: finance-contractors",
+        "Entra group: external-finance-admins",
+        "finance-saas billing-admin"
+      ],
+      "external_idp_visible_to_certifier": false,
+      "mapping_approved": "unknown"
+    }
+  ],
+  "cycle_and_depth": {
+    "max_depth_reviewed": 1,
+    "cycles_detected": "not-tested",
+    "truncated_paths": [
+      "legacy-finance-admins -> finance-active-users -> legacy-finance-admins"
+    ]
+  },
+  "drift_controls": {
+    "attribute_change_trigger": "missing",
+    "post_certification_change_review": "missing",
+    "last_drift_test": "missing"
+  },
+  "break_glass": {
+    "groups_in_scope": [],
+    "current_members": "unknown",
+    "activation_approval": "unknown",
+    "alerting": "unknown"
+  },
+  "expected_gate_results": [
+    {
+      "gate": "AR-EFF-01",
+      "status": "Fail",
+      "evidence": "Certification packet only reviewed direct grant revocation and did not build user-to-entitlement paths."
+    },
+    {
+      "gate": "AR-EFF-02",
+      "status": "Fail",
+      "evidence": "Nested expansion is truncated at depth 1 and cycle detection was not tested."
+    },
+    {
+      "gate": "AR-EFF-03",
+      "status": "Fail",
+      "evidence": "Dynamic group rule owner, last evaluation time, and sample membership are missing."
+    },
+    {
+      "gate": "AR-EFF-04",
+      "status": "Fail",
+      "evidence": "SCIM and external IdP mappings to the SaaS role are not included."
+    },
+    {
+      "gate": "AR-EFF-05",
+      "status": "Fail",
+      "evidence": "HR attribute drift after department transfer does not trigger recertification."
+    },
+    {
+      "gate": "AR-EFF-06",
+      "status": "Fail",
+      "evidence": "Partner IdP group can grant access but is not visible to the certifier."
+    },
+    {
+      "gate": "AR-EFF-07",
+      "status": "Not Evaluable",
+      "evidence": "Break-glass group membership, approval, and alerting are unknown."
+    },
+    {
+      "gate": "AR-EFF-08",
+      "status": "Fail",
+      "evidence": "Missing expansion evidence was counted as approved after direct grant revocation."
+    }
+  ],
+  "expected_assessment": {
+    "overall_status": "Fail",
+    "risk_rating": "High",
+    "confidence": "Low",
+    "finding": "Direct grant revocation does not remove effective billing-admin access through dynamic, nested, SCIM, and external IdP paths."
+  }
+}
