@@ -1,0 +1,85 @@
+{
+  "case": "vulnerable_onnx_external_data_provider_gap",
+  "skill": "model-supply-chain",
+  "expected_result": "Fail",
+  "model": {
+    "name": "payment-risk-score",
+    "format": "onnx",
+    "release_id": "model-registry://payment-risk/2026.06.candidate",
+    "top_level_file": "model.onnx",
+    "top_level_sha256": "recorded",
+    "bundle_manifest": {
+      "scope": ".onnx only",
+      "external_tensor_files": [
+        {
+          "path": "../shared/weights.bin",
+          "sha256": null,
+          "size_bytes": null,
+          "release_artifact": null
+        }
+      ]
+    },
+    "external_data": {
+      "present": true,
+      "locations_relative_to_bundle": false,
+      "path_normalization_checked": false,
+      "traversal_checked": false,
+      "symlink_hardlink_junction_checked": false
+    },
+    "conversion": {
+      "source_model_revision": "pytorch:main",
+      "converter_version": null,
+      "opset": 18,
+      "dynamic_axes": "unspecified",
+      "optimization_steps": [
+        "unknown graph optimization"
+      ],
+      "parity_validation": {
+        "representative_dataset": null,
+        "max_output_delta": null,
+        "reviewer_signoff": false
+      }
+    },
+    "runtime": {
+      "library": "onnxruntime",
+      "configured_providers": [
+        "TensorRTExecutionProvider",
+        "CUDAExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "allowed_providers": [
+        "TensorRTExecutionProvider"
+      ],
+      "fallback_allowed": true,
+      "fallback_alerting": "none",
+      "resource_limits": {
+        "cpu": null,
+        "memory": null
+      },
+      "effective_provider_log": null,
+      "custom_ops": [
+        {
+          "name": "com.example.PaymentNormalize",
+          "package": "payment-normalize-ops",
+          "version": null,
+          "digest": null,
+          "signature": null
+        }
+      ]
+    }
+  },
+  "expected_findings": [
+    "MSC-ONNX-01: bundle digest scope is incomplete because only model.onnx is hashed",
+    "MSC-ONNX-02: external tensor path can resolve outside the approved bundle root",
+    "MSC-ONNX-03: conversion provenance is incomplete",
+    "MSC-ONNX-04: source-to-ONNX parity validation is missing",
+    "MSC-ONNX-05: provider fallback is allowed without alerting or resource limits",
+    "MSC-ONNX-06: no effective provider execution evidence is attached",
+    "MSC-ONNX-07: custom operator provenance is missing"
+  ],
+  "review_decision": {
+    "integrity_status": "Fail",
+    "severity_floor": "High",
+    "rationale": "The top-level ONNX file hash does not bind external tensor data, conversion provenance, provider fallback behavior, or custom operator provenance."
+  }
+}

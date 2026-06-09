@@ -1,0 +1,75 @@
+{
+  "case": "benign_onnx_complete_bundle_runtime_policy",
+  "skill": "model-supply-chain",
+  "expected_result": "Pass",
+  "model": {
+    "name": "invoice-routing-model",
+    "format": "onnx",
+    "release_id": "model-registry://invoice-routing/2026.06.06",
+    "top_level_file": "model.onnx",
+    "bundle_manifest": {
+      "scope": "full bundle",
+      "artifacts": [
+        {
+          "path": "model.onnx",
+          "sha256": "6d7b3d8e0a2d4f11b0b5b5a4c2d4e9f100000000000000000000000000000001",
+          "size_bytes": 440912,
+          "release_artifact": "invoice-routing-2026.06.06"
+        },
+        {
+          "path": "tensors/weights.bin",
+          "sha256": "a41c2f970e7a6b10c3d2e9f4a5b6c7d800000000000000000000000000000002",
+          "size_bytes": 24888321,
+          "release_artifact": "invoice-routing-2026.06.06"
+        }
+      ]
+    },
+    "external_data": {
+      "present": true,
+      "locations_relative_to_bundle": true,
+      "path_normalization_checked": true,
+      "traversal_checked": true,
+      "symlink_hardlink_junction_checked": true,
+      "approved_bundle_root": "models/invoice-routing/2026.06.06"
+    },
+    "conversion": {
+      "source_model_revision": "git:9f2ab31d",
+      "converter_version": "torch.onnx 2.4.0",
+      "opset": 18,
+      "dynamic_axes": "batch only",
+      "optimization_steps": [
+        "onnx-simplifier 0.4.36"
+      ],
+      "preprocessing_contract": "docs/model-contracts/invoice-routing.md",
+      "parity_validation": {
+        "representative_dataset": "validation-2026-05",
+        "max_output_delta": 0.0004,
+        "tolerance": 0.001,
+        "reviewer_signoff": true
+      }
+    },
+    "runtime": {
+      "library": "onnxruntime",
+      "configured_providers": [
+        "CUDAExecutionProvider"
+      ],
+      "allowed_providers": [
+        "CUDAExecutionProvider"
+      ],
+      "fallback_allowed": false,
+      "fallback_alerting": "fail closed",
+      "resource_limits": {
+        "gpu_memory": "4GiB",
+        "cpu": "2 cores"
+      },
+      "effective_provider_log": "evidence/invoice-routing/provider-execution-2026-06-06.json",
+      "custom_ops": []
+    }
+  },
+  "expected_findings": [],
+  "review_decision": {
+    "integrity_status": "Pass",
+    "severity_floor": "None",
+    "rationale": "The review binds the full ONNX bundle, proves external-data path containment, records conversion parity, and verifies the effective provider policy."
+  }
+}

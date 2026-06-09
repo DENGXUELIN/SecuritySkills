@@ -14,7 +14,7 @@ phase: [build, review, operate]
 frameworks: [OWASP-LLM03-2025, SLSA-v1.0, MITRE-ATLAS]
 difficulty: advanced
 time_estimate: "45-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -116,6 +116,13 @@ Grep: "revision=|commit_hash|model_version" in **/*.{py,yaml,yml,json}
 Glob: **/*.{pt,bin,safetensors,pkl,onnx,pb,h5,gguf,ggml}
 Glob: **/model_config.json
 Glob: **/config.json
+
+# Check ONNX bundle and runtime-provider evidence
+Grep: "onnx.load|InferenceSession|onnxruntime|providers=|set_providers|external_data|convert_model_to_external_data|load_external_data" in **/*.{py,yaml,yml,json,toml}
+Glob: **/*.{onnx,ort}
+Glob: **/*.onnx.data
+Glob: **/external_data.json
+Glob: **/*model*manifest*.{json,yaml,yml}
 ```
 
 **Real-world case -- PoisonGPT (Mithril Security, 2023):** Researchers at Mithril Security demonstrated that a model on Hugging Face Hub could be surgically modified to spread targeted misinformation while maintaining normal performance on standard benchmarks. They took GPT-J-6B, used the ROME (Rank-One Model Editing) technique to alter specific factual associations, and uploaded the modified model under a name resembling a legitimate organization. Users downloading the model by name would receive the poisoned version with no indication of tampering. The attack succeeded because Hugging Face Hub at the time did not enforce model signing, and most download code did not verify checksums against a trusted source. This demonstrated that model provenance verification is not optional -- it is the first line of defense against supply chain compromise.
@@ -130,6 +137,34 @@ Glob: **/config.json
 | Model pulled from unverified third-party source (not the original publisher) | High |
 | No model card or provenance documentation available | Medium |
 | Checksums verified but against values stored in the same repository as the model (self-referential) | Medium |
+
+#### ONNX Bundle and Runtime Provider Gate
+
+When reviewing ONNX or ORT artifacts, treat the deployable artifact as the complete model bundle plus the effective runtime-provider policy. A checksum on the top-level `.onnx` protobuf is not enough when tensors, custom operators, conversion metadata, or execution-provider fallback can change what runs in production.
+
+**Required evidence gates:**
+
+| Gate | Required evidence | Failure mode caught |
+|---|---|---|
+| `MSC-ONNX-01` | Bundle manifest lists the `.onnx` or `.ort` file and every external tensor file with size, digest, storage location, and release identifier. | Hashing only `model.onnx` while mutable external data remains unbound. |
+| `MSC-ONNX-02` | External-data paths are normalized, relative to the approved bundle root, and checked for traversal, symlink, hardlink, junction, and overwrite behavior. | Loading weights from outside the reviewed model bundle. |
+| `MSC-ONNX-03` | Conversion provenance records source model revision, converter version, opset, dynamic axes, optimization/quantization steps, and preprocessing/postprocessing contract. | Treating an exported artifact as equivalent to the approved source model without proof. |
+| `MSC-ONNX-04` | Parity validation compares source and ONNX outputs on a representative validation set with documented tolerance and reviewer sign-off. | Silent conversion or opset drift. |
+| `MSC-ONNX-05` | Runtime-provider policy records allowed providers, configured provider order, fallback permission, fallback alerting, and resource limits. | Silent CPU or alternate-provider fallback changing production behavior. |
+| `MSC-ONNX-06` | Effective runtime logs show which providers executed the graph or subgraphs in the reviewed environment. | Assuming provider selection from configuration only. |
+| `MSC-ONNX-07` | Custom operators, execution-provider plugins, and runtime extensions are version-pinned and tied to package provenance, digest, or signature evidence. | Executable runtime extensions bypassing model-artifact provenance. |
+| `MSC-ONNX-08` | If bundle, conversion, or provider evidence is unavailable, mark the ONNX artifact `Not Evaluable` instead of passing model integrity. | Over-crediting final-file-only evidence. |
+
+**Finding guidance:**
+
+| Condition | Severity |
+|---|---|
+| Only the top-level `.onnx` file is hashed while external tensor files are mutable or untracked | High |
+| External-data paths can resolve outside the approved model directory | High |
+| Custom operators or execution-provider plugins lack digest, signature, or package provenance | High |
+| Converted ONNX artifact lacks source revision, converter version, opset, or parity validation | Medium |
+| Production runtime allows silent fallback to an unapproved provider or CPU without alerting/resource limits | Medium |
+| Final ONNX artifact is provided without bundle, conversion, or runtime-provider evidence | Not Evaluable -- request evidence before clearing the artifact |
 
 ---
 
@@ -382,6 +417,12 @@ Assess whether architectural and procedural controls exist to detect model backd
 |---|---|---|---|---|---|
 | [name] | [source] | [format] | [Yes/No] | [Yes/No] | [Complete/Partial/Missing] |
 
+## ONNX Bundle and Runtime Evidence
+
+| Model | Bundle Digest Scope | External Data Contained | Conversion Provenance | Parity Validation | Runtime Provider Policy | Effective Provider Evidence | Custom Ops/EP Provenance | Status |
+|---|---|---|---|---|---|---|---|---|
+| [name] | [.onnx only / full bundle / missing] | [Yes/No/N/A] | [Complete/Partial/Missing] | [Pass/Fail/Missing/N/A] | [Complete/Partial/Missing/N/A] | [Complete/Partial/Missing/N/A] | [Complete/Partial/Missing/N/A] | [Pass/Fail/Not Evaluable] |
+
 ## Findings
 
 ### Finding [N]: [Title]
@@ -441,6 +482,8 @@ Assess whether architectural and procedural controls exist to detect model backd
 
 5. **Evaluating models only on benchmarks.** Standard benchmarks measure general capability, not supply chain integrity. A backdoored model will perform normally on benchmarks by design. Behavioral differential testing with curated, domain-specific test sets that probe for targeted manipulation is required to surface backdoors.
 
+6. **Hashing only the ONNX wrapper.** Large ONNX models can store tensors in external files and use provider-specific runtime behavior. If evidence covers only `model.onnx`, reviewers may miss replaced external weights, unsafe external-data paths, custom-op provenance gaps, or fallback to a different execution provider.
+
 ---
 
 ## References
@@ -454,5 +497,8 @@ Assess whether architectural and procedural controls exist to detect model backd
 - Gu, T. et al. "BadNets: Identifying Vulnerabilities in the Machine Learning Model Supply Chain" (2017) -- arXiv:1708.06733
 - Hubinger, E. et al. "Sleeper Agents: Training Deceptive LLMs that Persist Through Safety Training" (2024) -- arXiv:2401.05566
 - Hugging Face. "Safetensors: A Simple and Safe Serialization Format" -- https://huggingface.co/docs/safetensors
+- ONNX. "External Data" -- https://onnx.ai/onnx/repo-docs/ExternalData.html
+- ONNX. "Security" -- https://onnx.ai/onnx/repo-docs/Security.html
+- ONNX Runtime. "Execution Providers" -- https://onnxruntime.ai/docs/execution-providers/
 - NIST AI Risk Management Framework 1.0 -- https://www.nist.gov/aiframework
 - Open Source Security Foundation (OpenSSF) -- https://openssf.org
