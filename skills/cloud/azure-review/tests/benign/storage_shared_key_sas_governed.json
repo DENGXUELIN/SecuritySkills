@@ -1,0 +1,129 @@
+{
+  "fixture": "storage_shared_key_sas_governed",
+  "skill": "azure-review",
+  "description": "Benign fixture for Azure Storage where sensitive blob accounts use Entra authorization and a legacy Azure Files Shared Key exception is bounded, monitored, rotated, and migrating.",
+  "storage_accounts": [
+    {
+      "name": "prodhealthrecords",
+      "data_sensitivity": "regulated-ephi",
+      "services": [
+        "blob"
+      ],
+      "shared_key_state": "disabled",
+      "evidence_source": "terraform shared_access_key_enabled=false plus Azure CLI allowSharedKeyAccess=false export",
+      "public_access": "disabled",
+      "network_default_action": "Deny",
+      "private_endpoint": true,
+      "sas_usage": [
+        {
+          "type": "user_delegation_sas",
+          "permissions": "read",
+          "scope": "container:exports/weekly",
+          "expiry": "4-hours",
+          "ip_restriction": "corporate-egress",
+          "protocol": "https",
+          "issuer": "managed-identity-export-service",
+          "revocation": "disable managed identity or revoke Entra role assignment"
+        }
+      ],
+      "listkeys_principals": []
+    },
+    {
+      "name": "legacyfilesprod",
+      "data_sensitivity": "internal-support-files",
+      "services": [
+        "file"
+      ],
+      "shared_key_state": "excepted",
+      "exception": {
+        "owner": "storage-platform",
+        "reason": "legacy Azure Files client migration",
+        "affected_service": "Azure Files SMB",
+        "expires": "2026-09-30",
+        "migration_target": "Microsoft Entra Kerberos for Azure Files",
+        "last_reviewed": "2026-06-03"
+      },
+      "network_default_action": "Deny",
+      "sas_policy": {
+        "expiration_period": "07.00:00:00",
+        "expiration_action": "Block",
+        "service_limitations_reviewed": true
+      },
+      "stored_access_policy": "files-support-uploads-policy",
+      "key_rotation": {
+        "interval": "30-days",
+        "last_rotated": "2026-06-01",
+        "emergency_revocation_test": "2026-05-22"
+      },
+      "listkeys_principals": [
+        {
+          "principal": "group:storage-breakglass",
+          "role": "Storage Account Key Operator Service Role",
+          "pim": "eligible-with-approval",
+          "scope": "storage-account-only"
+        }
+      ],
+      "diagnostics": {
+        "destination": "soc-log-analytics",
+        "categories": [
+          "StorageRead",
+          "StorageWrite",
+          "StorageDelete"
+        ],
+        "signals": [
+          "AuthenticationType",
+          "SasExpiryStatus",
+          "AuthorizationError"
+        ],
+        "retention": "365-days"
+      }
+    }
+  ],
+  "expected_gate_results": [
+    {
+      "gate": "AZ-STOR-SAS-01",
+      "status": "Pass",
+      "evidence": "Sensitive storage inventory records data sensitivity, services, owners, and authorization mode."
+    },
+    {
+      "gate": "AZ-STOR-SAS-02",
+      "status": "Pass",
+      "evidence": "Shared Key is disabled for ePHI blobs and excepted only for bounded legacy Files use."
+    },
+    {
+      "gate": "AZ-STOR-SAS-03",
+      "status": "Pass",
+      "evidence": "listkeys is limited to an approved break-glass group with PIM and account-only scope."
+    },
+    {
+      "gate": "AZ-STOR-SAS-04",
+      "status": "Pass",
+      "evidence": "SAS inventory records user delegation type, scope, permissions, expiry, IP, protocol, and issuer."
+    },
+    {
+      "gate": "AZ-STOR-SAS-05",
+      "status": "Pass",
+      "evidence": "Legacy account has SAS expiration policy with Block action and seven-day maximum."
+    },
+    {
+      "gate": "AZ-STOR-SAS-06",
+      "status": "Pass",
+      "evidence": "Stored access policy, 30-day key rotation, and emergency revocation test are documented."
+    },
+    {
+      "gate": "AZ-STOR-SAS-07",
+      "status": "Pass",
+      "evidence": "Storage diagnostics route key/SAS signals and read/write/delete events to SOC Log Analytics."
+    },
+    {
+      "gate": "AZ-STOR-SAS-08",
+      "status": "Pass",
+      "evidence": "No missing Shared Key, SAS, listkeys, or diagnostic evidence is counted as passing."
+    }
+  ],
+  "expected_assessment": {
+    "overall_status": "Pass",
+    "risk_rating": "Low",
+    "confidence": "High"
+  }
+}

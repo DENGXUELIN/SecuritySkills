@@ -290,6 +290,70 @@ resource "azurerm_storage_account" {
 }
 ```
 
+### Supplemental -- Storage Shared Key and SAS authorization evidence
+
+Section 3 storage controls must not treat network denial, HTTPS-only traffic, TLS, public access prevention, soft delete, or encryption as proof that the data-plane authorization path is least privilege. For sensitive Storage Accounts, collect Shared Key, SAS, `listkeys`, revocation, and diagnostic evidence.
+
+**Shared Key and SAS patterns:**
+
+```hcl
+resource "azurerm_storage_account" "sensitive" {
+  shared_access_key_enabled       = false
+  allow_nested_items_to_be_public = false
+  enable_https_traffic_only       = true
+  min_tls_version                 = "TLS1_2"
+}
+
+resource "azurerm_storage_account" "legacy_files_exception" {
+  shared_access_key_enabled = true
+  network_rules {
+    default_action = "Deny"
+  }
+  sas_policy {
+    expiration_period = "07.00:00:00"
+    expiration_action = "Block"
+  }
+}
+```
+
+**`listkeys` and diagnostic evidence patterns:**
+
+```hcl
+resource "azurerm_role_assignment" "storage_key_admin" {
+  scope                = azurerm_storage_account.legacy_files_exception.id
+  role_definition_name = "Storage Account Key Operator Service Role"
+  principal_id         = azuread_group.storage_breakglass.object_id
+}
+
+resource "azurerm_monitor_diagnostic_setting" "storage_auth" {
+  target_resource_id         = azurerm_storage_account.legacy_files_exception.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.soc.id
+  enabled_log {
+    category = "StorageRead"
+  }
+  enabled_log {
+    category = "StorageWrite"
+  }
+  enabled_log {
+    category = "StorageDelete"
+  }
+}
+```
+
+**Review checklist:**
+
+- Inventory every sensitive, regulated, production, and customer-facing Storage Account with exposed services and data sensitivity.
+- Record whether Shared Key is disabled, enabled, unknown, or enabled under a scoped exception.
+- For Shared Key exceptions, require owner, affected service, consumer, network boundary, key rotation, monitoring, expiry, and migration target.
+- Review role assignments that can run `Microsoft.Storage/storageAccounts/listkeys/action`, including inherited Owner, Contributor, and Storage Account Contributor paths.
+- Inventory SAS use by type: user delegation SAS, service SAS, and account SAS.
+- For each SAS path, record permissions, resource scope, issuer, IP/protocol restrictions, expiry, intended consumer, and revocation method.
+- Treat user delegation SAS separately from account/service SAS because it is authorized with Microsoft Entra credentials.
+- If SAS expiration policy is `Log`, document why `Block` is not active and the target date for enforcement on sensitive production data.
+- Require stored access policy or another tested revocation path for service/account SAS where supported.
+- Confirm diagnostic logs capture key/SAS use, failed authorization, `SasExpiryStatus`, and StorageRead/Write/Delete events and route them to SIEM or Log Analytics.
+- Mark missing SAS/listkeys/diagnostic evidence `Not Evaluable`; do not pass because network and encryption controls are green.
+
 ---
 
 ## Section 4 -- Database Services

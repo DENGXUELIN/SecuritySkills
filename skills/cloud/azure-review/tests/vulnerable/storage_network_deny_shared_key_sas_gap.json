@@ -1,0 +1,118 @@
+{
+  "fixture": "storage_network_deny_shared_key_sas_gap",
+  "skill": "azure-review",
+  "description": "Vulnerable fixture where Azure Storage network, TLS, public access, soft delete, and encryption controls look acceptable but Shared Key, SAS, listkeys, revocation, and diagnostics are ungoverned.",
+  "storage_accounts": [
+    {
+      "name": "sensitiveexports",
+      "data_sensitivity": "customer-financial-data",
+      "services": [
+        "blob",
+        "queue"
+      ],
+      "allow_nested_items_to_be_public": false,
+      "enable_https_traffic_only": true,
+      "min_tls_version": "TLS1_2",
+      "network_default_action": "Deny",
+      "cmk_enabled": true,
+      "soft_delete": "enabled",
+      "shared_key_state": "enabled",
+      "shared_key_exception": "missing",
+      "evidence_overcredit": "Reviewer marked storage acceptable from private endpoint, Deny network rule, TLS, CMK, and soft delete only.",
+      "listkeys_principals": [
+        {
+          "principal": "group:platform-operators",
+          "role": "Contributor",
+          "scope": "resource-group",
+          "pim": "none",
+          "approval": "none"
+        }
+      ],
+      "sas_usage": [
+        {
+          "type": "account_sas",
+          "permissions": "read,write,delete,list",
+          "scope": "account",
+          "expiry": "365-days",
+          "ip_restriction": "none",
+          "protocol": "https",
+          "consumer": "unknown",
+          "stored_access_policy": "none",
+          "revocation": "rotate-account-key-only"
+        },
+        {
+          "type": "service_sas",
+          "permissions": "read,list",
+          "scope": "container:finance-exports",
+          "expiry": "unknown",
+          "ip_restriction": "unknown",
+          "protocol": "unknown",
+          "consumer": "unknown",
+          "stored_access_policy": "missing",
+          "revocation": "unknown"
+        }
+      ],
+      "sas_policy": {
+        "expiration_period": "30.00:00:00",
+        "expiration_action": "Log",
+        "transition_to_block": "missing"
+      },
+      "diagnostics": {
+        "destination": "missing",
+        "categories": [],
+        "signals": [
+          "not-reviewed"
+        ],
+        "retention": "unknown"
+      }
+    }
+  ],
+  "expected_gate_results": [
+    {
+      "gate": "AZ-STOR-SAS-01",
+      "status": "Fail",
+      "evidence": "Authorization inventory is missing even though storage was passed from network and encryption controls."
+    },
+    {
+      "gate": "AZ-STOR-SAS-02",
+      "status": "Fail",
+      "evidence": "Shared Key remains enabled for sensitive storage with no scoped exception."
+    },
+    {
+      "gate": "AZ-STOR-SAS-03",
+      "status": "Fail",
+      "evidence": "Resource-group Contributor path can list account keys without PIM, approval, or monitoring."
+    },
+    {
+      "gate": "AZ-STOR-SAS-04",
+      "status": "Fail",
+      "evidence": "Account SAS is broad and long-lived; service SAS has unknown expiry, protocol, consumer, and revocation path."
+    },
+    {
+      "gate": "AZ-STOR-SAS-05",
+      "status": "Fail",
+      "evidence": "SAS expiration policy is Log only with no transition to Block."
+    },
+    {
+      "gate": "AZ-STOR-SAS-06",
+      "status": "Fail",
+      "evidence": "No stored access policy or tested emergency revocation path is documented."
+    },
+    {
+      "gate": "AZ-STOR-SAS-07",
+      "status": "Fail",
+      "evidence": "No diagnostics route for key/SAS use, SasExpiryStatus, failed auth, or StorageRead/Write/Delete events."
+    },
+    {
+      "gate": "AZ-STOR-SAS-08",
+      "status": "Not Evaluable",
+      "evidence": "Generated/manual SAS evidence is incomplete and must not be counted as Pass."
+    }
+  ],
+  "expected_assessment": {
+    "overall_status": "Fail",
+    "risk_rating": "High",
+    "confidence": "Low",
+    "finding": "Storage account hardening is over-credited while Shared Key, SAS, listkeys, revocation, and diagnostics are ungoverned."
+  }
+}
