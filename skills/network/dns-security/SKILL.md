@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [NIST-SP-800-81-Rev2, CIS-Controls-v8]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -156,7 +156,45 @@ dnssec
 
 ---
 
-### Step 3: Encrypted DNS Transport Review
+### Step 3: Authoritative Transaction Controls Review (NIST SP 800-81 Rev 2, Sections 3 and 6)
+
+DNSSEC signs authoritative data, but it does not authenticate zone transfer clients, dynamic update clients, or NOTIFY targets. A signed zone can still leak the full zone through open AXFR/IXFR or accept unauthorized record changes through broad dynamic update rules.
+
+For each authoritative zone, evaluate these gates before calling authoritative DNS security acceptable:
+
+| Gate | Evidence Required | Blocks If Missing |
+|---|---|---|
+| `DNS-XFR-01` | Approved secondary inventory for each zone, including IPs, TSIG keys, provider account IDs, and business owner. | Unknown or stale secondary targets cannot be distinguished from rogue transfer clients |
+| `DNS-XFR-02` | AXFR/IXFR ACLs restrict `allow-transfer` or provider equivalents to approved secondaries and monitoring systems only. | `allow-transfer { any; };`, `0.0.0.0/0`, `::/0`, or undocumented networks |
+| `DNS-XFR-03` | TSIG, GSS-TSIG, mTLS, IAM, or provider-native authenticated transfer controls are required for zone transfers. | IP-only transfer trust for sensitive or public authoritative zones |
+| `DNS-XFR-04` | Dynamic update is disabled or constrained with `update-policy`/equivalent by key, source, record type, name scope, and zone. | `allow-update { any; };` or broad update rights that can inject MX, NS, SRV, TXT, or A records |
+| `DNS-XFR-05` | NOTIFY/also-notify targets match the approved secondary inventory and use authenticated transfer paths where supported. | Zone change notifications to unknown secondaries or unmanaged providers |
+| `DNS-XFR-06` | Split-horizon/internal zones cannot be transferred to public or external secondaries; transfer scopes match view boundaries. | Internal host/service inventory leakage through public-facing transfer paths |
+| `DNS-XFR-07` | Transfer, update, denied-transfer, denied-update, and failed-TSIG logs are enabled and forwarded to review/alerting. | No evidence for attempted AXFR/IXFR or dynamic update abuse |
+| `DNS-XFR-08` | Periodic validation uses actual transfer/update tests from unauthorized and authorized clients, with timestamps and results retained. | Configuration-only claims without runtime proof |
+
+**BIND patterns to review:**
+
+```
+allow-transfer { key "xfr-secondary-a"; 192.0.2.53; };
+also-notify { 192.0.2.53 key "xfr-secondary-a"; };
+allow-update { none; };
+update-policy {
+    grant "dhcp-ddns-key" subdomain "dynamic.example.com" A TXT;
+};
+```
+
+**Cloud/provider patterns to review:**
+
+- Route 53, Cloud DNS, and Azure DNS zone transfer settings or API/IAM equivalents.
+- Secondary DNS provider configuration, outbound transfer targets, and signing keys used for synchronization.
+- IaC state for zone transfer, dynamic update, DNS peering, private zone sharing, and split-horizon views.
+
+**Finding classification:** Open AXFR/IXFR from the internet is **High** for public zones and **Critical** when internal/split-horizon records are exposed. Unauthenticated or broad dynamic update is **Critical** when it can alter MX, NS, SRV, TXT, or production A/AAAA/CNAME records. Missing transfer/update logging is **Medium**.
+
+---
+
+### Step 4: Encrypted DNS Transport Review
 
 Evaluate whether DNS queries are protected in transit.
 
@@ -194,7 +232,7 @@ forwarders { 1.1.1.1; };  # Plaintext -- flag as finding
 
 ---
 
-### Step 4: Response Policy Zones (RPZ) and Protective DNS (CIS Control 9.2)
+### Step 5: Response Policy Zones (RPZ) and Protective DNS (CIS Control 9.2)
 
 CIS Control 9.2 requires the use of DNS filtering services to block access to known malicious domains. RPZ (Response Policy Zones, defined by ISC) is the standard mechanism for DNS-based filtering on recursive resolvers.
 
@@ -237,7 +275,7 @@ If a cloud-based protective DNS service is used (Cisco Umbrella, Cloudflare Gate
 
 ---
 
-### Step 5: DNS Exfiltration and Tunneling Detection Patterns
+### Step 6: DNS Exfiltration and Tunneling Detection Patterns
 
 DNS tunneling encodes data in DNS query names or TXT record responses to create a covert communication channel. Detection requires pattern analysis, not just domain reputation.
 
@@ -286,7 +324,7 @@ abcdef0123456789.dnscat.example.com TXT
 
 ---
 
-### Step 6: Domain Categorization and Newly Registered Domain (NRD) Blocking
+### Step 7: Domain Categorization and Newly Registered Domain (NRD) Blocking
 
 - **NRD blocking:** Domains registered within the past 30 days are disproportionately associated with phishing and malware. CIS Control 9.2 supports blocking or flagging NRDs.
 - **DGA detection:** Domain Generation Algorithms produce random-appearing domain names. Detection relies on entropy analysis and machine learning classifiers integrated into protective DNS services.
@@ -298,9 +336,9 @@ abcdef0123456789.dnscat.example.com TXT
 
 | Severity | Definition |
 |----------|-----------|
-| **Critical** | Broken DNSSEC chain of trust (missing DS record in parent); authoritative zones serving invalid signatures. |
-| **High** | DNSSEC validation disabled on resolvers; no DNS filtering/RPZ; unsigned public authoritative zones; DNS bypass paths around protective DNS; no DNS query logging; weak signing algorithms. |
-| **Medium** | Plaintext DNS forwarding over untrusted networks; stale RPZ feeds; undocumented NTAs; no NRD blocking; no exfiltration detection; DoH bypass not controlled. |
+| **Critical** | Broken DNSSEC chain of trust (missing DS record in parent); authoritative zones serving invalid signatures; unauthenticated dynamic update can alter production MX/NS/SRV/TXT or high-value A/AAAA/CNAME records; internal/split-horizon zone data is transferable externally. |
+| **High** | DNSSEC validation disabled on resolvers; no DNS filtering/RPZ; unsigned public authoritative zones; DNS bypass paths around protective DNS; no DNS query logging; weak signing algorithms; open public AXFR/IXFR; unknown NOTIFY/secondary targets. |
+| **Medium** | Plaintext DNS forwarding over untrusted networks; stale RPZ feeds; undocumented NTAs; no NRD blocking; no exfiltration detection; DoH bypass not controlled; missing transfer/update/failed-TSIG logging. |
 | **Low** | Missing documentation of DNS architecture; resolver software not at latest version; cosmetic configuration issues. |
 
 ---
@@ -327,6 +365,25 @@ abcdef0123456789.dnscat.example.com TXT
 | Resolver | DNSSEC Validation | Encrypted Transport | RPZ/Filtering | Query Logging |
 |----------|-------------------|--------------------|--------------|--------------|
 | ns1      | Enabled/Disabled  | DoT/DoH/Plaintext  | Yes/No       | Yes/No       |
+
+### Authoritative Transaction Controls
+
+| Zone | Approved Secondaries | AXFR/IXFR ACL | Transfer Auth | Dynamic Update Policy | NOTIFY Inventory | Split-Horizon Boundary | Transfer/Update Logging | Runtime Test |
+|------|----------------------|---------------|---------------|-----------------------|------------------|------------------------|-------------------------|--------------|
+| example.com | Current/Stale | Restricted/Open | TSIG/GSS-TSIG/IAM/Missing | Disabled/Scoped/Open | Matched/Unknown | Preserved/Leaking | Enabled/Missing | Pass/Fail/Not Tested |
+
+### Authoritative Transaction Evidence Gates
+
+| Gate | Evidence | Result |
+|---|---|---|
+| DNS-XFR-01 | [Approved secondary inventory] | [Pass / Fail / Not Evaluable] |
+| DNS-XFR-02 | [AXFR/IXFR ACL evidence] | [Pass / Fail / Not Evaluable] |
+| DNS-XFR-03 | [Transfer authentication evidence] | [Pass / Fail / Not Evaluable] |
+| DNS-XFR-04 | [Dynamic update policy evidence] | [Pass / Fail / Not Evaluable] |
+| DNS-XFR-05 | [NOTIFY target inventory evidence] | [Pass / Fail / Not Evaluable] |
+| DNS-XFR-06 | [Split-horizon transfer boundary evidence] | [Pass / Fail / Not Evaluable] |
+| DNS-XFR-07 | [Transfer/update/failed-TSIG logging evidence] | [Pass / Fail / Not Evaluable] |
+| DNS-XFR-08 | [Authorized and unauthorized runtime test evidence] | [Pass / Fail / Not Evaluable] |
 
 ### Findings
 
@@ -384,6 +441,8 @@ abcdef0123456789.dnscat.example.com TXT
 
 4. **Ignoring DNS over TCP.** DNS is not UDP-only. DNS over TCP (port 53) supports large responses and is required for zone transfers. Some tunneling tools prefer TCP for reliability. Firewall rules and monitoring must cover both UDP and TCP port 53.
 
+5. **Treating DNSSEC as zone transfer protection.** DNSSEC validates record authenticity for resolvers; it does not prevent AXFR/IXFR leakage, unauthorized dynamic update, unknown NOTIFY targets, or missing transfer/update logs.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -413,4 +472,5 @@ This skill processes DNS configuration files that may contain user-supplied zone
 
 ## Changelog
 
+- **1.0.1** -- Add authoritative transaction controls for AXFR/IXFR ACLs, transfer authentication, dynamic update policy, secondary/NOTIFY inventory, split-horizon transfer boundaries, logging, and runtime transfer/update tests.
 - **1.0.0** -- Initial release. Full coverage of NIST SP 800-81 Rev 2 and CIS Controls v8 Control 9.2 for DNS security review.

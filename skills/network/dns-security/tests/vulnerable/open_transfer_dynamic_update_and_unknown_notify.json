@@ -1,0 +1,87 @@
+{
+  "scenario": "open-transfer-dynamic-update-and-unknown-notify",
+  "skill": "dns-security",
+  "expected_skill_version": "1.0.1",
+  "zone": "corp.example",
+  "authoritative_role": "public_primary",
+  "dnssec": {
+    "signed": true,
+    "ds_record_published": true,
+    "algorithm": "ECDSAP256SHA256"
+  },
+  "named_conf": {
+    "allow_transfer": [
+      "any"
+    ],
+    "allow_update": [
+      "any"
+    ],
+    "also_notify": [
+      "198.51.100.77",
+      "192.0.2.53"
+    ],
+    "tsig_keys_for_transfer": [],
+    "update_policy": null
+  },
+  "approved_secondary_inventory": [
+    {
+      "ip": "192.0.2.53",
+      "owner": "managed-dns-secondary-a",
+      "tsig_key": "xfr-secondary-a"
+    }
+  ],
+  "split_horizon": {
+    "view": "internal-and-public-mixed",
+    "internal_records_present": true,
+    "external_transfer_allowed": true
+  },
+  "logging": {
+    "xfer_out": false,
+    "update": false,
+    "security_failed_tsig": false,
+    "forwarded_to_siem": false
+  },
+  "runtime_tests": {
+    "unauthorized_axfr_from_internet": "succeeded",
+    "unauthorized_update_mx": "succeeded",
+    "authorized_secondary_ixfr": "not_tested"
+  },
+  "expected_findings": [
+    {
+      "id": "DNS-XFR-01",
+      "severity": "high",
+      "reason": "also-notify includes an unknown secondary target outside the approved inventory"
+    },
+    {
+      "id": "DNS-XFR-02",
+      "severity": "high",
+      "reason": "AXFR/IXFR is allowed from any client"
+    },
+    {
+      "id": "DNS-XFR-03",
+      "severity": "high",
+      "reason": "zone transfers lack TSIG or equivalent authentication"
+    },
+    {
+      "id": "DNS-XFR-04",
+      "severity": "critical",
+      "reason": "dynamic update is broadly allowed and can modify production DNS records"
+    },
+    {
+      "id": "DNS-XFR-06",
+      "severity": "critical",
+      "reason": "internal records can transfer through an external path"
+    },
+    {
+      "id": "DNS-XFR-07",
+      "severity": "medium",
+      "reason": "transfer, update, and failed-TSIG logging are disabled"
+    },
+    {
+      "id": "DNS-XFR-08",
+      "severity": "high",
+      "reason": "unauthorized runtime transfer and update tests succeeded"
+    }
+  ],
+  "expected_disposition": "fail_authoritative_transaction_controls"
+}

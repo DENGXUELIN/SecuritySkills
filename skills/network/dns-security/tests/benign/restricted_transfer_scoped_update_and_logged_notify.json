@@ -1,0 +1,82 @@
+{
+  "scenario": "restricted-transfer-scoped-update-and-logged-notify",
+  "skill": "dns-security",
+  "expected_skill_version": "1.0.1",
+  "zone": "corp.example",
+  "authoritative_role": "public_primary",
+  "dnssec": {
+    "signed": true,
+    "ds_record_published": true,
+    "algorithm": "ECDSAP256SHA256"
+  },
+  "named_conf": {
+    "allow_transfer": [
+      "key xfr-secondary-a",
+      "192.0.2.53"
+    ],
+    "allow_update": [
+      "none"
+    ],
+    "update_policy": [
+      {
+        "key": "dhcp-ddns-key",
+        "scope": "dynamic.corp.example",
+        "record_types": [
+          "A",
+          "TXT"
+        ]
+      }
+    ],
+    "also_notify": [
+      {
+        "ip": "192.0.2.53",
+        "key": "xfr-secondary-a"
+      }
+    ],
+    "tsig_keys_for_transfer": [
+      "xfr-secondary-a"
+    ]
+  },
+  "approved_secondary_inventory": [
+    {
+      "ip": "192.0.2.53",
+      "owner": "managed-dns-secondary-a",
+      "tsig_key": "xfr-secondary-a",
+      "last_reviewed": "2026-06-01"
+    }
+  ],
+  "split_horizon": {
+    "view": "public",
+    "internal_records_present": false,
+    "external_transfer_allowed": false
+  },
+  "logging": {
+    "xfer_out": true,
+    "update": true,
+    "security_failed_tsig": true,
+    "forwarded_to_siem": true,
+    "sample_log_ids": [
+      "dns-xfr-20260609-001",
+      "dns-update-20260609-011",
+      "dns-tsigfail-20260609-002"
+    ]
+  },
+  "runtime_tests": {
+    "unauthorized_axfr_from_internet": "refused",
+    "unauthorized_update_mx": "denied",
+    "authorized_secondary_ixfr": "succeeded",
+    "tested_at": "2026-06-09T12:20:00Z"
+  },
+  "expected_gate_results": {
+    "DNS-XFR-01": "pass",
+    "DNS-XFR-02": "pass",
+    "DNS-XFR-03": "pass",
+    "DNS-XFR-04": "pass",
+    "DNS-XFR-05": "pass",
+    "DNS-XFR-06": "pass",
+    "DNS-XFR-07": "pass",
+    "DNS-XFR-08": "pass"
+  },
+  "expected_status": "pass",
+  "false_positive_guardrail": "do not flag authoritative transaction controls when approved secondary inventory, restricted AXFR/IXFR, transfer authentication, scoped update policy, matched NOTIFY targets, split-horizon separation, logs, and runtime tests are present"
+}
