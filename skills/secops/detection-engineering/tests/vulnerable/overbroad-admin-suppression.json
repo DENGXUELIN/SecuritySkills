@@ -1,0 +1,73 @@
+{
+  "fixture": "overbroad-admin-suppression",
+  "expected_skill_decision": {
+    "decision": "Not Evaluable",
+    "risk_level": "high",
+    "reason": "Suppression is broad, ownerless, non-expiring, and removes true-positive coverage on privileged admin hosts."
+  },
+  "technique": {
+    "id": "T1059.001",
+    "name": "Command and Scripting Interpreter: PowerShell",
+    "data_components": [
+      "Process Creation",
+      "Command Execution"
+    ]
+  },
+  "sigma_detection": {
+    "selection_process": {
+      "Image|endswith": [
+        "\\powershell.exe",
+        "\\pwsh.exe"
+      ]
+    },
+    "selection_encoded": {
+      "CommandLine|contains": [
+        "-enc",
+        "-EncodedCommand"
+      ]
+    },
+    "filter_admin_hosts": {
+      "Computer|contains": "ADMIN"
+    },
+    "filter_admin_users": {
+      "User|contains": "admin"
+    },
+    "condition": "selection_process and selection_encoded and not 1 of filter_admin_*"
+  },
+  "suppression_governance": {
+    "suppression_id": null,
+    "scope_type": "broad_substring",
+    "owner": null,
+    "approval_ticket": null,
+    "approved_by": null,
+    "approval_date": null,
+    "expiry": null,
+    "review_cadence_days": null,
+    "benign_evidence": {
+      "sample_count": 0,
+      "sample_window_days": 0,
+      "sample_sources": []
+    },
+    "true_positive_regression": {
+      "test_id": "atomic-red-team-T1059.001-encoded-command",
+      "result": "fail",
+      "known_positive_still_alerts": false,
+      "suppressed_positive_examples": [
+        "domain-admin encoded command on ADMIN-DC-01",
+        "cloud-admin encoded command on IDP-ADMIN-01"
+      ]
+    },
+    "coverage_impact": {
+      "heatmap_before": "Operational",
+      "heatmap_after": "Tested",
+      "downgrade_required": true,
+      "procedure_examples_removed": [
+        "privileged user encoded PowerShell",
+        "admin host encoded PowerShell"
+      ]
+    },
+    "compensating_detection": null,
+    "rollback_owner": null,
+    "rollback_procedure": null
+  }
+}

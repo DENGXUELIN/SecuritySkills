@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [MITRE-ATT&CK-v16, Sigma, Palantir-ADS]
 difficulty: advanced
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -106,6 +106,22 @@ Before writing the rule, enumerate:
 - Known legitimate use cases that will match the detection logic (expected false positives)
 - Evasion techniques an adversary might use to avoid the detection (known blind spots)
 - Tuning parameters that can reduce false positives without creating blind spots
+- Suppression governance evidence for every filter that removes events from alerting
+
+**Suppression Governance Evidence Gate:**
+
+Treat every filter, allowlist, exception, and suppression as detection logic that can create a blind spot. Do not accept a suppression as safe unless it passes all applicable checks:
+
+| Gate | Evidence Required | Reject / Downgrade When |
+|------|-------------------|-------------------------|
+| `DET-SUPP-01` Scope | Exact fields, values, entities, hosts, identity groups, command patterns, and log sources affected by the suppression | Scope uses broad substrings such as `admin`, `svc`, `test`, `backup`, path prefixes, or host-name contains rules without bounded membership |
+| `DET-SUPP-02` Owner and approval | Business owner, detection owner, approval ticket, reviewer, and approval date | Suppression is added by the rule author alone or has no accountable owner |
+| `DET-SUPP-03` Expiry / review date | Expiry date or review cadence tied to the risk of the suppressed behavior | Suppression is permanent, stale, or lacks review evidence |
+| `DET-SUPP-04` Benign evidence | Recent benign samples proving the exact suppressed pattern is expected | Evidence only says "false positive" without sample events or environment context |
+| `DET-SUPP-05` TP regression | Known-positive or adversary-emulation sample proving malicious variants still alert after suppression | The suppression removes the only true-positive procedure sample for the technique |
+| `DET-SUPP-06` High-risk scope | Extra approval and shorter review windows for domain controllers, identity providers, privileged users, EDR, SIEM, production cloud, and payment systems | High-risk assets or privileged principals are suppressed by the same broad rule as low-risk endpoints |
+| `DET-SUPP-07` Coverage impact | ATT&CK technique, procedure, data component, and heatmap impact after applying the suppression | Coverage remains `Operational` or `Robust` even though key procedure examples no longer alert |
+| `DET-SUPP-08` Compensating detection / rollback | Compensating rule, alternate telemetry, rollback owner, and disable procedure | Suppression is accepted without a recovery path or alternate signal |
 
 ### Step 3: Author the Sigma Rule
 
@@ -244,6 +260,8 @@ List known sources of false positives and recommended tuning actions.
 
 **Tuning recommendation:** Add parent process exclusions for validated automation tools after confirming their encoded command usage is benign. Document each exclusion with a ticket reference.
 
+**Suppression governance recommendation:** For each tuning action, produce a Suppression Governance Matrix row with suppression ID, exact condition, owner, approval ticket, expiry/review date, benign evidence, true-positive regression result, high-risk scope review, coverage impact, compensating detection, and rollback owner. If any required field is missing, classify the suppression as `Not Evaluable` rather than treating it as a harmless false-positive reduction.
+
 #### Priority
 Define the alert priority and its justification.
 
@@ -356,6 +374,12 @@ detections/
 | P3 | Medium | Detection gap for a technique with available log sources but lower threat intelligence relevance. Coverage improvement opportunity. | Create and deploy detection within 30 days |
 | P4 | Low | Detection exists but has not been validated or tuned. Coverage is theoretical only. | Validate and tune within 90 days |
 
+**Suppression-specific classification:**
+
+- **P2 High:** Suppression removes true-positive coverage for a relevant ATT&CK procedure, applies to high-risk assets or privileged principals, or lacks compensating detection.
+- **P3 Medium:** Suppression is narrow but missing owner, expiry, benign evidence, or true-positive regression proof.
+- **P4 Low:** Suppression is properly scoped and approved but lacks scheduled review or coverage heatmap update.
+
 ---
 
 ## 5. Output Format
@@ -365,7 +389,7 @@ Produce detection engineering deliverables in this structure:
 ```markdown
 ## Detection Engineering Report: [ATT&CK Technique ID]
 **Date:** [YYYY-MM-DD]
-**Skill:** detection-engineering v1.0.0
+**Skill:** detection-engineering v1.0.1
 **Frameworks:** MITRE ATT&CK v16, Sigma, Palantir ADS
 
 ### ATT&CK Technique Summary
@@ -389,11 +413,17 @@ Produce detection engineering deliverables in this structure:
 | Target Coverage | [Operational / Robust] |
 | Validation Method | [Atomic Red Team test ID / manual test procedure] |
 
+### Suppression Governance Matrix
+| Suppression ID | Exact Scope | Owner / Approval | Expiry / Review | Benign Evidence | TP Regression | Coverage Impact | Compensating Detection | Rollback Owner |
+|----------------|-------------|------------------|-----------------|-----------------|---------------|-----------------|------------------------|----------------|
+| [SUPP-001] | [Exact fields and values] | [Owner, ticket, date] | [YYYY-MM-DD] | [Sample/event set] | [Pass/Fail] | [No change / downgrade] | [Rule or telemetry] | [Team/person] |
+
 ### Deployment Notes
 - **Target SIEM:** [Platform]
 - **Converted Query:** [KQL/SPL/EQL equivalent if requested]
 - **Estimated False Positive Rate:** [Low / Medium / High]
 - **Tuning Recommendations:** [Specific filter additions]
+- **Suppression Decision:** [Approved / Not Evaluable / Rejected]
 ```
 
 ---
@@ -493,6 +523,10 @@ Detection rules are not write-once artifacts. Log sources change, environments e
 ### Pitfall 5: Mapping Detections to ATT&CK Techniques Incorrectly
 
 Overly broad or incorrect ATT&CK mappings undermine coverage analysis. A rule that detects a specific PowerShell obfuscation technique should map to T1059.001 (PowerShell) and potentially T1027 (Obfuscated Files or Information), not to the parent T1059 alone. Use sub-technique IDs when the detection is specific to a sub-technique. Validate mappings against the ATT&CK technique definition and procedure examples.
+
+### Pitfall 6: Treating Suppression as Harmless Noise Reduction
+
+Suppressions and allowlists are executable detection logic. A filter such as `User|contains: admin` or `Computer|contains: ADMIN` can remove the exact privileged-user and admin-host activity that adversaries prefer. Require exact scope, owner approval, expiry, benign samples, true-positive regression, coverage impact, and rollback evidence before accepting the tuning. If those artifacts are missing, mark the suppression `Not Evaluable` and downgrade any heatmap claim that depends on it.
 
 ---
 

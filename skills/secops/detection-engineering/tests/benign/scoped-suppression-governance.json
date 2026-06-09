@@ -1,0 +1,72 @@
+{
+  "fixture": "scoped-suppression-governance",
+  "expected_skill_decision": {
+    "decision": "Approved",
+    "risk_level": "low",
+    "reason": "Suppression is exact, owned, expiring, supported by benign samples, and true-positive regression still alerts."
+  },
+  "technique": {
+    "id": "T1059.001",
+    "name": "Command and Scripting Interpreter: PowerShell",
+    "data_components": [
+      "Process Creation",
+      "Command Execution"
+    ]
+  },
+  "sigma_detection": {
+    "selection_process": {
+      "Image|endswith": [
+        "\\powershell.exe",
+        "\\pwsh.exe"
+      ]
+    },
+    "selection_encoded": {
+      "CommandLine|contains": [
+        "-enc",
+        "-EncodedCommand"
+      ]
+    },
+    "filter_deployment_tool": {
+      "ParentImage|endswith": "\\deployment-agent.exe",
+      "CommandLine|contains": "Invoke-ApprovedPackageInstall",
+      "User": "svc-package-deploy",
+      "Computer": [
+        "PKG-BUILD-01",
+        "PKG-BUILD-02"
+      ]
+    },
+    "condition": "selection_process and selection_encoded and not filter_deployment_tool"
+  },
+  "suppression_governance": {
+    "suppression_id": "SUPP-DET-2026-0042",
+    "scope_type": "exact_parent_command_user_host",
+    "owner": "endpoint-platform",
+    "approval_ticket": "DET-CHANGE-0042",
+    "approved_by": "detection-review-board",
+    "approval_date": "2026-06-01",
+    "expiry": "2026-07-01",
+    "review_cadence_days": 30,
+    "benign_evidence": {
+      "sample_count": 42,
+      "sample_window_days": 14,
+      "sample_sources": [
+        "sentinel-rule-preview",
+        "edr-process-search"
+      ]
+    },
+    "true_positive_regression": {
+      "test_id": "atomic-red-team-T1059.001-encoded-command",
+      "result": "pass",
+      "known_positive_still_alerts": true
+    },
+    "coverage_impact": {
+      "heatmap_before": "Operational",
+      "heatmap_after": "Operational",
+      "downgrade_required": false,
+      "procedure_examples_removed": []
+    },
+    "compensating_detection": "DET-PS-EncodedCommand-ParentAnomaly",
+    "rollback_owner": "soc-detection-oncall",
+    "rollback_procedure": "disable SUPP-DET-2026-0042 in detection-as-code and redeploy"
+  }
+}
