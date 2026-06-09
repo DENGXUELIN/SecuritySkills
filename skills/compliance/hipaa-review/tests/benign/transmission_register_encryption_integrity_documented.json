@@ -1,0 +1,247 @@
+{
+  "case_id": "hipaa_transmission_security_documented_register",
+  "description": "A covered entity documents all production and exception ePHI transmission paths with encryption, integrity, recipient, and addressable-rationale evidence before crediting 45 CFR 164.312(e).",
+  "entity_type": "covered_entity",
+  "assessment_date": "2026-06-09",
+  "transmission_register": [
+    {
+      "path_id": "api-claims-primary",
+      "route_type": "primary_api",
+      "source": "ehr-core",
+      "destination": "claims-clearinghouse-api",
+      "ephi_elements": [
+        "patient_id",
+        "encounter_id",
+        "diagnosis_code",
+        "procedure_code"
+      ],
+      "data_owner": "Revenue Cycle",
+      "operational_owner": "Integration Services",
+      "external_recipient": true,
+      "business_associate": {
+        "name": "North Clearinghouse",
+        "baa_id": "BAA-NCH-2026-01",
+        "service_scope": "claims submission and acknowledgement",
+        "subcontractor_flow_down_reviewed": true
+      },
+      "encryption_evidence": {
+        "protocol": "TLS",
+        "minimum_version": "1.3",
+        "certificate_validation": "enforced with hostname validation and private CA pin set",
+        "downgrade_controls": "TLS 1.0/1.1 disabled; HSTS enforced where browser-mediated",
+        "runtime_evidence": [
+          "load-balancer-export-2026-06-07",
+          "mtls-handshake-sample-2026-06-08"
+        ]
+      },
+      "integrity_evidence": {
+        "control": "signed payload digest",
+        "algorithm": "HMAC-SHA256 over canonical claim envelope",
+        "reconciliation": "daily claim acknowledgement reconciliation job RC-EDI-ACK"
+      },
+      "operational_evidence": {
+        "transfer_logs": "splunk-query-api-claims-2026-06-08",
+        "failed_integrity_alert": "SIEM-HIPAA-TRANS-FAIL-02",
+        "certificate_monitoring": "cert-expiry-monitor-api-claims",
+        "retest_cadence": "quarterly"
+      },
+      "status": "Compliant"
+    },
+    {
+      "path_id": "edi-837-as2",
+      "route_type": "edi_as2",
+      "source": "billing-edi-gateway",
+      "destination": "payer-as2-endpoint",
+      "ephi_elements": [
+        "patient_name",
+        "member_id",
+        "diagnosis_code",
+        "claim_amount"
+      ],
+      "data_owner": "Revenue Cycle",
+      "operational_owner": "EDI Operations",
+      "external_recipient": true,
+      "business_associate": {
+        "name": "Payer Network Services",
+        "baa_id": "BAA-PNS-2025-11",
+        "service_scope": "EDI claims transport",
+        "subcontractor_flow_down_reviewed": true
+      },
+      "encryption_evidence": {
+        "protocol": "AS2 over TLS",
+        "minimum_version": "1.2",
+        "certificate_validation": "partner certificate thumbprints verified during rotation",
+        "downgrade_controls": "plain HTTP listener disabled",
+        "runtime_evidence": [
+          "as2-mdn-sample-2026-06-08",
+          "partner-cert-rotation-ticket-CHG-8421"
+        ]
+      },
+      "integrity_evidence": {
+        "control": "AS2 signed MDN MIC plus EDI control totals",
+        "algorithm": "SHA-256 MIC",
+        "reconciliation": "999/277CA acknowledgement reconciliation"
+      },
+      "operational_evidence": {
+        "transfer_logs": "edi-gateway-transfer-log-2026-06-08",
+        "failed_integrity_alert": "AS2-MIC-MISMATCH",
+        "certificate_monitoring": "partner-cert-expiry-dashboard",
+        "retest_cadence": "after each payer endpoint change"
+      },
+      "status": "Compliant"
+    },
+    {
+      "path_id": "sftp-lab-results",
+      "route_type": "sftp_batch",
+      "source": "lab-interface-engine",
+      "destination": "contract-lab-sftp",
+      "ephi_elements": [
+        "patient_name",
+        "date_of_birth",
+        "lab_order_id",
+        "lab_result"
+      ],
+      "data_owner": "Clinical Operations",
+      "operational_owner": "Interface Team",
+      "external_recipient": true,
+      "business_associate": {
+        "name": "Contract Lab LLC",
+        "baa_id": "BAA-CLAB-2026-02",
+        "service_scope": "lab testing and result exchange",
+        "subcontractor_flow_down_reviewed": true
+      },
+      "encryption_evidence": {
+        "protocol": "SFTP",
+        "minimum_version": "SSH-2 with approved ciphers only",
+        "certificate_validation": "host key pinned in managed known_hosts",
+        "downgrade_controls": "FTP and FTPS disabled on gateway",
+        "runtime_evidence": [
+          "sftp-session-log-2026-06-07",
+          "known-hosts-change-ticket-CHG-8388"
+        ]
+      },
+      "integrity_evidence": {
+        "control": "SHA-256 manifest signed by sender",
+        "algorithm": "SHA-256 plus detached signature",
+        "reconciliation": "manifest count compared to received result acknowledgements"
+      },
+      "operational_evidence": {
+        "transfer_logs": "mft-job-history-2026-06-08",
+        "failed_integrity_alert": "MFT-HASH-MISMATCH",
+        "certificate_monitoring": "ssh-host-key-review-calendar",
+        "retest_cadence": "semiannual and after host-key rotation"
+      },
+      "status": "Compliant"
+    },
+    {
+      "path_id": "support-portal-attachment",
+      "route_type": "vendor_portal",
+      "source": "clinical-support-queue",
+      "destination": "ehr-vendor-support-portal",
+      "ephi_elements": [
+        "patient_id",
+        "encounter_note_excerpt"
+      ],
+      "data_owner": "Clinical Applications",
+      "operational_owner": "Application Support",
+      "external_recipient": true,
+      "business_associate": {
+        "name": "EHR Vendor Inc.",
+        "baa_id": "BAA-EHR-2025-06",
+        "service_scope": "application support with minimum necessary ePHI attachments",
+        "subcontractor_flow_down_reviewed": true
+      },
+      "encryption_evidence": {
+        "protocol": "TLS",
+        "minimum_version": "1.3",
+        "certificate_validation": "browser and API client validation enforced",
+        "downgrade_controls": "portal denies HTTP and obsolete TLS",
+        "runtime_evidence": [
+          "portal-security-header-capture-2026-06-08",
+          "vendor-soc2-tls-control-map"
+        ]
+      },
+      "integrity_evidence": {
+        "control": "portal attachment digest and immutable ticket audit log",
+        "algorithm": "SHA-256 attachment hash",
+        "reconciliation": "ticket export hash compared before closure"
+      },
+      "operational_evidence": {
+        "transfer_logs": "support-ticket-attachments-sample-2026-06",
+        "failed_integrity_alert": "portal-audit-tamper-alert",
+        "certificate_monitoring": "vendor-certificate-expiry-attestation",
+        "retest_cadence": "annual vendor review and after portal change"
+      },
+      "status": "Compliant"
+    },
+    {
+      "path_id": "emergency-manual-transfer",
+      "route_type": "manual_exception",
+      "source": "hospital-incident-command",
+      "destination": "receiving-facility-secure-mailbox",
+      "ephi_elements": [
+        "patient_name",
+        "transfer_summary",
+        "active_medication_list"
+      ],
+      "data_owner": "Emergency Preparedness",
+      "operational_owner": "Incident Command",
+      "external_recipient": true,
+      "business_associate": {
+        "name": "Receiving Facility",
+        "baa_id": "treatment-disclosure-documented-no-baa-required",
+        "service_scope": "patient transfer for treatment",
+        "subcontractor_flow_down_reviewed": "not_applicable"
+      },
+      "encryption_evidence": {
+        "protocol": "secure message portal",
+        "minimum_version": "TLS 1.2",
+        "certificate_validation": "managed portal endpoint only",
+        "downgrade_controls": "ordinary email prohibited by playbook",
+        "runtime_evidence": [
+          "emergency-transfer-drill-2026-05-14"
+        ]
+      },
+      "integrity_evidence": {
+        "control": "portal audit receipt and receiving clinician confirmation",
+        "algorithm": "platform message integrity log",
+        "reconciliation": "transfer checklist confirmation"
+      },
+      "addressable_rationale": {
+        "implemented_as_written": false,
+        "equivalent_controls": [
+          "secure portal only",
+          "minimum necessary template",
+          "incident commander approval",
+          "post-event privacy review"
+        ],
+        "risk_analysis_link": "RA-EP-2026-04",
+        "approval_ticket": "GRC-EXC-441"
+      },
+      "operational_evidence": {
+        "transfer_logs": "drill-artifacts-2026-05-14",
+        "failed_integrity_alert": "not_applicable_manual_exception",
+        "certificate_monitoring": "portal-vendor-review",
+        "retest_cadence": "annual emergency-preparedness exercise"
+      },
+      "status": "Addressable - Alternative Implemented"
+    }
+  ],
+  "expected_gate_results": {
+    "HIPAA-TRANS-01": "Pass",
+    "HIPAA-TRANS-02": "Pass",
+    "HIPAA-TRANS-03": "Pass",
+    "HIPAA-TRANS-04": "Pass",
+    "HIPAA-TRANS-05": "Pass",
+    "HIPAA-TRANS-06": "Pass",
+    "HIPAA-TRANS-07": "Pass",
+    "HIPAA-TRANS-08": "Pass"
+  },
+  "expected_assessment": {
+    "164.312(e)(1)": "Compliant",
+    "164.312(e)(2)(i)": "Compliant",
+    "164.312(e)(2)(ii)": "Compliant",
+    "status_cap": "None",
+    "finding": "All known ePHI transmission routes, including emergency/manual exception handling, have current encryption, integrity, recipient, BAA, and operational evidence."
+  }
+}

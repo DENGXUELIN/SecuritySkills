@@ -334,6 +334,19 @@ Hybrid Entity: [Yes/No] — If yes, document healthcare component designation
 - Implement a mechanism to encrypt ePHI whenever deemed appropriate
 - Note: Encryption of ePHI in transit is strongly recommended by OCR. Unencrypted transmission of ePHI over the internet is a frequent enforcement target.
 
+##### Transmission Path Evidence Gate
+
+Do not mark 164.312(e) as Compliant or Addressable - Alternative Implemented from a generic "TLS enabled" statement. Require path-level evidence for every electronic ePHI transmission route, including exception and manual routes.
+
+- `HIPAA-TRANS-01` - Maintain a transmission path register covering primary APIs, EDI/AS2, SFTP jobs, email, webhook callbacks, vendor portal exports, support attachments, clearinghouse routes, emergency/manual transfers, and decommissioned-but-still-enabled routes.
+- `HIPAA-TRANS-02` - For each path, document source system, destination, ePHI elements, data owner, operational owner, external recipient, Business Associate status, and whether the recipient or subcontractor is covered by a current BAA or equivalent arrangement.
+- `HIPAA-TRANS-03` - Record encryption evidence per path: protocol, minimum version, cipher or algorithm policy, certificate validation, mutual authentication where used, key ownership, downgrade/STARTTLS stripping controls, and sampled runtime proof such as headers, logs, or configuration exports.
+- `HIPAA-TRANS-04` - Record integrity controls per path, such as digital signatures, signed payload digests, EDI control totals, AS2 MICs, SFTP file hashes, tamper-evident queues, immutable audit logs, message acknowledgements, or reconciliation jobs.
+- `HIPAA-TRANS-05` - Treat non-TLS, opportunistic TLS, manual email, portable-media handoff, vendor portal download, and emergency transfer paths as Not Evaluable or Non-Compliance unless documented with an addressable rationale, equivalent controls, owner approval, and risk-analysis linkage.
+- `HIPAA-TRANS-06` - Confirm external and Business Associate recipient handling, including BAA service scope, subcontractor flow-down, portal storage/archive behavior, mailbox retention, downstream export handling, and termination/offboarding controls.
+- `HIPAA-TRANS-07` - Verify operational evidence is current and sampled from production-equivalent paths: transfer logs, failed-authentication or failed-integrity logs, certificate expiry monitoring, key/cert rotation records, exception approvals, and retest cadence.
+- `HIPAA-TRANS-08` - Cap status at Partial Compliance when any known ePHI route is inventoried but lacks encryption proof, integrity proof, recipient/BAA proof, or addressable rationale; cap status at Not Evaluable when the path inventory itself is incomplete.
+
 ---
 
 ### Step 5: Organizational Requirements (45 CFR 164.314)
@@ -445,6 +458,23 @@ Assess:
 
 ### Technical Safeguards (164.312)
 [same table format]
+
+#### Transmission Security Evidence (164.312(e))
+
+| Path ID | Source | Destination / Recipient | ePHI Elements | External / BA Status | Encryption Evidence | Integrity Evidence | Addressable Rationale / Equivalent Control | Status |
+|---------|--------|-------------------------|---------------|----------------------|---------------------|-------------------|--------------------------------------------|--------|
+| [path] | [system] | [recipient] | [data] | [CE/BA/vendor/internal] | [protocol/cert/downgrade proof] | [signature/hash/MIC/reconciliation proof] | [if applicable] | [Compliant / Partial / Non-Compliance / Not Evaluable] |
+
+| Gate | Evidence Required | Result | Finding |
+|------|-------------------|--------|---------|
+| HIPAA-TRANS-01 | Complete primary and exception ePHI transmission path register | [Pass/Fail/NE] | [notes] |
+| HIPAA-TRANS-02 | Per-path source, destination, ePHI elements, owner, recipient, and BAA status | [Pass/Fail/NE] | [notes] |
+| HIPAA-TRANS-03 | Encryption, certificate validation, and downgrade-control evidence | [Pass/Fail/NE] | [notes] |
+| HIPAA-TRANS-04 | Integrity-control evidence | [Pass/Fail/NE] | [notes] |
+| HIPAA-TRANS-05 | Addressable rationale or equivalent controls for nonstandard/exception paths | [Pass/Fail/NE] | [notes] |
+| HIPAA-TRANS-06 | External recipient, BA, subcontractor, archive, and export handling | [Pass/Fail/NE] | [notes] |
+| HIPAA-TRANS-07 | Current operational logs, monitoring, approvals, and retest cadence | [Pass/Fail/NE] | [notes] |
+| HIPAA-TRANS-08 | Status cap applied when path inventory or evidence is incomplete | [Pass/Fail/NE] | [notes] |
 
 ### Organizational Requirements (164.314)
 [same table format]
@@ -570,6 +600,8 @@ Policies, Procedures, and Documentation — 164.316
 4. **Confusing HIPAA Security Rule with HIPAA Privacy Rule.** The Security Rule (Subpart C) applies only to ePHI and focuses on technical, physical, and administrative safeguards. The Privacy Rule (Subpart E) covers all PHI including paper records and addresses permitted uses and disclosures. A Security Rule review does not satisfy Privacy Rule obligations and vice versa.
 
 5. **Failing to document the "why" behind security decisions.** The Security Rule is designed to be flexible and scalable. But that flexibility requires documentation. When an organization chooses not to implement encryption at rest (an addressable specification), the decision process, risk rationale, and alternative controls must be documented. OCR auditors expect written justification, not verbal explanations.
+
+6. **Treating "TLS enabled" as complete transmission security.** Transmission Security requires path-by-path review. A compliant primary API does not prove claims resubmission email, SFTP exports, vendor portal downloads, support attachments, webhook callbacks, or emergency/manual transfers have encryption, integrity controls, recipient/BAA coverage, and addressable rationale.
 
 ---
 

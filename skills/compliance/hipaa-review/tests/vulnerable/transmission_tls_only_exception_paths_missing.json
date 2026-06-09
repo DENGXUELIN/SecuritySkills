@@ -1,0 +1,174 @@
+{
+  "case_id": "hipaa_transmission_security_tls_only_overclaim",
+  "description": "A review credits 45 CFR 164.312(e) from a primary API TLS checkbox while exception ePHI routes lack encryption, integrity, recipient, and addressable-rationale evidence.",
+  "entity_type": "business_associate",
+  "assessment_date": "2026-06-09",
+  "claimed_status": {
+    "164.312(e)(1)": "Compliant",
+    "basis": "All production systems use TLS enabled connections."
+  },
+  "transmission_register": [
+    {
+      "path_id": "primary-api",
+      "route_type": "primary_api",
+      "source": "care-management-platform",
+      "destination": "payer-api",
+      "ephi_elements": [
+        "patient_id",
+        "care_plan_id",
+        "diagnosis_code"
+      ],
+      "data_owner": "Care Management",
+      "operational_owner": "Platform Engineering",
+      "external_recipient": true,
+      "business_associate": {
+        "name": "Payer API",
+        "baa_id": "not_provided",
+        "service_scope": "not_documented",
+        "subcontractor_flow_down_reviewed": false
+      },
+      "encryption_evidence": {
+        "protocol": "TLS enabled",
+        "minimum_version": "not_documented",
+        "certificate_validation": "not_documented",
+        "downgrade_controls": "not_documented",
+        "runtime_evidence": []
+      },
+      "integrity_evidence": {
+        "control": "not_documented",
+        "reconciliation": "not_documented"
+      },
+      "operational_evidence": {
+        "transfer_logs": "monthly volume screenshot only",
+        "failed_integrity_alert": "not_documented",
+        "certificate_monitoring": "not_documented",
+        "retest_cadence": "not_documented"
+      }
+    },
+    {
+      "path_id": "claims-resubmission-email",
+      "route_type": "manual_email_exception",
+      "source": "billing-operations-mailbox",
+      "destination": "payer-appeals-mailbox",
+      "ephi_elements": [
+        "patient_name",
+        "member_id",
+        "diagnosis_code",
+        "appeal_note"
+      ],
+      "data_owner": "Revenue Cycle",
+      "operational_owner": "Billing Operations",
+      "external_recipient": true,
+      "business_associate": {
+        "name": "Payer Appeals",
+        "baa_id": "not_provided",
+        "service_scope": "not_documented",
+        "subcontractor_flow_down_reviewed": false
+      },
+      "encryption_evidence": {
+        "protocol": "ordinary email",
+        "minimum_version": "opportunistic_tls_unknown",
+        "certificate_validation": "not_documented",
+        "downgrade_controls": "none",
+        "runtime_evidence": []
+      },
+      "integrity_evidence": {
+        "control": "none",
+        "reconciliation": "manual spreadsheet without message digest"
+      },
+      "addressable_rationale": null,
+      "operational_evidence": {
+        "transfer_logs": "mailbox search not exported",
+        "failed_integrity_alert": "none",
+        "certificate_monitoring": "none",
+        "retest_cadence": "none"
+      }
+    },
+    {
+      "path_id": "vendor-portal-export",
+      "route_type": "vendor_portal_download",
+      "source": "population-health-export",
+      "destination": "analytics-vendor-portal",
+      "ephi_elements": [
+        "patient_name",
+        "date_of_birth",
+        "encounter_notes"
+      ],
+      "data_owner": "Population Health",
+      "operational_owner": "Analytics Team",
+      "external_recipient": true,
+      "business_associate": {
+        "name": "Analytics Vendor",
+        "baa_id": "expired",
+        "service_scope": "portal export not covered",
+        "subcontractor_flow_down_reviewed": false
+      },
+      "encryption_evidence": {
+        "protocol": "browser portal",
+        "minimum_version": "not_documented",
+        "certificate_validation": "not_documented",
+        "downgrade_controls": "not_documented",
+        "runtime_evidence": []
+      },
+      "integrity_evidence": {
+        "control": "none",
+        "reconciliation": "not_documented"
+      },
+      "addressable_rationale": null,
+      "operational_evidence": {
+        "transfer_logs": "not_collected",
+        "failed_integrity_alert": "none",
+        "certificate_monitoring": "not_documented",
+        "retest_cadence": "none"
+      },
+      "archive_behavior": {
+        "portal_storage_retention": "unknown",
+        "downstream_export_controls": "unknown"
+      }
+    }
+  ],
+  "known_missing_paths": [
+    "support attachments sent to vendor case notes",
+    "webhook callback for appointment reminders",
+    "emergency manual transfer procedure"
+  ],
+  "expected_gate_results": {
+    "HIPAA-TRANS-01": "Fail",
+    "HIPAA-TRANS-02": "Fail",
+    "HIPAA-TRANS-03": "Fail",
+    "HIPAA-TRANS-04": "Fail",
+    "HIPAA-TRANS-05": "Fail",
+    "HIPAA-TRANS-06": "Fail",
+    "HIPAA-TRANS-07": "Fail",
+    "HIPAA-TRANS-08": "Fail"
+  },
+  "expected_findings": [
+    {
+      "gate": "HIPAA-TRANS-01",
+      "finding": "The register omits known support attachment, webhook callback, and emergency/manual transfer routes, so 164.312(e) is Not Evaluable until path coverage is complete."
+    },
+    {
+      "gate": "HIPAA-TRANS-03",
+      "finding": "The primary API only states TLS enabled and lacks minimum version, certificate validation, downgrade controls, and runtime proof."
+    },
+    {
+      "gate": "HIPAA-TRANS-04",
+      "finding": "Email and portal export paths lack signatures, hashes, MICs, control totals, tamper-evident logs, or reconciliation evidence."
+    },
+    {
+      "gate": "HIPAA-TRANS-05",
+      "finding": "Manual email sends diagnosis codes without documented encryption, equivalent controls, owner approval, or risk-analysis rationale."
+    },
+    {
+      "gate": "HIPAA-TRANS-06",
+      "finding": "External recipient and BA handling is incomplete because BAA scope is missing or expired and portal archive/export behavior is unknown."
+    }
+  ],
+  "expected_assessment": {
+    "164.312(e)(1)": "Not Evaluable",
+    "164.312(e)(2)(i)": "Non-Compliance",
+    "164.312(e)(2)(ii)": "Non-Compliance",
+    "status_cap": "Not Evaluable",
+    "reason": "The path inventory is incomplete and known ePHI routes lack encryption, integrity, recipient, BAA, and addressable-rationale evidence."
+  }
+}
