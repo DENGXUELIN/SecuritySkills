@@ -1,0 +1,52 @@
+{
+  "id": "agentic-ag08-benign-action-bound-approval-001",
+  "skill": "agentic-top-10",
+  "skill_version": "1.0.2",
+  "category": "AG08",
+  "scenario": "Benign human approval is bound to exact normalized action parameters",
+  "expected_result": "Do not flag the approval gate as bypassable when the executor verifies the same digest, nonce, expiry, reviewer authority, and separation-of-duties evidence before invocation.",
+  "agent_action": {
+    "action_id": "deploy-2026-06-06-042",
+    "tool": "deploy_service",
+    "target": "docs-api/staging",
+    "normalized_parameters": {
+      "service": "docs-api",
+      "environment": "staging",
+      "image_digest": "sha256:1111",
+      "change_ticket": "CHG-1042"
+    },
+    "action_digest": "sha256:7d4f0c2f"
+  },
+  "approval_receipt": {
+    "gate_ids": [
+      "AG08-APPROVAL-01",
+      "AG08-APPROVAL-02",
+      "AG08-APPROVAL-03",
+      "AG08-APPROVAL-04",
+      "AG08-APPROVAL-05",
+      "AG08-APPROVAL-07",
+      "AG08-APPROVAL-08"
+    ],
+    "approval_id": "apr-9942",
+    "approved_digest": "sha256:7d4f0c2f",
+    "reviewer_role": "release-approver",
+    "reviewer_identity_proof": "mfa-verified",
+    "separation_of_duties_checked": true,
+    "nonce": "n-2026-0606-9942",
+    "expires_at": "2026-06-06T10:15:00Z",
+    "policy_version": "deploy-approval-v3"
+  },
+  "executor_verification": {
+    "digest_checked_before_tool_call": true,
+    "receipt_not_expired": true,
+    "nonce_unused": true,
+    "policy_version_matches": true,
+    "fail_closed_on_mismatch": true,
+    "executed_digest": "sha256:7d4f0c2f"
+  },
+  "output_expectations": [
+    "AG08 Approval Binding Evidence table shows matching approved and executed digests.",
+    "Reviewer authority and separation of duties are recorded.",
+    "No finding is raised solely because a human approval gate exists."
+  ]
+}

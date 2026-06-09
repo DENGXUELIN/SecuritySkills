@@ -13,7 +13,7 @@ phase: [design, build, review]
 frameworks: [OWASP-Agentic-AI, MITRE-ATLAS, NIST-AI-RMF]
 difficulty: advanced
 time_estimate: "45-90min"
-version: "1.0.1"
+version: "1.0.2"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -326,6 +326,21 @@ In 2024, a red team exercise at a technology company (published in their securit
 5. Present approval requests with full context. Show the human reviewer the complete action chain, not just the immediate request.
 6. Rotate and limit approval sessions to combat approval fatigue. Set maximum approval counts per session.
 
+#### AG08 Approval Binding Evidence Gate
+
+Human approval is only meaningful when the approval receipt is bound to the exact tool call that later executes. Reviewers must verify the approved action, target, normalized parameters, digest, reviewer identity proof, nonce, expiry, and executor-side verification immediately before invocation.
+
+| Gate | Evidence Required | Finding Trigger |
+|---|---|---|
+| AG08-APPROVAL-01 | Approval request records action ID, tool name, target resource, normalized parameters, and risk class. | Approval contains a summary only, so the reviewer cannot prove what was approved. |
+| AG08-APPROVAL-02 | Approval receipt includes a digest over normalized parameters, action target, tool version, and policy version. | Agent can mutate environment, destination, payload, or diff after approval. |
+| AG08-APPROVAL-03 | Receipt has nonce, expiry, session binding, and single-use replay protection. | Stale approval can be reused across sessions, environments, or later actions. |
+| AG08-APPROVAL-04 | Reviewer identity, MFA or equivalent proof, role authority, and separation-of-duties result are recorded. | Same identity can request, approve, and execute a sensitive action. |
+| AG08-APPROVAL-05 | Executor verifies the receipt digest, expiry, nonce, and policy version immediately before tool invocation. | Approval is checked in UI only, while the executor trusts mutable agent parameters. |
+| AG08-APPROVAL-06 | Batch approvals enumerate per-action membership, per-action digest, cumulative risk, and membership immutability. | Broad approval authorizes heterogeneous high-impact actions hidden under a generic label. |
+| AG08-APPROVAL-07 | Failure mode is fail-closed for missing approval service, digest mismatch, expired receipt, or unknown reviewer authority. | Agent continues when approval verification is unavailable or ambiguous. |
+| AG08-APPROVAL-08 | Post-action receipt records executed digest, reviewer receipt, outcome, and residual replay risk. | Final report cannot prove the executed action matched the approved action. |
+
 **Framework Mapping:**
 
 - OWASP LLM Top 10 2025: LLM06 — Excessive Agency
@@ -506,6 +521,12 @@ Structure the final report as follows:
 - **Priority:** [P0/P1/P2/P3]
 
 [Repeat for AG02 through AG10]
+
+### AG08 Approval Binding Evidence
+
+| Action | Approved Digest | Executed Digest | Reviewer Proof | Nonce/Expiry | Executor Check | Decision |
+|---|---|---|---|---|---|---|
+| ... | ... | ... | ... | ... | pass/fail | accept/finding |
 
 ## Risk Summary Matrix
 

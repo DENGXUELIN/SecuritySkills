@@ -1,0 +1,67 @@
+{
+  "id": "agentic-ag08-vulnerable-stale-approval-mutation-001",
+  "skill": "agentic-top-10",
+  "skill_version": "1.0.2",
+  "category": "AG08",
+  "scenario": "Agent reuses stale human approval after mutating tool parameters",
+  "expected_result": "Flag AG08 approval bypass because the executed action is not cryptographically bound to the reviewed action.",
+  "reviewed_action": {
+    "tool": "deploy_service",
+    "target": "docs-api/staging",
+    "normalized_parameters": {
+      "service": "docs-api",
+      "environment": "staging",
+      "image_digest": "sha256:1111"
+    },
+    "action_digest": null
+  },
+  "executed_action": {
+    "tool": "deploy_service",
+    "target": "docs-api/production",
+    "normalized_parameters": {
+      "service": "docs-api",
+      "environment": "production",
+      "image_digest": "sha256:2222"
+    },
+    "executed_digest": "sha256:mutated"
+  },
+  "approval_receipt": {
+    "approval_id": "apr-8841",
+    "reviewer_role": "release-approver",
+    "nonce": null,
+    "expires_at": null,
+    "approved_digest": null,
+    "separation_of_duties_checked": false
+  },
+  "executor_verification": {
+    "digest_checked_before_tool_call": false,
+    "receipt_expiry_checked": false,
+    "nonce_replay_checked": false,
+    "fail_closed_on_mismatch": false
+  },
+  "batch_approval": {
+    "summary": "routine maintenance changes",
+    "membership_mutable_after_approval": true,
+    "per_action_digests": [],
+    "cumulative_risk_score": null,
+    "hidden_high_impact_action": "production deployment"
+  },
+  "should_flag": [
+    {
+      "gate_id": "AG08-APPROVAL-02",
+      "finding": "Approval is not bound to normalized parameters, so staging approval can be reused for production execution."
+    },
+    {
+      "gate_id": "AG08-APPROVAL-03",
+      "finding": "Receipt has no nonce, expiry, or replay protection."
+    },
+    {
+      "gate_id": "AG08-APPROVAL-05",
+      "finding": "Executor does not verify approval digest immediately before tool invocation."
+    },
+    {
+      "gate_id": "AG08-APPROVAL-06",
+      "finding": "Batch approval has mutable membership and no per-action digests."
+    }
+  ]
+}
