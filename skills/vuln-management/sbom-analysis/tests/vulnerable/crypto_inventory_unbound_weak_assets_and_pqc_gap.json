@@ -1,0 +1,66 @@
+{
+  "scenario": "crypto-inventory-unbound-weak-assets-and-pqc-gap",
+  "skill": "sbom-analysis",
+  "expected_skill_version": "1.0.1",
+  "artifact_type": "sbom-plus-crypto-inventory",
+  "release_scope": {
+    "production_release": true,
+    "encryption_or_signing_in_scope": true
+  },
+  "crypto_assets": [
+    {
+      "asset": "legacy-signing-cert",
+      "type": "certificate",
+      "algorithm": "sha1WithRSAEncryption",
+      "key_length": 1024,
+      "component_binding": null,
+      "owner": null,
+      "expires_at": "2028-12-31T00:00:00Z",
+      "rotation_cadence": null,
+      "storage_protection": "filesystem"
+    },
+    {
+      "asset": "payment-hmac",
+      "type": "algorithm",
+      "algorithm": "HMAC-MD5",
+      "component_binding": null,
+      "owner": "payments-platform",
+      "rotation_cadence": "annual",
+      "storage_protection": "application-config"
+    },
+    {
+      "asset": "customer-archive-encryption-key",
+      "type": "public_key",
+      "algorithm": "RSA-OAEP",
+      "key_length": 4096,
+      "component_binding": "archive-service",
+      "owner": "data-platform",
+      "storage_protection": "kms",
+      "data_retention_years": 12,
+      "rotation_cadence": "365d",
+      "pqc_readiness": null
+    }
+  ],
+  "expected_findings": [
+    {
+      "id": "CBOM-EVID-02",
+      "severity": "medium",
+      "reason": "cryptographic assets are not bound to the components or services that use them"
+    },
+    {
+      "id": "CBOM-EVID-03",
+      "severity": "high",
+      "reason": "weak SHA-1/RSA-1024 and MD5-based algorithms lack migration justification"
+    },
+    {
+      "id": "CBOM-EVID-04",
+      "severity": "medium",
+      "reason": "owner, rotation, and storage-protection evidence is incomplete"
+    },
+    {
+      "id": "CBOM-EVID-05",
+      "severity": "medium",
+      "reason": "long-retention public-key cryptography lacks crypto-agility or PQC migration evidence"
+    }
+  ]
+}

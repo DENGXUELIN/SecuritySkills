@@ -13,7 +13,7 @@ phase: [build, operate]
 frameworks: [CycloneDX-1.5, SPDX-2.3, VEX-CSAF, NTIA-SBOM-Minimum-Elements]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -52,6 +52,7 @@ Before starting, collect or confirm:
 - [ ] **Compliance requirements:** Applicable mandates (EO 14028 for US federal suppliers, EU Cyber Resilience Act, FDA premarket guidance for medical devices)
 - [ ] **License policy:** Organization's approved/prohibited license list, if applicable
 - [ ] **Known vulnerability data:** CVE data sources to cross-reference (NVD, OSV, GitHub Advisory Database)
+- [ ] **Cryptographic inventory evidence:** CBOM, certificate inventory, protocol configuration, key ownership/rotation records, and component binding evidence when the product performs encryption, signing, mTLS, SSH, or JWT issuance
 
 If the SBOM format is ambiguous, inspect the file structure to determine the format before proceeding.
 
@@ -237,6 +238,54 @@ License Analysis:
 - Conflicts Detected:   [N] -- list specific conflicts
 ```
 
+### Step 5A: Cryptographic Inventory and CBOM Readiness
+
+When the software performs encryption, signing, mTLS, SSH, JWT issuance, certificate-based authentication, long-term archival protection, or payment/security messaging, evaluate whether the SBOM is accompanied by enough CBOM or crypto-inventory evidence to support lifecycle decisions. Keep this separate from NTIA minimum-element scoring: a CycloneDX 1.5 or SPDX 2.3 SBOM can be NTIA-complete while still lacking usable cryptographic inventory.
+
+**Framework mapping:** CycloneDX CBOM concepts, NIST SP 800-57 key lifecycle, NIST PQC migration planning
+
+Evaluate:
+
+1. **Inventory coverage:** Algorithms, protocols, certificates, signing materials, public-key mechanisms, and cryptographic libraries used by the released product are listed.
+2. **Component binding:** Each crypto asset is tied to a component, service, endpoint, package, image, or runtime configuration. Library presence alone is not usage evidence.
+3. **Weak algorithm handling:** MD5, SHA-1 signatures, RSA keys under 2048 bits, static DH groups, TLS 1.0/1.1, CBC-only exposure, or custom crypto have migration or risk-acceptance evidence.
+4. **Lifecycle evidence:** Owners, rotation cadence, expiration, storage protection, issuance source, and retirement path are documented for keys and certificates.
+5. **PQC and crypto agility:** Long-retention encrypted or signed data and long-lived public-key trust paths have a migration assessment, data-retention horizon, and replacement plan.
+6. **Scope calibration:** Development-only certificates, excluded test fixtures, and compatibility algorithms in general-purpose libraries are not production findings when release-scope evidence proves they are not shipped or used.
+
+```
+CBOM / Crypto Inventory Evidence:
+- Product / Release:        [name/version]
+- Evidence Source:          [CBOM | SBOM properties | cert inventory | protocol config | runtime export | Not Provided]
+- Asset:                    [algorithm | key | certificate | protocol | library | trust anchor]
+- Component Binding:        [component/service/endpoint/package/image]
+- Usage Evidence:           [config/runtime/export/vendor attestation]
+- Owner / Rotation:         [owner, cadence, expiry]
+- Storage Protection:       [KMS/HSM/protected store/file/unknown]
+- Data Retention Horizon:   [N months/years or Not Applicable]
+- PQC / Crypto Agility:     [Assessed | Planned | Missing | Not Applicable]
+- Status:                   [Pass | Fail | Not Evaluable]
+```
+
+Flag these conditions:
+
+```
+CBOM-EVID-01: Product uses encryption, signing, mTLS, SSH, or JWTs but no crypto inventory or CBOM evidence is provided
+CBOM-EVID-02: Crypto assets are listed but not bound to the component, service, endpoint, package, or runtime that uses them
+CBOM-EVID-03: Deprecated or weak algorithms appear in production scope without migration, exception, or compensating evidence
+CBOM-EVID-04: Keys or certificates lack owner, rotation cadence, expiration, issuance source, or storage-protection evidence
+CBOM-EVID-05: Long-retention or long-lived public-key usage lacks PQC or crypto-agility assessment
+CBOM-EVID-06: VEX, supplier claim, or risk acceptance references cryptography without identifying the actual algorithm, key, certificate, or protocol evidence
+CBOM-EVID-07: Test or development crypto material is reported as production risk without release-scope proof
+CBOM-EVID-08: General-purpose crypto library presence is treated as proof of active weak-algorithm use without configuration or runtime evidence
+```
+
+Classification guidance:
+
+- Production weak crypto with missing owner, rotation, or migration evidence should normally be **Elevated Risk** and may be **Critical Supply Chain Risk** when it protects sensitive production data, signing chains, update channels, or long-retention records.
+- Marketing-only claims such as "uses strong encryption" without CBOM, certificate inventory, protocol configuration, or component binding are **Not Evaluable**, not a clean pass.
+- CBOM absence by itself is not an NTIA minimum-element failure; report it as a separate cryptographic inventory gap.
+
 ---
 
 ## Findings Classification
@@ -259,7 +308,7 @@ Produce a structured report with these exact sections:
 ```markdown
 ## SBOM Analysis Report
 **Date:** [YYYY-MM-DD]
-**Skill:** sbom-analysis v1.0.0
+**Skill:** sbom-analysis v1.0.1
 **Frameworks:** CycloneDX 1.5, SPDX 2.3, VEX (CSAF), NTIA Minimum Elements
 **Reviewer:** AI-assisted (human review required for license conflicts and risk decisions)
 
@@ -323,6 +372,13 @@ conflicts), and overall classification.]
 **Conflicts Detected:** [Yes/No]
 [If yes, list each conflict with affected components and remediation guidance]
 
+### Cryptographic Inventory and CBOM Readiness
+[If crypto inventory, CBOM, certificate, protocol, or runtime crypto evidence is provided or expected]
+
+| Asset | Type | Algorithm / Protocol | Component Binding | Usage Evidence | Owner / Rotation | Storage Protection | PQC / Agility | Status |
+|---|---|---|---|---|---|---|---|---|
+| [name] | [algorithm/key/certificate/protocol/library] | [RSA-2048/TLS 1.3/etc.] | [component/service/endpoint] | [config/runtime/export] | [owner/cadence/expiry] | [KMS/HSM/file/unknown] | [Assessed/Planned/Missing/NA] | [Pass/Fail/Not Evaluable] |
+
 ### Overall Classification
 **Rating:** [Critical Supply Chain Risk | Elevated Risk | Acceptable | Strong]
 **Rationale:** [2-3 sentences explaining the rating]
@@ -349,6 +405,11 @@ A lightweight SBOM standard supporting multiple use cases (software, hardware, s
 - Specification: https://cyclonedx.org/docs/1.5/
 - Schema: https://github.com/CycloneDX/specification
 - Tool Center: https://cyclonedx.org/tool-center/
+
+### CycloneDX CBOM
+CycloneDX supports a Cryptography Bill of Materials capability for capturing cryptographic algorithms, keys, certificates, protocols, and related properties. Use CBOM evidence to evaluate crypto usage, lifecycle ownership, weak algorithm migration, and post-quantum readiness separately from NTIA minimum SBOM completeness.
+- Capability overview: https://cyclonedx.org/capabilities/cbom/
+- Specification index: https://cyclonedx.org/docs/
 
 ### SPDX 2.3 (Linux Foundation / ISO/IEC 5962:2021)
 An international open standard (ISO 5962) for communicating SBOM information including components, licenses, copyrights, and security references. SPDX 2.3 is the latest stable release in the 2.x line.
@@ -381,6 +442,10 @@ Published by NTIA in July 2021 as part of Executive Order 14028 implementation. 
 
 5. **Failing to track SBOM freshness.** An SBOM is a point-in-time snapshot. Software composition changes with every dependency update, build, or deployment. SBOMs older than the most recent build/release are potentially inaccurate. Check the SBOM timestamp against the software's actual release date and flag stale SBOMs.
 
+6. **Equating library presence with cryptographic usage.** A general-purpose library may include compatibility implementations the product never enables. Require component binding, protocol configuration, certificate metadata, or runtime evidence before reporting weak algorithm exposure.
+
+7. **Merging CBOM gaps into NTIA SBOM scoring.** CBOM gaps are important for risk analysis, but they are not one of the seven NTIA minimum elements. Keep crypto inventory findings separate from SBOM completeness ratings.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -398,6 +463,7 @@ Published by NTIA in July 2021 as part of Executive Order 14028 implementation. 
 - NTIA Minimum Elements for an SBOM: https://www.ntia.gov/sites/default/files/publications/sbom_minimum_elements_report_0.pdf
 - NTIA SBOM FAQ: https://www.ntia.gov/page/software-bill-materials
 - CycloneDX 1.5 Specification: https://cyclonedx.org/docs/1.5/
+- CycloneDX CBOM: https://cyclonedx.org/capabilities/cbom/
 - CycloneDX GitHub: https://github.com/CycloneDX/specification
 - SPDX 2.3 Specification: https://spdx.github.io/spdx-spec/v2.3/
 - SPDX License List: https://spdx.org/licenses/
