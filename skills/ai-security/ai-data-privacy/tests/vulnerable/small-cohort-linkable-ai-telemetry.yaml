@@ -1,0 +1,52 @@
+case_id: AI-TEL-VULN-001
+description: Derived AI telemetry leaks small cohorts and reuses stable identifiers across lifecycle stores.
+telemetry_flow:
+  raw_prompt_persisted: false
+  completion_text_persisted: false
+  persisted_fields:
+    - prompt_category
+    - model_quality_label
+    - account_hash
+    - plan
+    - country
+    - industry
+    - model_version
+    - event_hour
+dashboard_export:
+  prompt_category: medical_billing
+  plan: enterprise
+  country: SG
+  industry: oncology
+  model_version: support_assistant_v3
+  distinct_accounts_after_filters: 2
+  examples_included: true
+  near_real_time_release: true
+  minimum_threshold_configured_globally: 20
+  threshold_rechecked_after_filters: false
+  repeated_exports_audited: false
+pseudonym_controls:
+  account_hash_algorithm: sha256_lowercase_account_contact
+  keyed_hmac: false
+  purpose_scoped_surrogate: false
+  reused_across_stores:
+    - prompt_telemetry
+    - vector_retrieval_events
+    - support_case_events
+    - billing_events
+    - evaluation_dataset_labels
+expected_findings:
+  - gate: AI-TEL-01
+    severity: High
+    reason: The dashboard applies a global threshold but exposes a filtered cohort of two accounts.
+  - gate: AI-TEL-03
+    severity: High
+    reason: Near-real-time release can reveal when a single account enters a sensitive prompt category.
+  - gate: AI-TEL-04
+    severity: Medium
+    reason: Repeated exports are not audited or budgeted, enabling differencing attacks.
+  - gate: AI-TEL-05
+    severity: High
+    reason: The subject identifier is a stable unsalted hash and remains dictionary-attackable.
+  - gate: AI-TEL-06
+    severity: High
+    reason: The same identifier joins prompt telemetry with vector, support, billing, and evaluation stores.

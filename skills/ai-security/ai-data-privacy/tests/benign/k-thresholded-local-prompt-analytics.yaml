@@ -1,0 +1,42 @@
+case_id: AI-TEL-BENIGN-001
+description: Privacy-preserving prompt analytics with local classification and k-thresholded exports.
+telemetry_flow:
+  raw_prompt_persisted: false
+  completion_text_persisted: false
+  local_classifier_only: true
+  persisted_fields:
+    - prompt_category
+    - model_version
+    - plan
+    - region
+    - week
+    - aggregate_count
+  user_or_account_identifier_persisted: false
+  redacted_payload_persisted: false
+cohort_controls:
+  minimum_distinct_accounts: 25
+  denominator: distinct_accounts
+  applied_after_filters:
+    - prompt_category
+    - model_version
+    - plan
+    - region
+    - week
+  threshold_buffering: true
+  repeated_export_control: differential_privacy_budget
+  export_audit: true
+pseudonym_controls:
+  purpose_scoped_surrogate: true
+  keyed_hmac_for_internal_join: true
+  cross_domain_reuse_allowed: false
+expected_assessment:
+  result: no_finding
+  false_positive_guardrail: AI-TEL-08
+  reason: Raw prompts and completions are not persisted, no linkable subject identifier is exported, and aggregate rows are released only after per-filter cohort thresholds are met.
+  satisfied_gates:
+    - AI-TEL-01
+    - AI-TEL-02
+    - AI-TEL-03
+    - AI-TEL-04
+    - AI-TEL-05
+    - AI-TEL-08

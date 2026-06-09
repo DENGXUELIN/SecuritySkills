@@ -13,7 +13,7 @@ phase: [design, build, review, operate]
 frameworks: [NIST-AI-RMF-1.0, OWASP-LLM02-2025]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -77,6 +77,7 @@ Before beginning the assessment, gather the following. If any item is unavailabl
 | Privacy policy | Public-facing policy documents | Defines commitments to users about data handling |
 | Data retention policies | Internal governance docs, code configs | Determines how long AI-processed data persists |
 | Logging configuration | Application code, infrastructure configs | Reveals what prompt/completion data is captured |
+| AI telemetry and analytics schemas | Product analytics events, model-quality dashboards, export jobs | Shows whether derived prompt categories or identifiers can still disclose personal data |
 | Training/fine-tuning data documentation | Data pipeline docs, dataset cards | Identifies personal data in training corpus |
 | Consent management implementation | Frontend code, API code, database schemas | Shows how user consent is captured and enforced |
 | Data classification scheme | Governance documentation | Defines sensitivity levels applied to AI data flows |
@@ -145,6 +146,7 @@ Assess whether personal data is exposed, leaked, or inadequately protected in th
 - System prompts that contain PII (customer names, account numbers, internal user data hardcoded for testing or personalization).
 - Model completions returned to users without PII scanning -- the model may reproduce PII from its context or generate plausible PII from memorized training data.
 - PII transmitted to third-party LLM APIs where the provider's data handling terms are unclear or insufficient.
+- Derived AI telemetry such as prompt categories, model-quality labels, account attributes, or pseudonymous identifiers stored in analytics systems without small-cohort controls or purpose separation.
 
 **Detection methods using allowed tools:**
 
@@ -162,6 +164,10 @@ Grep: "openai|anthropic|api.key|azure.openai|bedrock|vertex.ai|cohere|mistral" i
 
 # Check for access control in RAG retrieval
 Grep: "metadata_filter|access_control|permission|authorization|tenant" in **/*.{py,ts,js}
+
+# Check for AI telemetry and linkable pseudonymous identifiers
+Grep: "prompt_category|completion_category|model_quality|model_event|ai_event|telemetry|analytics|dashboard|cohort|segment" in **/*.{py,ts,js,yaml,yml,json}
+Grep: "sha256|sha1|md5|hash|digest|pseudonym|anonymous_id|subject_id|surrogate|hmac" in **/*.{py,ts,js,yaml,yml,json}
 ```
 
 **Model memorization risk:** LLMs can memorize and reproduce training data, including PII. Research by Carlini et al. (2021, 2023) demonstrated that GPT-2 and GPT-3 could be prompted to emit memorized training data including names, phone numbers, email addresses, and physical addresses. The risk is proportional to data frequency in training (repeated PII is more likely to be memorized) and inversely proportional to model size diversity (smaller fine-tuned models on narrow datasets memorize more). For fine-tuned models, this risk is especially acute -- the fine-tuning data is typically smaller and more repetitive than pre-training data, increasing memorization likelihood.
@@ -175,6 +181,8 @@ Grep: "metadata_filter|access_control|permission|authorization|tenant" in **/*.{
 | No PII detection on model completions before returning to users | High |
 | RAG retrieval returns documents across tenant or authorization boundaries | High |
 | User prompts containing PII are sent to the model without redaction | High |
+| AI usage analytics expose small cohorts or unique users after filters are applied | High |
+| Stable unsalted identifiers are reused across prompt telemetry, vector events, support records, billing, or evaluation datasets | High |
 | System prompts contain hardcoded PII (even test data) | Medium |
 | No assessment of model memorization risk for fine-tuned models trained on PII-containing data | Medium |
 
@@ -225,6 +233,7 @@ Grep: "backup|snapshot|archive" in **/*.{yaml,yml,json,toml}
 | Model checkpoints | Encode training data in weights; large storage footprint | Retain only production and rollback versions; delete intermediate checkpoints |
 | RAG source documents | Original documents with full content including PII | Align retention with document source system; propagate deletions to vector store |
 | Evaluation/test datasets | May contain real user data used for testing | Anonymize or use synthetic data; apply same retention as production data |
+| AI telemetry exports | Prompt categories, model labels, account attributes, and time windows can re-identify small cohorts | Apply per-filter thresholds, delayed release, query controls, and purpose-scoped identifiers |
 
 **What constitutes a finding:**
 
@@ -237,6 +246,53 @@ Grep: "backup|snapshot|archive" in **/*.{yaml,yml,json,toml}
 | Backup systems retain AI data beyond primary retention period | Medium |
 | No automated purge mechanism for expired AI data | Medium |
 | Audit logs contain full prompt/completion text with no redaction | Low |
+
+---
+
+### Step 3.1 -- AI Telemetry and Aggregate Analytics Privacy
+
+Assess whether transformed AI telemetry is still personal or commercially sensitive after raw prompts and completions are removed. Prompt categories, model names, plan tier, geography, industry, timestamps, evaluation labels, and stable identifiers can disclose sensitive facts when a dashboard exposes small cohorts or joins events across AI lifecycle stores.
+
+**Telemetry privacy evidence gates:**
+
+| Gate | Evidence Required | Finding if Missing |
+|---|---|---|
+| AI-TEL-01 | Minimum cohort threshold enforced after every dashboard filter, export filter, time window, and drill-down | Small-cell leakage through filtered AI telemetry |
+| AI-TEL-02 | Threshold denominator uses distinct people/accounts and excludes test, service, and duplicate events | Inflated cohort count hides single-subject disclosure |
+| AI-TEL-03 | Near-real-time analytics buffers or delays release until thresholds are met | New event arrival reveals membership in a sensitive prompt category |
+| AI-TEL-04 | Repeated exports are rate-limited, audited, or governed by a differential-privacy budget | Analysts can reconstruct suppressed cells by differencing queries |
+| AI-TEL-05 | Pseudonymous identifiers are keyed, purpose-scoped, rotated when needed, and not dictionary-attackable | Stable hashes or reusable IDs remain personal data |
+| AI-TEL-06 | Identifier reuse across prompt telemetry, vector logs, support, billing, and evaluation stores has legal-basis and retention evidence | Cross-domain joins re-identify AI users or accounts |
+| AI-TEL-07 | Exports suppress examples, labels, or free-text facets when cohorts fall below threshold | Representative examples reveal the only member of a sensitive cohort |
+| AI-TEL-08 | False-positive guardrail distinguishes ephemeral local classification from persisted raw or linkable data | Privacy-preserving local metrics are over-reported as prompt logging |
+
+**False-positive guardrail:** Do not report ephemeral local prompt classification as prompt/completion logging when all of these are true: raw prompt text is not persisted, completion text is not persisted, no user or account identifier is written, no linkable redacted payload is stored, and only k-thresholded aggregate metrics are exported after filters.
+
+**Telemetry Privacy Evidence output:**
+
+| Field | Description |
+|---|---|
+| Telemetry store/export | Analytics table, dashboard, report, warehouse job, or model-quality export reviewed |
+| Raw text persisted | Whether prompt/completion text, redacted text, examples, or snippets are stored |
+| Sensitive dimensions | Prompt category, model label, geography, plan, industry, tenant, time window, model version |
+| Threshold rule | Minimum cohort size, denominator definition, and where it is enforced |
+| Filter coverage | Evidence that thresholds apply after all dashboard/export filters and drill-downs |
+| Release timing | Batch, delayed, buffered, or near-real-time release behavior |
+| Identifier design | Purpose-scoped surrogate, keyed HMAC, rotation, or unsafe stable hash |
+| Cross-domain joins | Stores that can join the same subject across prompt, vector, support, billing, or evaluation data |
+| Query reconstruction controls | Rate limit, export audit, differential-privacy budget, or none |
+| Assessment | `Compliant`, `Finding`, or `Not Evaluable` with reason |
+
+**What constitutes a finding:**
+
+| Condition | Severity |
+|---|---|
+| Filtered AI analytics can expose cohorts below the approved threshold | High |
+| Prompt-category dashboards release near-real-time single-account events | High |
+| Unsalted or reusable identifiers can link AI telemetry across privacy domains | High |
+| Repeated exports allow suppressed cells to be reconstructed by differencing | Medium |
+| Threshold evidence exists only at global dataset level, not per filtered view | Medium |
+| Ephemeral local classification is reported even though no raw or linkable data persists | Low false positive |
 
 ---
 
@@ -411,7 +467,7 @@ user input -> prompt assembly -> LLM API -> completion -> output -> logging/stor
 ## Findings
 
 ### Finding [N]: [Title]
-- **Category:** [Training Data | Prompt/Completion PII | Data Retention | Memorization | EU AI Act | Consent]
+- **Category:** [Training Data | Prompt/Completion PII | AI Telemetry | Data Retention | Memorization | EU AI Act | Consent]
 - **Severity:** [Critical | High | Medium | Low | Informational]
 - **OWASP LLM Category:** LLM02:2025 -- Sensitive Information Disclosure
 - **NIST AI RMF Function:** [GOVERN | MAP | MEASURE | MANAGE] [subcategory]
@@ -429,6 +485,7 @@ user input -> prompt assembly -> LLM API -> completion -> output -> logging/stor
 |---|---|---|---|
 | Training data privacy | [Yes/Partial/No] | [description] | [severity] |
 | PII in prompts/completions | [Yes/Partial/No] | [description] | [severity] |
+| AI telemetry privacy | [Yes/Partial/No] | [description] | [severity] |
 | Data retention | [Yes/Partial/No] | [description] | [severity] |
 | Memorization risk | [Yes/Partial/No] | [description] | [severity] |
 | EU AI Act compliance | [Yes/Partial/No/N/A] | [description] | [severity] |
@@ -471,6 +528,8 @@ user input -> prompt assembly -> LLM API -> completion -> output -> logging/stor
 4. **Conflating data minimization with data deletion.** Data minimization (collecting only what is necessary) is a design-time principle. Data deletion (removing data when it is no longer needed or when a subject requests erasure) is an operational requirement. Both are needed. Many teams implement minimization at the application layer but fail to propagate deletion to downstream AI data stores (vector databases, training dataset snapshots, model checkpoints, conversation logs, analytics pipelines).
 
 5. **Ignoring model memorization as a privacy risk.** Organizations that use pre-trained or fine-tuned models often do not test for memorization of personal data. A model that has memorized PII from its training corpus is effectively a data store containing personal data -- it can reproduce that data on specific prompts. This has regulatory implications: if the model contains memorized PII of EU residents, GDPR obligations apply to the model weights themselves, not just the training dataset.
+
+6. **Treating aggregate AI telemetry as automatically anonymous.** Prompt categories, model-quality labels, and account attributes can reveal sensitive facts when dashboards expose small cohorts, allow repeated filtered exports, or reuse identifiers across prompt telemetry, vector retrieval, support, billing, and evaluation stores. Apply minimum cell-size thresholds after every filter and treat pseudonymous telemetry as personal data when it remains linkable.
 
 ---
 
