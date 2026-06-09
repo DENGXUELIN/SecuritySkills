@@ -1,0 +1,81 @@
+{
+  "case_id": "sast-polyglot-monorepo-complete-sarif-coverage",
+  "skill": "sast-config",
+  "expected_skill_decision": "workspace_coverage_complete",
+  "scenario": "A polyglot monorepo maps each deployable production component to current SARIF, scanner logs, language matrices, and approved exclusions.",
+  "repository": {
+    "name": "commerce-platform",
+    "review_commit": "9d4f3a1",
+    "branch": "main"
+  },
+  "production_components": [
+    {
+      "component": "checkout-web",
+      "paths": ["apps/checkout-web"],
+      "language": "typescript",
+      "release_artifact": "web-checkout:9d4f3a1",
+      "scanner": "semgrep",
+      "sarif_category": "semgrep-checkout-web",
+      "automation_details_id": "semgrep:apps/checkout-web",
+      "included_paths": ["apps/checkout-web/src"],
+      "excluded_paths": ["apps/checkout-web/generated"],
+      "exclusion_justification": "generated client regenerated from checked schema",
+      "handwritten_production_loc_covered_percent": 97,
+      "decision": "complete"
+    },
+    {
+      "component": "payments-api",
+      "paths": ["services/payments-api"],
+      "language": "go",
+      "release_artifact": "payments-api:9d4f3a1",
+      "scanner": "codeql",
+      "sarif_category": "codeql-go-payments-api",
+      "automation_details_id": "codeql:go:services/payments-api",
+      "codeql_database": "go-payments-api-db",
+      "extractor_status": "success",
+      "included_paths": ["services/payments-api"],
+      "excluded_paths": ["services/payments-api/testdata"],
+      "handwritten_production_loc_covered_percent": 99,
+      "decision": "complete"
+    },
+    {
+      "component": "auth-worker",
+      "paths": ["workers/auth-worker"],
+      "language": "python",
+      "release_artifact": "auth-worker:9d4f3a1",
+      "scanner": "semgrep",
+      "sarif_category": "semgrep-auth-worker",
+      "automation_details_id": "semgrep:workers/auth-worker",
+      "included_paths": ["workers/auth-worker/src"],
+      "excluded_paths": ["workers/auth-worker/tests"],
+      "handwritten_production_loc_covered_percent": 96,
+      "decision": "complete"
+    }
+  ],
+  "workspace_gate_results": {
+    "SAST-WORKSPACE-01": "pass",
+    "SAST-WORKSPACE-02": "pass",
+    "SAST-WORKSPACE-03": "pass",
+    "SAST-WORKSPACE-04": "pass",
+    "SAST-WORKSPACE-05": "pass",
+    "SAST-WORKSPACE-06": "pass",
+    "SAST-WORKSPACE-07": "pass",
+    "SAST-WORKSPACE-08": "pass"
+  },
+  "output_expectations": {
+    "workspace_coverage_decision": "complete",
+    "finding_severity": "PASS",
+    "required_report_fields": [
+      "component",
+      "paths",
+      "language",
+      "release_artifact",
+      "scanner_run_id",
+      "sarif_category",
+      "commit_sha",
+      "included_paths",
+      "excluded_paths",
+      "handwritten_production_loc_covered"
+    ]
+  }
+}

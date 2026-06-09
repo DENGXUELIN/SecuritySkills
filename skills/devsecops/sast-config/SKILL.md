@@ -12,7 +12,7 @@ phase: [build]
 frameworks: [OWASP-ASVS-4.0.3, CWE-Top-25]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -91,6 +91,27 @@ Categorize by:
 - **Rule source:** Default/managed rules, community rules, custom org rules.
 - **Integration point:** Pre-commit, PR check, scheduled scan, IDE plugin.
 
+#### Monorepo Workspace Coverage Gate
+
+Before accepting repository-wide SAST maturity, map scan artifacts to deployable components and production languages. A green root-level job is **NOT EVALUABLE** for a polyglot monorepo unless SARIF, scanner logs, or dashboard metadata prove every production workspace was included or explicitly excluded with owner-approved justification.
+
+| Gate | Evidence Required | Unsafe Shortcut |
+|---|---|---|
+| SAST-WORKSPACE-01 | Production component inventory with path, language, build system, release artifact, owner, and criticality | Repository root is treated as a single application |
+| SAST-WORKSPACE-02 | Scanner-to-component mapping for CodeQL, Semgrep, SonarQube, Bandit, ESLint-security, and custom scanners | One successful JavaScript scan is credited for Go, Python, Java, or C# services |
+| SAST-WORKSPACE-03 | SARIF `runs`, `artifacts`, `automationDetails.id`, category, commit SHA, branch, and included/excluded paths | Dashboard status is accepted without path-level proof |
+| SAST-WORKSPACE-04 | CodeQL language matrix, database/extractor logs, build target list, and failed/empty extraction evidence | Autobuild success for root project is assumed to cover nested modules |
+| SAST-WORKSPACE-05 | Semgrep include/exclude flags, `--subdir`, `.semgrepignore`, and generated/vendor/test path treatment | A subdirectory scan is uploaded as full-repository coverage |
+| SAST-WORKSPACE-06 | Handwritten production LOC or file count separated from generated, vendor, test, fixture, and build-output code | Generated code inflates scanned file count and hides missing source coverage |
+| SAST-WORKSPACE-07 | PR scan context proves current head coverage, not base-branch-only or stale scheduled scan results | Base branch SARIF is reused for changed production workspaces |
+| SAST-WORKSPACE-08 | Approved exclusion record with owner, reason, expiry/review date, compensating control, and affected release artifact | Missing component coverage is marked pass because the component is "out of scope" |
+
+**False Positive Calibration:**
+
+- A monorepo can be partially compliant when each deployable component has a mapped scanner artifact and missing coverage is recorded separately.
+- Generated, vendored, or test-only subtrees may be excluded when the exclusion is documented and does not hide production handwritten code.
+- A lightweight PR scan can be acceptable for developer feedback only if a scheduled full scan covers every production component and the report states which result supports the final coverage decision.
+
 ---
 
 ### Step 2: Rule Coverage Analysis Against CWE Top 25
@@ -116,6 +137,8 @@ For each CWE, verify:
 - At least one active rule covers the weakness for each language in the codebase.
 - Rule is enabled (not suppressed in configuration).
 - Rule severity matches the CWE's risk (Top 10 CWEs should not be INFO level).
+- Coverage is evaluated per production component and language, not only as one aggregate repository score.
+- SARIF or scanner evidence proves the component path was scanned at the reviewed commit, with generated/vendor/test LOC excluded from coverage claims.
 
 **Finding classification:** CWE Top 10 weakness with zero SAST coverage for a language in use is **High**. CWE 11-25 with no coverage is **Medium**.
 
@@ -427,6 +450,7 @@ jobs:
 - SAST runs on every pull request (not just scheduled scans).
 - SAST is a required status check (PR cannot merge if SAST fails).
 - Full repository scan runs on a schedule (weekly minimum) in addition to PR-scoped scans.
+- Monorepo scans cover every production component or include owner-approved exclusions with expiry/review dates.
 - SAST container/action is pinned to a specific version (not `latest`).
 - Results are uploaded to a central dashboard (Semgrep App, GitHub Security tab, SonarQube).
 - Scan time is under 10 minutes for PR checks (developer experience matters).
@@ -457,6 +481,12 @@ jobs:
 - Configuration files analyzed: <list of file paths>
 - Date: <assessment date>
 - Frameworks applied: OWASP ASVS 4.0.3, CWE Top 25
+
+### Workspace Coverage Matrix
+
+| Component | Path(s) | Language(s) | Release Artifact | Scanner / Run ID | SARIF Category | Commit SHA | Included Paths | Excluded Paths | Handwritten Production LOC Covered | Decision |
+|-----------|---------|-------------|------------------|------------------|----------------|------------|----------------|----------------|------------------------------------|----------|
+| <component> | <paths> | <languages> | <artifact> | <tool/run> | <category> | <sha> | <paths> | <paths + justification> | <percent/count> | <complete/partial/gap/not evaluable> |
 
 ### CWE Top 25 Coverage
 
@@ -536,6 +566,8 @@ jobs:
 
 5. **Ignoring SAST scan performance.** If SAST takes 30 minutes on a PR check, developers will find ways to bypass it. Target under 10 minutes for PR scans. Use diff-aware scanning for PRs and reserve full analysis for scheduled scans.
 
+6. **Treating one green monorepo scan as complete coverage.** A passing CodeQL, Semgrep, or SonarQube job can still scan only one workspace, one language, or one root package. Require component-to-SARIF evidence before claiming production coverage across a polyglot monorepo.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -564,4 +596,5 @@ This skill processes SAST configuration files, custom rules, and code patterns t
 
 ## Changelog
 
+- **1.0.1** -- Added monorepo workspace-scoped SARIF completeness gates, Workspace Coverage Matrix, and component-level coverage guidance.
 - **1.0.0** -- Initial release. Full coverage of SAST configuration review against OWASP ASVS 4.0.3 and CWE Top 25, with Semgrep and CodeQL patterns.

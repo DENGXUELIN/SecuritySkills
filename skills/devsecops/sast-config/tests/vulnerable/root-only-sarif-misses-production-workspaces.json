@@ -1,0 +1,73 @@
+{
+  "case_id": "sast-root-only-sarif-misses-production-workspaces",
+  "skill": "sast-config",
+  "expected_skill_decision": "high_risk_workspace_coverage_gap",
+  "scenario": "A polyglot monorepo reports green SAST status from a root JavaScript scan, but Go and Python production services are excluded or absent from SARIF.",
+  "repository": {
+    "name": "commerce-platform",
+    "review_commit": "4b7c2d0",
+    "branch": "feature/export-refactor"
+  },
+  "reported_status": {
+    "dashboard": "green",
+    "tool": "CodeQL",
+    "languages_reported": ["javascript"],
+    "cwe_top25_coverage_reported": "18_of_25",
+    "sarif_upload_claim": "full_repo"
+  },
+  "actual_scan_evidence": {
+    "workflow": ".github/workflows/codeql.yml",
+    "language_matrix": ["javascript"],
+    "paths_ignore": ["services/**", "workers/**", "packages/**"],
+    "sarif_runs": [
+      {
+        "automation_details_id": "codeql:javascript:root",
+        "category": "codeql-javascript",
+        "artifacts_include": ["web/**", "package.json"],
+        "commit_sha": "base-branch-sha",
+        "branch": "main"
+      }
+    ],
+    "semgrep_command": "semgrep ci --subdir apps/checkout-web",
+    "generated_vendor_files_scanned": 4103,
+    "handwritten_production_files_scanned": 61
+  },
+  "missing_components": [
+    {
+      "component": "payments-api",
+      "paths": ["services/payments-api"],
+      "language": "go",
+      "release_artifact": "payments-api:4b7c2d0",
+      "missing_evidence": ["codeql_go_database", "sarif_artifacts", "included_paths", "current_head_sha"]
+    },
+    {
+      "component": "auth-worker",
+      "paths": ["workers/auth-worker"],
+      "language": "python",
+      "release_artifact": "auth-worker:4b7c2d0",
+      "missing_evidence": ["semgrep_python_run", "bandit_run", "sarif_category", "approved_exclusion"]
+    }
+  ],
+  "workspace_gate_results": {
+    "SAST-WORKSPACE-01": "fail",
+    "SAST-WORKSPACE-02": "fail",
+    "SAST-WORKSPACE-03": "fail",
+    "SAST-WORKSPACE-04": "fail",
+    "SAST-WORKSPACE-05": "fail",
+    "SAST-WORKSPACE-06": "fail",
+    "SAST-WORKSPACE-07": "fail",
+    "SAST-WORKSPACE-08": "fail"
+  },
+  "output_expectations": {
+    "workspace_coverage_decision": "gap",
+    "finding_severity": "HIGH",
+    "required_findings": [
+      "production_component_inventory_missing",
+      "single_language_scan_overcredited",
+      "sarif_missing_production_paths",
+      "base_branch_scan_reused_for_current_pr",
+      "generated_vendor_loc_inflates_coverage",
+      "missing_approved_exclusion_for_unscanned_components"
+    ]
+  }
+}
