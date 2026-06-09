@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [CVSS-4.0, CWE]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -48,6 +48,7 @@ Before starting, collect or confirm:
 - [ ] **Current scan policies:** Existing scan policy names, configurations, and plugin/check selections
 - [ ] **Scan scope:** Target IP ranges, hostnames, applications, containers, or cloud accounts
 - [ ] **Authentication status:** Are scans currently authenticated (credentialed) or unauthenticated?
+- [ ] **Credentialed coverage evidence:** Per-asset or per-asset-class proof that credentials were attempted, accepted, privileged enough, and able to collect local package/patch/registry/file inventory
 - [ ] **False positive examples:** Specific findings suspected or confirmed as false positives, with evidence
 - [ ] **Scan frequency:** Current scan schedule and any performance constraints
 - [ ] **Result volume:** Approximate number of findings per scan cycle and false positive rate if known
@@ -176,6 +177,31 @@ Authentication Configuration:
 - Credential Rotation: [Every N days]
 - Last Verification:   [YYYY-MM-DD, success rate: [N]%]
 ```
+
+#### Credentialed Scan Coverage Evidence Gate
+
+Do not treat "scan completed", "authenticated scan", or an empty result set as negative evidence until credentialed local checks are proven for the scoped assets. Build a coverage denominator before suppressing findings, downgrading severity, or accepting patch-compliance claims.
+
+For every asset class and high-value asset, capture:
+
+| Gate | Required evidence | Fail / Not Evaluable condition |
+|------|-------------------|--------------------------------|
+| `SCAN-CRED-01` | Asset/platform inventory and expected credential type are listed. | Scan summary has no denominator for assets that required credentials. |
+| `SCAN-CRED-02` | Credential source, account type, privilege level, and vault/reference are recorded. | "Authenticated" is claimed without credential source or privilege evidence. |
+| `SCAN-CRED-03` | Authentication result is recorded per asset or asset class. | One successful credential family is generalized to all assets. |
+| `SCAN-CRED-04` | Scanner-specific proof is present, such as Tenable credentialed checks, Qualys authentication status QIDs, Rapid7 credential test output, or agent status. | Vendor auth indicators are absent or stale. |
+| `SCAN-CRED-05` | Local inventory proof succeeded for the relevant checks: package manager, patch inventory, Windows registry/share access, file checks, database version query, or network device command output. | Login succeeds but local package/patch/config evidence is missing. |
+| `SCAN-CRED-06` | Scan engine reachability and required management ports/protocols are evidenced. | Credential failure is caused by blocked SMB/WinRM/SSH/SNMP/API paths but scan is still treated as complete. |
+| `SCAN-CRED-07` | Agent freshness is verified when agent inventory is used. | Agent exists but is stale, offline, or outside the accepted check-in window. |
+| `SCAN-CRED-08` | Coverage decision is explicit: Full, Partial, Failed, Not Attempted, or Not Evaluable, with retest owner and due date. | False-positive suppression or severity downgrade proceeds before failed/partial coverage is retested. |
+
+**Classification rule:** Mark patch-level conclusions **Not Evaluable** when credential status, privilege level, local inventory retrieval, or agent freshness cannot be proven. Treat failed credentialed checks on production assets as a **High** tuning gap when scan results are used for patch compliance, SLA reporting, severity overrides, or false-positive suppression.
+
+#### Credentialed Scan Coverage Matrix
+
+| Asset class | Assets in scope | Scanner / engine | Credential source | Auth result | Local inventory proof | Agent freshness | Failed / not attempted assets | Coverage decision | Retest owner / due date |
+|-------------|-----------------|------------------|-------------------|-------------|-----------------------|-----------------|-------------------------------|-------------------|-------------------------|
+| `<class>` | `<count/list>` | `<scanner>` | `<vault/ref>` | `Success/Partial/Failed/Not Attempted/Unknown` | `<evidence>` | `<fresh/stale/N/A>` | `<count/list>` | `Full/Partial/Failed/Not Evaluable` | `<owner/date>` |
 
 ### Step 4: Severity Override Criteria
 
@@ -322,6 +348,12 @@ Highlight the most impactful tuning recommendations.]
 | Scan Frequency | [Current schedule] | [Recommended schedule] | [Priority] |
 | Port Range | [Current range] | [Recommended range] | [Priority] |
 
+### Credentialed Scan Coverage
+
+| Asset Class | Assets in Scope | Scanner / Engine | Credential Source | Auth Result | Local Inventory Proof | Agent Freshness | Failed / Not Attempted Assets | Coverage Decision | Retest Owner / Due Date |
+|---|---|---|---|---|---|---|---|---|---|
+| [Windows servers] | [count/list] | [scanner/engine] | [vault/site/shared credential] | [success/failed/partial] | [registry/share/package evidence] | [fresh/stale/N/A] | [count/list] | [Full/Partial/Failed/Not Evaluable] | [owner/date] |
+
 ### False Positive Analysis
 
 | Plugin/Check ID | CVE ID | FP Pattern | Affected Assets | Evidence | Recommendation |
@@ -398,6 +430,8 @@ Common Weakness Enumeration. A community-developed list of software and hardware
 4. **Failing to re-evaluate severity overrides when context changes.** A severity downgrade justified by network segmentation becomes invalid if the segmentation is later removed or modified. Severity overrides must be reviewed quarterly and immediately upon any change to the deployment context (network changes, system migration, data classification changes).
 
 5. **Not correlating results across scanners.** Organizations running multiple scanners often treat each scanner's output independently, leading to duplicate remediation efforts for the same vulnerability and missed findings that only one scanner detects. Establish a correlation process using CVE ID as the primary key and CWE as a fallback for non-CVE findings.
+6. **Accepting unauthenticated or partially authenticated scans as negative evidence.** A clean scan is only useful if the scanner proved the local evidence it needed to inspect. Credential failures, insufficient privileges, stale agents, blocked management ports, or missing package/patch inventory turn "not detected" into unknown coverage. Track credentialed scan coverage separately from vulnerability counts.
+7. **Suppressing banner or version findings before credentialed retest.** Backported-package false positives require package-release, vendor advisory, or authenticated local inventory proof. Do not suppress or downgrade solely from a successful remote network scan.
 
 ---
 
@@ -423,9 +457,19 @@ Common Weakness Enumeration. A community-developed list of software and hardware
 - PCI DSS 4.0 (Requirement 11.3): https://www.pcisecuritystandards.org/
 - Qualys VMDR Documentation: https://www.qualys.com/documentation/
 - Tenable Nessus Documentation: https://docs.tenable.com/nessus/
+- Tenable Nessus Credentialed Checks: https://docs.tenable.com/nessus/10_10/Content/NessusCredentialedChecks.htm
+- Tenable Scan Tuning Credentials Configuration: https://docs.tenable.com/quick-reference/vulnerability-management-scan-tuning/Content/VM-Scan-Tuning/CredentialsConfiguration.htm
+- Qualys Authentication Status QIDs: https://docs.qualys.com/en/vm/latest/authentication/auth_stat_qids.htm
 - Rapid7 InsightVM Documentation: https://docs.rapid7.com/insightvm/
+- Rapid7 InsightVM Scan Credentials: https://docs.rapid7.com/insightvm/configuring-scan-credentials/
 - Greenbone/OpenVAS: https://greenbone.github.io/docs/
 - Trivy: https://aquasecurity.github.io/trivy/
 - Grype: https://github.com/anchore/grype
 - Nuclei: https://docs.projectdiscovery.io/tools/nuclei/
 - NVD (NIST): https://nvd.nist.gov/
+
+---
+
+## Changelog
+
+- **1.0.1** -- Added credentialed scan coverage evidence gates, per-asset coverage output, scanner-specific auth proof requirements, stale-agent handling, and fixture-backed examples for full versus failed credentialed coverage.
