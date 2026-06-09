@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [SSVC-2.1, EPSS-v3, CISA-KEV]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -48,6 +48,7 @@ Before starting, collect or confirm:
 - [ ] **Current SLA assignments:** Existing SLA tiers and deadlines for each finding, if previously triaged
 - [ ] **Asset inventory context:** Business criticality, exposure (internet-facing, internal, air-gapped), owner, and environment (production, staging, dev) for affected systems
 - [ ] **Patch availability:** Whether vendor patches, hotfixes, or workarounds exist for each CVE
+- [ ] **Exploit evidence sources:** KEV retrieval timestamp, EPSS score date/percentile, exploit maturity source, source URL, and asset applicability evidence for any P0/P1 or exception decision
 - [ ] **Change management constraints:** Maintenance windows, freeze periods, change advisory board (CAB) schedules
 - [ ] **Compensating controls inventory:** WAF rules, network segmentation, EDR policies, disabled features currently in place
 - [ ] **Compliance mandates:** Applicable regulatory requirements (CISA BOD 22-01, PCI DSS 4.0 Requirement 6.3.3, HIPAA, FedRAMP)
@@ -109,6 +110,54 @@ Assign or validate SLA tiers using the following matrix. SLA tiers are derived f
 2. **SSVC primacy:** The SSVC decision outcome is the primary driver; EPSS and CVSS serve as secondary validation
 3. **Upward adjustment only:** If EPSS or KEV status indicates higher urgency than the SSVC decision alone, escalate the tier; never use EPSS to downgrade an SSVC Immediate decision
 4. **Asset criticality modifier:** For non-critical assets (dev, test, sandbox), the SLA tier may be relaxed by one level with documented justification
+
+### Step 2A: Validate Exploit Evidence Freshness and Maturity
+
+Before changing an SLA tier, prove the exploitability signals are current, attributable, and applicable to the affected asset. This gate prevents two opposite errors: emergency escalation from stale or low-confidence exploit claims, and unsafe deferral of confirmed exploitation because a secondary score is low.
+
+**Framework mapping:** SSVC 2.1 exploitation state, EPSS v3 daily scoring, CISA KEV catalog evidence
+
+Validate the following before final tier assignment:
+
+1. **KEV currency:** Record the CISA KEV source URL, catalog retrieval time, catalog due date when present, and whether the CVE is still listed in the current feed.
+2. **EPSS completeness:** Record EPSS score, percentile, score date, and retrieval time. Missing date or percentile is insufficient for escalation, trend claims, or deferral support.
+3. **Exploit maturity:** Classify the signal as `confirmed_active`, `weaponized`, `public_poc`, `private_poc`, `rumor`, or `none`. Do not treat public PoC availability as confirmed active exploitation.
+4. **Source quality:** Prefer CISA KEV, vendor advisories, CERT/CC, FIRST EPSS, reputable exploit databases with timestamps, scanner metadata with plugin update dates, or internal incident telemetry. Blogs, gists, and social posts need corroboration.
+5. **Asset applicability:** Confirm the vulnerable version, exposed component, configuration preconditions, reachability, and mitigations for the specific asset before escalating or accepting risk.
+6. **Control binding:** When compensating controls are used to delay remediation, show test evidence against the same exploit path and set an expiration or retest date.
+
+```
+Exploit Evidence Record:
+- CVE ID:                    [CVE-YYYY-NNNNN]
+- Proposed SLA Tier:         [P0-P5]
+- KEV Status / Source Date:  [Listed/Not Listed, source URL, retrieved_at]
+- EPSS Score / Percentile:   [score, percentile, score_date, retrieved_at]
+- Exploit Maturity:          [confirmed_active | weaponized | public_poc | private_poc | rumor | none]
+- Source Quality:            [authoritative | corroborated | single-source | unverified]
+- Asset Applicability:       [Confirmed | Partial | Not Confirmed]
+- Control Path Tested:       [Yes/No/Not Applicable]
+- Evidence Status:           [Pass | Fail | Not Evaluable]
+```
+
+Flag these conditions:
+
+```
+PATCH-FRESH-01: P0/P1 tier uses KEV, EPSS, or exploit evidence without retrieval date, source URL, or score date
+PATCH-FRESH-02: EPSS score is missing percentile, score date, or current retrieval timestamp
+PATCH-FRESH-03: Public PoC, blog, gist, or social claim is treated as confirmed active exploitation without corroboration
+PATCH-FRESH-04: Exploit claim is not mapped to deployed version, configuration, reachability, and mitigations
+PATCH-FRESH-05: Confirmed KEV or active exploitation is downgraded because EPSS is currently low
+PATCH-FRESH-06: Compensating control was not tested against the cited exploit path or lacks expiry/retest evidence
+PATCH-FRESH-07: Ransomware, botnet, or mass-exploitation label lacks campaign, telemetry, or authoritative source evidence
+PATCH-FRESH-08: Missing exploit evidence is silently treated as safe instead of `Not Evaluable`
+```
+
+**False-positive guardrails:**
+
+- A confirmed KEV finding remains urgent even when EPSS is low; EPSS should not downgrade known exploitation.
+- A public PoC can justify closer monitoring or P2/P1 treatment, but P0 active-exploitation language requires stronger evidence.
+- Development-only PoCs, unreachable vulnerable code paths, or mitigated configurations should not be escalated without asset applicability proof.
+- If only screenshots, scanner summaries, or copied CSV rows are available, mark the exploit-evidence dimension `Not Evaluable` and state what source is missing.
 
 ### Step 3: EPSS Trend Analysis
 
@@ -278,7 +327,7 @@ Produce a structured report with these exact sections:
 ```markdown
 ## Patch Prioritization Report
 **Date:** [YYYY-MM-DD]
-**Skill:** patch-prioritization v1.0.0
+**Skill:** patch-prioritization v1.0.1
 **Frameworks:** SSVC 2.1, EPSS v3, CISA KEV
 **Reviewer:** AI-assisted (human review required for P0/P1 actions and risk acceptances)
 
@@ -306,6 +355,13 @@ findings requiring immediate action.]
 | CVE ID | Current EPSS | 30-day Prior | Trend | Recommended Action |
 |---|---|---|---|---|
 | [CVE-ID] | [score] | [score] | [Surging/Rising] | [Action] |
+
+### Exploit Evidence Freshness and Maturity
+[List any exploitability evidence gaps, Not Evaluable cases, and false-positive guardrails that changed an SLA decision]
+
+| CVE ID | Proposed SLA | KEV Source Date | EPSS Date / Percentile | Exploit Maturity | Source Quality | Asset Applicability | Evidence Status |
+|---|---|---|---|---|---|---|---|
+| [CVE-ID] | [P0-P5] | [date/source] | [date/percentile] | [confirmed_active/weaponized/public_poc/private_poc/rumor/none] | [authoritative/corroborated/single-source/unverified] | [Confirmed/Partial/Not Confirmed] | [Pass/Fail/Not Evaluable] |
 
 ### Prioritized Patch Schedule
 
@@ -373,6 +429,10 @@ Known Exploited Vulnerabilities catalog maintained by CISA. Contains CVEs with c
 4. **Ignoring EPSS trend direction.** A CVE with a low absolute EPSS score but a rapidly rising trend (e.g., from 0.02 to 0.15 in two weeks) signals that exploit development is progressing. Treating EPSS as a static snapshot rather than a time series misses emerging threats. Always evaluate 7/30/90-day trends.
 
 5. **Scheduling patches without rollback plans.** Patch deployment failures without rollback procedures cause unplanned outages that erode trust in the patching program. Every patch window must include a validated rollback procedure, tested in a non-production environment where possible.
+
+6. **Using stale exploitability snapshots for emergency work.** Cached KEV exports, old EPSS CSVs, and copied scanner fields may be useful for backlog reporting, but they are not enough for P0/P1 changes unless source dates and retrieval times are recorded.
+
+7. **Confusing public PoC with active exploitation.** Public proof-of-concept code is a meaningful signal, but active exploitation requires stronger evidence such as KEV listing, incident telemetry, reputable threat intelligence, or verified campaign reporting.
 
 ---
 
