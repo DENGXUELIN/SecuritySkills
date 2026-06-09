@@ -14,7 +14,7 @@ phase: [build, review, operate]
 frameworks: [OWASP-LLM03-2025, SLSA-v1.0, MITRE-ATLAS]
 difficulty: advanced
 time_estimate: "45-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -82,6 +82,7 @@ Before beginning the assessment, gather the following. If any item is unavailabl
 | Model signing or attestation | CI/CD configs, SLSA provenance files, Sigstore artifacts | Confirms cryptographic supply chain verification |
 | Access controls on model storage | Cloud storage IAM, artifact registry permissions | Determines who can replace or modify model weights |
 | Adapter/plugin sources | LoRA configs, adapter download code | Third-party adapters inherit the same supply chain risks |
+| Promotion and deployment manifests | Model registry releases, deployment YAML, rollout logs, approval tickets | Proves evaluated artifacts are the artifacts deployed |
 
 ---
 
@@ -226,6 +227,57 @@ Glob: **/Jenkinsfile
 | No code review requirement on training configuration changes | Medium |
 | Training pipeline lacks reproducibility controls | Medium |
 | No experiment tracking or training audit trail | Medium |
+
+---
+
+### Step 3a -- Model Promotion and Deployment Binding
+
+Verify that the artifact that passed evaluation, approval, and model-card review is the exact immutable artifact deployed to each runtime environment. Provenance and evaluation evidence are incomplete if production pulls `main`, `latest`, mutable bucket prefixes, or unbound adapter paths after approval.
+
+**What to look for in code and configuration:**
+
+- Evaluation reports that reference a model family, repo, or registry alias without a digest, commit SHA, provider version ID, or immutable object version.
+- Approval tickets that approve a model name but do not bind the evaluated artifact identity, model card version, evaluation run ID, and deploy manifest.
+- Deployment manifests that use `latest`, `main`, unversioned S3/GCS paths, mutable container tags, or current provider defaults.
+- Canary, shadow, staging, and production deployments that do not record which exact artifact was served in each environment.
+- LoRA, QLoRA, PEFT, or other adapter releases that bind only the adapter and omit the base model digest, tokenizer version, or merged artifact hash.
+- Rollback plans that point to an alias or bucket prefix without verifying checksum, signature, evaluation status, and known-vulnerability or backdoor-test status.
+
+**Detection methods using allowed tools:**
+
+```
+# Find model promotion, evaluation, and deployment references
+Grep: "model_uri|model_id|model_version|revision|digest|sha256|evaluation_run|model_card|approval" in **/*.{py,yaml,yml,json,md}
+Grep: "latest|main|prod|staging|canary|shadow|rollback|deploy" in **/*.{py,yaml,yml,json,md,sh}
+Grep: "lora|qlora|peft|adapter|base_model|tokenizer" in **/*.{py,yaml,yml,json,md}
+
+# Find registry and storage paths that may be mutable
+Grep: "s3://|gs://|az://|hf://|huggingface://|registry" in **/*.{py,yaml,yml,json,md,sh}
+```
+
+**Promotion evidence gates:**
+
+| Gate | Evidence Required | Finding Trigger |
+|---|---|---|
+| MODEL-PROMO-01 | Evaluation report includes immutable model identity: digest, commit SHA, object version, provider version ID, or signed attestation. | Evaluation names only a model family, repo, or mutable alias. |
+| MODEL-PROMO-02 | Approval record binds artifact identity, evaluation run ID, model card version, policy decision, and approver authority. | Approval ticket names the model but not the exact evaluated artifact. |
+| MODEL-PROMO-03 | Deployment manifest references immutable model, adapter, tokenizer, container, and serving-code identities. | Deployment pulls `main`, `latest`, unversioned paths, or current provider defaults. |
+| MODEL-PROMO-04 | Promotion path enforces registry immutability, signature or attestation verification, and restricted write access. | A user with training or registry access can replace a released artifact after approval. |
+| MODEL-PROMO-05 | Canary, shadow, staging, production, and regional deployments record served artifact identity and rollout status. | Environment-specific deployments cannot be tied back to the approved artifact. |
+| MODEL-PROMO-06 | Adapter releases bind base model digest, adapter digest, tokenizer/config version, and merge procedure. | LoRA/adapter approval omits base model identity or merged artifact verification. |
+| MODEL-PROMO-07 | Rollback targets have checksum/signature verification, evaluation status, model card version, and known-risk review. | Rollback uses aliases or old bucket prefixes without re-verifying the artifact. |
+| MODEL-PROMO-08 | Post-deploy verification confirms the runtime served identity matches the approved deploy manifest. | Startup logs, registry metadata, or endpoint metadata are not checked after release. |
+
+**What constitutes a finding:**
+
+| Condition | Severity |
+|---|---|
+| Production deploys a model artifact that cannot be tied to the evaluated artifact | High |
+| Deployment uses mutable model or container references for production inference | High |
+| Approval is not bound to digest/revision, evaluation run, and model card version | High |
+| LoRA/adapter release omits base model or merged artifact identity | High |
+| Rollback target is unverified or lacks current risk/evaluation status | Medium |
+| Environment-specific rollout identity is missing for canary or shadow deployments | Medium |
 
 ---
 
@@ -382,10 +434,16 @@ Assess whether architectural and procedural controls exist to detect model backd
 |---|---|---|---|---|---|
 | [name] | [source] | [format] | [Yes/No] | [Yes/No] | [Complete/Partial/Missing] |
 
+## Promotion and Deployment Binding
+
+| Environment | Evaluated Artifact | Approval / Eval Run | Deploy Manifest Identity | Served Identity Verified | Rollback Verified |
+|---|---|---|---|---|---|
+| [prod/staging/canary] | [digest/revision/object version] | [ticket/run/model card] | [model/container/adapter identity] | [Yes/No + evidence] | [Yes/No + evidence] |
+
 ## Findings
 
 ### Finding [N]: [Title]
-- **Category:** [Provenance | Training Data | Fine-Tuning Pipeline | Inference Dependency | Model Card | Backdoor Detection]
+- **Category:** [Provenance | Promotion Binding | Training Data | Fine-Tuning Pipeline | Inference Dependency | Model Card | Backdoor Detection]
 - **Severity:** [Critical | High | Medium | Low | Informational]
 - **OWASP LLM Category:** LLM03:2025 -- Supply Chain Vulnerabilities
 - **MITRE ATLAS Technique:** [technique ID and name]
@@ -401,6 +459,7 @@ Assess whether architectural and procedural controls exist to detect model backd
 | Domain | Current State | Target State | Gap Severity |
 |---|---|---|---|
 | Model provenance | [description] | [recommendation] | [severity] |
+| Promotion and deployment binding | [description] | [recommendation] | [severity] |
 | Training data lineage | [description] | [recommendation] | [severity] |
 | Fine-tuning pipeline | [description] | [recommendation] | [severity] |
 | Inference dependencies | [description] | [recommendation] | [severity] |

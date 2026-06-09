@@ -1,0 +1,66 @@
+{
+  "case": "mutable_promotion_alias_overcredited",
+  "skill": "model-supply-chain",
+  "expected_result": "finding",
+  "model": {
+    "name": "fraud-risk-ranker",
+    "source": "huggingface://finance/fraud-risk-ranker",
+    "revision": "main",
+    "artifact_sha256": null,
+    "model_card_version": "latest"
+  },
+  "evaluation": {
+    "run_id": "eval-2026-06-04-2210",
+    "reported_model": "finance/fraud-risk-ranker",
+    "artifact_sha256": null,
+    "status": "passed"
+  },
+  "approval": {
+    "ticket": "AI-REL-4777",
+    "approved_model_family": "fraud-risk-ranker",
+    "approved_artifact_sha256": null,
+    "approved_eval_run": null,
+    "approver_role": "product-owner"
+  },
+  "deployment": {
+    "environment": "production",
+    "manifest_model_uri": "s3://models/fraud-risk-ranker/latest",
+    "serving_image": "registry.example.com/ml/fraud-risk:latest",
+    "adapter_uri": "s3://models/fraud-risk-ranker/adapters/current",
+    "base_model_digest": null,
+    "adapter_digest": null,
+    "served_identity_verified": false
+  },
+  "rollback": {
+    "target": "s3://models/fraud-risk-ranker/previous",
+    "signature_verified": false,
+    "evaluation_status": "unknown",
+    "known_risk_review": "missing"
+  },
+  "expected_findings": [
+    {
+      "gate": "MODEL-PROMO-01",
+      "reason": "Evaluation does not identify the immutable artifact that was tested."
+    },
+    {
+      "gate": "MODEL-PROMO-02",
+      "reason": "Approval is bound to a model family instead of digest, evaluation run, and model card version."
+    },
+    {
+      "gate": "MODEL-PROMO-03",
+      "reason": "Deployment pulls mutable model and container aliases."
+    },
+    {
+      "gate": "MODEL-PROMO-06",
+      "reason": "Adapter release omits both base model and adapter digests."
+    },
+    {
+      "gate": "MODEL-PROMO-07",
+      "reason": "Rollback target is an alias with no signature, evaluation, or risk review evidence."
+    },
+    {
+      "gate": "MODEL-PROMO-08",
+      "reason": "Runtime served identity was not verified against the approved manifest."
+    }
+  ]
+}

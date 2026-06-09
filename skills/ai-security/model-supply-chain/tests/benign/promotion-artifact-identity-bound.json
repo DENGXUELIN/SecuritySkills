@@ -1,0 +1,46 @@
+{
+  "case": "promotion_artifact_identity_bound",
+  "skill": "model-supply-chain",
+  "expected_result": "pass",
+  "model": {
+    "name": "support-intent-classifier",
+    "source": "huggingface://acme/support-intent-classifier",
+    "revision": "8f44a5e2c9f2a97b4c12e48c8a94a5f0a6d4b331",
+    "artifact_sha256": "f8a0d7ef56d4f9b5b5d682d0c6a5c35f86d45a31d09c3b2b7f3f536b32b6f4c1",
+    "model_card_version": "2026-06-03"
+  },
+  "evaluation": {
+    "run_id": "eval-2026-06-05-0412",
+    "dataset_snapshot": "customer-support-eval@sha256:80ab0c1e",
+    "artifact_sha256": "f8a0d7ef56d4f9b5b5d682d0c6a5c35f86d45a31d09c3b2b7f3f536b32b6f4c1",
+    "status": "passed"
+  },
+  "approval": {
+    "ticket": "AI-REL-4721",
+    "approved_artifact_sha256": "f8a0d7ef56d4f9b5b5d682d0c6a5c35f86d45a31d09c3b2b7f3f536b32b6f4c1",
+    "approved_eval_run": "eval-2026-06-05-0412",
+    "approver_role": "ml-risk-owner"
+  },
+  "deployment": {
+    "environment": "production",
+    "manifest_model_digest": "sha256:f8a0d7ef56d4f9b5b5d682d0c6a5c35f86d45a31d09c3b2b7f3f536b32b6f4c1",
+    "serving_image_digest": "sha256:dcf3b6a186690f6ab7616e39672ad8625d710e9e3f4b5077b5e9c9196b65d203",
+    "served_identity_log": "startup-2026-06-06T02:10:21Z",
+    "served_identity_verified": true
+  },
+  "rollback": {
+    "target_digest": "sha256:429a27f74fe9fbf9c5f83bbf6d82c9466a6c0df3bb8d1c43f9e9e5fe6f24a11a",
+    "signature_verified": true,
+    "evaluation_status": "passed",
+    "known_risk_review": "current"
+  },
+  "covered_gates": [
+    "MODEL-PROMO-01",
+    "MODEL-PROMO-02",
+    "MODEL-PROMO-03",
+    "MODEL-PROMO-04",
+    "MODEL-PROMO-05",
+    "MODEL-PROMO-07",
+    "MODEL-PROMO-08"
+  ]
+}
