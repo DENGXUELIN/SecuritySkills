@@ -704,3 +704,114 @@ resource "azurerm_linux_web_app" {
   }
 }
 ```
+---
+
+## Supplemental -- Azure Functions HTTP Trigger, Key, and Admin Endpoint Evidence
+
+These checks are not CIS Azure v2.1.0 recommendation IDs. Use them as supplemental evidence when the repository contains Azure Functions resources, `function.json`, host.json, ARM/Bicep/Terraform function app resources, deployment packages, or runtime configuration exports.
+
+### AZURE-FUNCTIONS-HTTP-AUTH -- Verify HTTP trigger auth levels and upstream identity controls
+
+Review every HTTP trigger route and its `authLevel`:
+
+```json
+{
+  "bindings": [
+    {
+      "type": "httpTrigger",
+      "authLevel": "anonymous",
+      "methods": ["get", "post"],
+      "route": "orders/{id}"
+    }
+  ]
+}
+```
+
+Flag production `anonymous` triggers unless evidence shows enforced upstream identity-aware control such as App Service Authentication, API Management JWT validation, App Gateway/WAF authentication, or an equivalent control. For intentionally public routes, record route purpose, allowed methods, rate limits, validation, and monitoring evidence.
+
+### AZURE-FUNCTIONS-KEYS -- Verify function, host, and master/admin key governance
+
+Function and host keys are shared access material, not user identity. Require evidence for:
+
+- Function-specific keys
+- Host keys
+- Master/admin key handling
+- Who can read, list, regenerate, or deploy keys
+- Storage location and rotation evidence
+- Separation between production and non-production keys
+
+### AZURE-FUNCTIONS-ADMIN -- Verify admin endpoint and SCM/Kudu isolation
+
+Check runtime admin, `/admin`, SCM/Kudu, and deployment endpoints:
+
+```hcl
+resource "azurerm_linux_function_app" "example" {
+  public_network_access_enabled = false
+
+  site_config {
+    scm_minimum_tls_version = "1.2"
+
+    ip_restriction {
+      action     = "Deny"
+      ip_address = "0.0.0.0/0"
+    }
+  }
+
+  app_settings = {
+    "functionsRuntimeAdminIsolationEnabled" = "1"
+  }
+}
+```
+
+Flag public admin or SCM exposure when it lacks strong identity controls, private access, or access restrictions. If `functionsRuntimeAdminIsolationEnabled` is supported but not evidenced, mark the admin isolation dimension `Not Evaluable`.
+
+### AZURE-FUNCTIONS-MANAGED-IDENTITY -- Prefer managed identity for downstream resources
+
+Check for system-assigned or user-assigned managed identity and identity-based connections:
+
+```hcl
+resource "azurerm_linux_function_app" "example" {
+  identity {
+    type = "SystemAssigned"
+  }
+
+  app_settings = {
+    "AzureWebJobsStorage__accountName" = azurerm_storage_account.example.name
+  }
+}
+```
+
+Flag static connection material for Storage, Service Bus, Event Hubs, SQL, or Key Vault access when managed identity or identity-based connections are available and no compensating rationale is provided.
+
+### AZURE-FUNCTIONS-INGRESS -- Verify public network, private endpoint, APIM/App Gateway, and CORS scope
+
+Review:
+
+- `publicNetworkAccess`
+- Private endpoint configuration
+- Access restrictions and deny-by-default rules
+- API Management or App Gateway fronting
+- App Service Authentication settings
+- CORS allowed origins and credentials behavior
+- Route-level exposure and environment sensitivity
+
+### AZURE-FUNCTIONS-DIAGNOSTICS -- Verify invocation, authorization, key-use, and admin-operation telemetry
+
+Require Application Insights or diagnostic settings for invocation telemetry, failed authorization, key-use events, admin API calls, and anomalous invocation volume:
+
+```hcl
+resource "azurerm_monitor_diagnostic_setting" "function_app" {
+  target_resource_id = azurerm_linux_function_app.example.id
+
+  enabled_log {
+    category = "FunctionAppLogs"
+  }
+
+  metric {
+    category = "AllMetrics"
+    enabled  = true
+  }
+}
+```
+
+If only IaC is available and no log export is provided, mark diagnostics `Not Evaluable` instead of Pass.

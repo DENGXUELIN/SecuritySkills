@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [CIS-Azure-v2.1.0]
 difficulty: intermediate
 time_estimate: "60-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -88,6 +88,58 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, Bic
 
 ---
 
+### Supplemental Gate: Azure Functions HTTP Trigger, Key, and Admin Endpoint Evidence
+
+Azure Functions share App Service infrastructure, but HTTP triggers, function/host keys, runtime admin endpoints, SCM/Kudu exposure, and downstream identity patterns create serverless-specific review paths. Apply this supplemental gate when IaC or exports include `azurerm_linux_function_app`, `azurerm_windows_function_app`, `Microsoft.Web/sites` with `kind=functionapp`, `function.json`, host.json, deployment packages, or Azure Functions runtime settings.
+
+This gate is supplemental evidence and does not claim a CIS Azure recommendation ID. Keep its findings separate from Section 9 App Service scoring while still including them in the prioritized remediation plan.
+
+```
+AZFUNC-EVID-01: HTTP trigger `authLevel` is `anonymous` in production without enforced upstream identity-aware control
+AZFUNC-EVID-02: HTTP trigger uses `function` or `admin` key level as the only client authentication for sensitive routes
+AZFUNC-EVID-03: Function, host, or master/admin key inventory lacks owner, storage location, read/list permission, or rotation evidence
+AZFUNC-EVID-04: `/admin`, runtime admin APIs, SCM/Kudu, or deployment endpoints are reachable from public networks without strong identity and network controls
+AZFUNC-EVID-05: `functionsRuntimeAdminIsolationEnabled` support is ignored or not evidenced for eligible function apps
+AZFUNC-EVID-06: Downstream access relies on static connection material where managed identity or identity-based connections are available
+AZFUNC-EVID-07: Public network access, CORS, private endpoint, APIM/App Gateway, or access restriction evidence is missing or not tied to the function app
+AZFUNC-EVID-08: Invocation, failed authorization, key-use, and admin-operation telemetry is missing or cannot be tied to the reviewed function app
+```
+
+**Evidence to collect:**
+
+| Evidence Area | Required Evidence | Decision Rule |
+|---|---|---|
+| HTTP trigger authorization | `function.json`, code annotation, or deployment export for each route and `authLevel` | Public production anonymous routes need upstream identity-aware enforcement or a documented public-use rationale |
+| Function and host keys | Inventory of function, host, and master/admin keys; owner; read/list permissions; rotation evidence | Keys are shared access material, not per-user authorization |
+| Admin endpoint isolation | `/admin`, runtime admin API, SCM/Kudu, deployment endpoint, private endpoint, access restriction, and `functionsRuntimeAdminIsolationEnabled` evidence | Public admin or SCM exposure without strong identity and network controls is High severity |
+| Downstream identity | System/user-assigned managed identity and identity-based connections for Storage, Key Vault, Service Bus, Event Hubs, SQL, or other dependencies | Prefer managed identity; justify remaining static connection material |
+| Public ingress controls | `publicNetworkAccess`, access restrictions, private endpoints, APIM/App Gateway, App Service Authentication, and CORS | Function keys alone do not satisfy authentication for sensitive APIs |
+| Diagnostics | App Insights, diagnostic settings, invocation logs, failed authorization, key-use, admin API calls, and anomalous invocation volume | Missing telemetry makes the function-specific control `Not Evaluable` |
+
+```
+Azure Functions Evidence:
+- Function App:                 [name/resource ID]
+- Environment / Sensitivity:    [prod/non-prod, public/internal, data sensitivity]
+- Trigger Route:                [method/path]
+- Auth Level:                   [anonymous | function | admin]
+- Upstream Auth Control:        [App Service Auth | APIM JWT | App Gateway/WAF | None | Not Evaluable]
+- Public Network Access:        [Enabled/Disabled]
+- Private Endpoint:             [Yes/No]
+- Key Inventory / Rotation:     [owner/date/source/read-list permissions]
+- Admin Endpoint Isolation:     [functionsRuntimeAdminIsolationEnabled/network restrictions/SCM state]
+- Downstream Identity:          [managed identity | identity-based connection | static connection material]
+- Diagnostic Evidence:          [App Insights/diagnostic setting/log query]
+- Decision:                     [Pass | Fail | Not Evaluable]
+```
+
+**False-positive guardrails:**
+
+- Do not fail intentionally public anonymous functions such as health checks or public webhooks when route scope, upstream validation, rate limiting, and monitoring are evidenced.
+- Do not treat the presence of a function key as per-user authorization; require identity-aware control for sensitive operations.
+- Do not mark diagnostics as Pass from IaC alone when no invocation/admin telemetry export is available; use `Not Evaluable`.
+
+---
+
 
 ---
 
@@ -141,6 +193,13 @@ Produce the final report using the structure defined in the Output Format sectio
 | 7 | Virtual Machines | X | Y | Z | nn% |
 | 8 | Key Vault | X | Y | Z | nn% |
 | 9 | App Service | X | Y | Z | nn% |
+| Supplemental | Azure Functions | X | Y | Z | nn% |
+
+### Azure Functions Supplemental Evidence
+
+| Function App | Environment | Trigger | Auth Level | Upstream Auth | Key Governance | Admin / SCM Isolation | Downstream Identity | Diagnostics | Status |
+|---|---|---|---|---|---|---|---|---|---|
+| [function app] | [prod/non-prod] | [method/path] | [anonymous/function/admin] | [control] | [owner/rotation/read-list evidence] | [isolation evidence] | [managed identity/static material] | [evidence] | [Pass/Fail/Not Evaluable] |
 
 ### Detailed Findings
 
@@ -184,6 +243,7 @@ Produce the final report using the structure defined in the Output Format sectio
 | 7 | Virtual Machines | Azure Bastion, managed disks, disk encryption with CMK, approved extensions, endpoint protection |
 | 8 | Key Vault | Key/secret expiration, soft delete, purge protection, RBAC authorization, private endpoints |
 | 9 | App Service | Authentication, HTTPS redirect, TLS version, client certificates, Entra ID registration, HTTP/2, FTP disabled |
+| Supplemental | Azure Functions | HTTP trigger auth levels, function/host keys, admin endpoint isolation, managed identity, public ingress, diagnostics |
 
 ### CIS Profile Levels
 
@@ -200,6 +260,8 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **NSG rules using service tags.** A rule with `source_address_prefix = "Internet"` is equivalent to `0.0.0.0/0`. Both must be flagged for CIS 6.1 and 6.2.
 5. **Key Vault purge protection is irreversible.** CIS 8.5 requires `purge_protection_enabled = true`. Note this cannot be disabled once enabled -- flag this for awareness during remediation.
 6. **App Service TLS version on both Linux and Windows.** Check `azurerm_linux_web_app` and `azurerm_windows_web_app` resources separately.
+7. **Treating Azure Functions as generic Web Apps.** Function apps need route-level `authLevel`, key governance, admin endpoint isolation, downstream identity, ingress, and diagnostics evidence beyond the generic App Service checks.
+8. **Treating function keys as user authentication.** Function and host keys are shared access material. Sensitive routes need identity-aware upstream enforcement and auditable key governance.
 
 ---
 
@@ -225,10 +287,14 @@ Produce the final report using the structure defined in the Output Format sectio
 - Azure Storage Security: https://learn.microsoft.com/en-us/azure/storage/common/storage-security-guide
 - Azure Key Vault Best Practices: https://learn.microsoft.com/en-us/azure/key-vault/general/best-practices
 - Azure App Service Security: https://learn.microsoft.com/en-us/azure/app-service/overview-security
+- Azure Functions Security Concepts: https://learn.microsoft.com/en-us/azure/azure-functions/security-concepts
+- Azure Functions HTTP Trigger: https://learn.microsoft.com/en-us/azure/azure-functions/functions-bindings-http-webhook-trigger
+- Azure Functions Identity-Based Connections: https://learn.microsoft.com/en-us/azure/azure-functions/functions-reference#configure-an-identity-based-connection
 - Terraform AzureRM Provider Documentation: https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs
 
 ---
 
 ## Changelog
 
+- **1.0.1** -- Add Azure Functions HTTP trigger, key governance, admin endpoint, managed identity, and diagnostics evidence gates.
 - **1.0.0** -- Initial release. Full coverage of CIS Microsoft Azure Foundations Benchmark v2.1.0 sections 1 through 9.

@@ -1,0 +1,56 @@
+{
+  "scenario": "function-public-webhook-with-upstream-controls",
+  "skill": "azure-review",
+  "expected_skill_version": "1.0.1",
+  "function_app": {
+    "name": "prod-webhook-func",
+    "environment": "production",
+    "kind": "functionapp,linux",
+    "public_network_access_enabled": true,
+    "private_endpoint": false
+  },
+  "http_triggers": [
+    {
+      "route": "webhooks/vendor",
+      "methods": [
+        "post"
+      ],
+      "authLevel": "anonymous",
+      "upstream_auth_control": {
+        "control": "api-management-jwt-validation",
+        "required_claims": [
+          "aud",
+          "iss"
+        ],
+        "rate_limit_policy": "per-vendor"
+      },
+      "sensitivity": "public-webhook-receiver"
+    }
+  ],
+  "key_governance": {
+    "function_keys_inventoried": true,
+    "host_keys_inventoried": true,
+    "read_list_permissions_reviewed": true,
+    "rotation_evidence": "CHG-2026-0609"
+  },
+  "admin_endpoint": {
+    "scm_public": false,
+    "admin_api_public": false,
+    "functionsRuntimeAdminIsolationEnabled": "1",
+    "access_restrictions": [
+      "deny-internet",
+      "allow-build-agent-subnet"
+    ]
+  },
+  "downstream_access": {
+    "uses_managed_identity": true,
+    "identity_based_connection_evidence": "AzureWebJobsStorage__accountName"
+  },
+  "diagnostics": {
+    "app_insights_enabled": true,
+    "admin_operation_logs_available": true,
+    "failed_authorization_logs_available": true
+  },
+  "expected_status": "pass",
+  "false_positive_guardrail": "anonymous public webhook route is acceptable when upstream identity validation, key governance, admin isolation, managed identity, and telemetry are evidenced"
+}

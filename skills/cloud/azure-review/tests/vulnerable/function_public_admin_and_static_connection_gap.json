@@ -1,0 +1,73 @@
+{
+  "scenario": "function-public-admin-and-static-connection-gap",
+  "skill": "azure-review",
+  "expected_skill_version": "1.0.1",
+  "function_app": {
+    "name": "prod-orders-func",
+    "environment": "production",
+    "kind": "functionapp,linux",
+    "public_network_access_enabled": true,
+    "private_endpoint": false
+  },
+  "http_triggers": [
+    {
+      "route": "orders/{id}",
+      "methods": [
+        "get",
+        "post"
+      ],
+      "authLevel": "anonymous",
+      "upstream_auth_control": null,
+      "sensitivity": "customer-order-data"
+    }
+  ],
+  "key_governance": {
+    "function_keys_inventoried": false,
+    "host_keys_inventoried": false,
+    "read_list_permissions_reviewed": false,
+    "rotation_evidence": null
+  },
+  "admin_endpoint": {
+    "scm_public": true,
+    "admin_api_public": true,
+    "functionsRuntimeAdminIsolationEnabled": null,
+    "access_restrictions": []
+  },
+  "downstream_access": {
+    "uses_managed_identity": false,
+    "uses_static_connection_material": true,
+    "identity_based_connection_evidence": null
+  },
+  "diagnostics": {
+    "app_insights_enabled": false,
+    "admin_operation_logs_available": false,
+    "failed_authorization_logs_available": false
+  },
+  "expected_findings": [
+    {
+      "id": "AZFUNC-EVID-01",
+      "severity": "high",
+      "reason": "production anonymous HTTP trigger lacks enforced upstream identity-aware control"
+    },
+    {
+      "id": "AZFUNC-EVID-03",
+      "severity": "medium",
+      "reason": "function and host key governance evidence is missing"
+    },
+    {
+      "id": "AZFUNC-EVID-04",
+      "severity": "high",
+      "reason": "admin and SCM endpoints are publicly reachable without network restrictions"
+    },
+    {
+      "id": "AZFUNC-EVID-06",
+      "severity": "medium",
+      "reason": "downstream access uses static connection material where managed identity evidence is missing"
+    },
+    {
+      "id": "AZFUNC-EVID-08",
+      "severity": "medium",
+      "reason": "invocation, authorization, and admin-operation telemetry is unavailable"
+    }
+  ]
+}
