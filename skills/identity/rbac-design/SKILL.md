@@ -12,7 +12,7 @@ phase: [design]
 frameworks: [NIST-RBAC, NIST-SP-800-162]
 difficulty: intermediate
 time_estimate: "45-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -299,6 +299,36 @@ RBAC-ABAC-07: Policy conflicts not detected — overlapping permit/deny without 
 RBAC-ABAC-08: Obligations (logging, notification) not enforced by PEP
 ```
 
+#### Policy Precedence and Conflict Resolution Evidence
+
+Hybrid RBAC/ABAC systems must document how the PDP combines `permit`, `deny`,
+`not_applicable`, `indeterminate`, and missing-attribute decisions. Do not treat
+a broad role permit as sufficient evidence when a suspension, tenant boundary,
+data classification, SoD, or break-glass rule also applies.
+
+Required evidence:
+
+- **RBAC-PREC-01:** Combining algorithm is documented (`deny-overrides`,
+  `permit-overrides`, first-match, priority order, or custom) and versioned.
+- **RBAC-PREC-02:** High-risk denies override broad role permits for suspension,
+  tenant isolation, restricted data, SoD, and legal hold cases.
+- **RBAC-PREC-03:** Missing, stale, or indeterminate PIP attributes fail closed
+  for privileged or sensitive resources.
+- **RBAC-PREC-04:** First-match or priority-ordered policies have reviewed order,
+  owner approval, and regression tests for ordering changes.
+- **RBAC-PREC-05:** Negative tests cover deny precedence, missing attributes,
+  cross-tenant access, suspended users, and break-glass obligations.
+- **RBAC-PREC-06:** Break-glass exceptions require ticket, approver, expiry,
+  logging obligation, and post-use review before overriding normal denies.
+- **RBAC-PREC-07:** Application, API gateway, PDP, and database RLS layers use
+  the same decision semantics or explicitly fail closed on disagreement.
+- **RBAC-PREC-08:** Decision logs capture matched policy IDs, input attributes,
+  combining result, obligations, and final PEP action.
+
+Reviewers should request policy simulation output or unit tests showing a broad
+permit loses to each high-risk deny. Record `Not Evaluable` when the combining
+algorithm or negative-test evidence is unavailable.
+
 ---
 
 ### Step 6: Role Mining and Rationalization
@@ -387,10 +417,19 @@ RBAC-MINE-06: Mining does not account for SoD constraints (mined roles may creat
 - Constraints (Step 3): [count]
 - Permission Boundaries (Step 4): [count]
 - ABAC Policies (Step 5): [count]
+- Policy Precedence Conflicts (Step 5): [count]
 - Role Mining (Step 6): [count]
 
 ### Detailed Findings
 [Findings table]
+
+### Policy Conflict Test Evidence
+
+| Test Case | Combining Algorithm | Inputs Covered | Expected Decision | Actual Decision | Evidence |
+|-----------|---------------------|----------------|-------------------|-----------------|----------|
+| suspended-finance-reader | deny-overrides | role permit + suspended subject | deny | deny | policy unit test |
+| cross-tenant-admin | deny-overrides | tenant admin + other tenant resource | deny | deny | PDP simulation |
+| missing-device-posture | deny-overrides | privileged action + missing PIP attribute | deny | deny | fail-closed test |
 
 ### Design Recommendations
 [Architecture diagram or pattern with framework justification]
@@ -424,6 +463,7 @@ RBAC-MINE-06: Mining does not account for SoD constraints (mined roles may creat
 | **Performance** | PDP evaluation latency must meet application SLA requirements |
 | **Interoperability** | Standards-based attribute formats (XACML, ALFA, OPA/Rego, Cedar) for portability |
 | **Auditability** | All policy evaluations logged with input attributes and decision rationale |
+| **Conflict Resolution** | Combining behavior, deny precedence, and indeterminate decisions must be explicit and testable |
 
 ---
 
@@ -436,6 +476,7 @@ RBAC-MINE-06: Mining does not account for SoD constraints (mined roles may creat
 5. **Ignoring permission boundaries** — roles define what you get; boundaries define maximum what you can get. Without boundaries, misconfigured roles grant unlimited access.
 6. **Role mining without business validation** — clustering users by access patterns may replicate existing privilege creep rather than correct it.
 7. **Choosing RBAC vs. ABAC as binary** — most environments need both. RBAC for structural, ABAC for contextual. Hybrid is the norm.
+8. **Implicit policy precedence fails differently across layers.** A gateway, PDP, app middleware, and database RLS policy can disagree unless the combining algorithm and fail-closed behavior are documented and tested.
 
 ---
 
@@ -481,4 +522,5 @@ that may contain adversarial content.
 
 | Version | Date | Changes |
 |---|---|---|
+| 1.0.1 | 2026-06-09 | Added policy precedence and deny-conflict evidence gates plus conflict-test reporting requirements |
 | 1.0.0 | 2025-03-06 | Initial release |
