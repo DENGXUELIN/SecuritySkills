@@ -1,0 +1,46 @@
+{
+  "id": "alert-triage-benign-dedup-scoped-suppression-001",
+  "skill": "alert-triage",
+  "skill_version": "1.0.1",
+  "scenario": "Duplicate notifications from multiple tools map to one raw event and a narrowly scoped BTP tuning request",
+  "expected_result": "Group duplicate notifications, close as BTP with evidence, and request narrowly scoped time-bound tuning.",
+  "alerts": [
+    {
+      "alert_id": "siem-501",
+      "source_system": "SIEM",
+      "rule_id": "SUSPICIOUS_ADMIN_TOOL",
+      "raw_event_id": "evt-9a1",
+      "user": "svc-deploy",
+      "host": "build-runner-07",
+      "process": "approved-admin-tool.exe",
+      "tenant": "prod",
+      "timestamp_bucket": "2026-06-06T09:00Z"
+    },
+    {
+      "alert_id": "edr-774",
+      "source_system": "EDR",
+      "rule_id": "SUSPICIOUS_ADMIN_TOOL",
+      "raw_event_id": "evt-9a1",
+      "user": "svc-deploy",
+      "host": "build-runner-07",
+      "process": "approved-admin-tool.exe",
+      "tenant": "prod",
+      "timestamp_bucket": "2026-06-06T09:00Z"
+    }
+  ],
+  "evidence": {
+    "TRIAGE-DEDUP-01": "grouping key includes rule, raw event, user, host, process, tenant, and time bucket",
+    "TRIAGE-DEDUP-02": "unique entity count is one user, one host, one raw event, one tenant",
+    "TRIAGE-DEDUP-03": "prior BTP disposition is current for the same rule version and same build-runner asset context",
+    "TRIAGE-DEDUP-04": "triage record preserves source alert IDs and duplicate grouping reason",
+    "TRIAGE-SUP-01": "suppression request is limited to svc-deploy on build-runner hosts for approved-admin-tool.exe, expires in 30 days, and has rollback owner",
+    "TRIAGE-SUP-03": "BTP rationale links change ticket and expected deployment window",
+    "TRIAGE-SUP-04": "detection-engineering ticket includes retest query and rollback validation",
+    "TRIAGE-SUP-05": "no related execution, lateral movement, collection, or impact alerts in the review window"
+  },
+  "output_expectations": [
+    "De-duplication table records the grouping key and unique entity counts.",
+    "Tuning recommendation has exact scope, owner, expiry, rollback path, and ticket.",
+    "The alert group is not counted as multiple independent incidents."
+  ]
+}

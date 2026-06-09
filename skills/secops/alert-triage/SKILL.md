@@ -13,7 +13,7 @@ phase: [operate, respond]
 frameworks: [MITRE-ATT&CK-v16, NIST-SP-800-61-Rev2]
 difficulty: beginner
 time_estimate: "10-20min per alert"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -107,6 +107,22 @@ Connect the alert data with surrounding context to build a picture of what happe
 ### Phase 3: Classify
 
 Assign a disposition and priority based on collected and correlated data.
+
+#### De-duplication and Suppression Safety Gate
+
+Before closing a group of alerts as duplicate, BTP, or FP, prove that grouping and suppression will not hide distributed attack spread or later-stage activity. De-duplication reduces analyst noise; suppression changes detection coverage and therefore needs owner, scope, expiry, rollback, and follow-up evidence.
+
+| Gate | Evidence Required | Finding Trigger |
+|---|---|---|
+| TRIAGE-DEDUP-01 | Duplicate grouping key includes rule ID, raw event ID or source event hash, user, host, process, source/destination, tenant or cloud account, and time bucket. | Alerts are collapsed only by rule name or alert title. |
+| TRIAGE-DEDUP-02 | Cardinality is checked across users, hosts, source IPs, destinations, tenants, geographies, and time buckets before labeling an alert storm as noise. | Many affected entities are grouped as duplicate notifications without spread analysis. |
+| TRIAGE-DEDUP-03 | Prior disposition reuse records prior close date, analyst, rule version, asset criticality, threat intel context, and current raw event match. | Stale FP/BTP decisions are reused after rule, asset, or threat context changed. |
+| TRIAGE-DEDUP-04 | Case count, unique entity count, grouping reason, and excluded outliers are retained in the triage record. | The final report cannot reconstruct which alerts were grouped or why outliers were excluded. |
+| TRIAGE-SUP-01 | Suppression request records owner, ticket, exact field scope, expiry, rollback path, and change window. | Broad or permanent suppression is proposed from a single alert closure. |
+| TRIAGE-SUP-02 | Suppression is blocked or escalated for privileged users, critical assets, high-risk tenants, or late-stage ATT&CK tactics unless specifically risk-accepted. | High-value activity is hidden under a generic benign filter. |
+| TRIAGE-SUP-03 | BTP/FP rationale includes raw evidence, expected activity proof, rule-logic mismatch, or data-quality cause. | Alert fatigue or volume is used as the reason to close the alert. |
+| TRIAGE-SUP-04 | Detection-engineering follow-up includes compensating detection, monitoring query, test plan, and rollback validation. | Tuning removes coverage without replacement detection or retest evidence. |
+| TRIAGE-SUP-05 | Kill-chain coverage is checked before suppression to confirm related initial access, execution, lateral movement, collection, or impact signals are not present. | Recurring activity is suppressed before surrounding tactics are reviewed. |
 
 #### Disposition Categories
 
@@ -234,6 +250,16 @@ Produce the triage decision as a structured report:
 - **Threat Intel:** [IOC match results]
 - **Kill Chain Position:** [Where this falls in the attack lifecycle]
 
+### De-duplication and Suppression Safety
+| Field | Value |
+|-------|-------|
+| Duplicate Grouping Key | [rule/raw event/user/host/process/source/destination/tenant/time bucket] |
+| Unique Entity Counts | [users, hosts, IPs, tenants, geographies] |
+| Prior Disposition Freshness | [date, analyst, rule version, asset context] |
+| Suppression Scope | [exact field filters, owner, expiry, rollback, ticket] |
+| Kill-Chain Coverage Check | [related tactics reviewed before close/tuning] |
+| Decision | [group/close/escalate/tuning request] |
+
 ### Recommended Actions
 - [ ] [Action 1 -- e.g., isolate host, disable account, block IP]
 - [ ] [Action 2 -- e.g., collect forensic artifacts, memory dump]
@@ -318,6 +344,10 @@ Investigating an alert in isolation without checking for activity before and aft
 ### Pitfall 5: Delaying Escalation While Seeking Perfect Information
 
 Waiting for complete certainty before escalating a high-priority alert costs response time. NIST SP 800-61 recommends erring on the side of over-notification. If 20 minutes of investigation has not resolved the disposition and the alert involves a critical asset or privileged account, escalate to Tier 2 or the IR team with your current findings and continue investigation in parallel.
+
+### Pitfall 6: Treating Alert Volume as Proof of Benign Noise
+
+High alert volume can mean duplicate tool notifications, but it can also mean distributed credential attack activity, malware propagation, or recurring command execution across many assets. Do not collapse or suppress a storm until grouping keys, unique entity counts, prior disposition freshness, and kill-chain coverage have been reviewed.
 
 ---
 

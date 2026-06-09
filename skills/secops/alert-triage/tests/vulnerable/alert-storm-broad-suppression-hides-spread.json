@@ -1,0 +1,56 @@
+{
+  "id": "alert-triage-vulnerable-alert-storm-suppression-001",
+  "skill": "alert-triage",
+  "skill_version": "1.0.1",
+  "scenario": "Distributed failed-auth storm is collapsed as noise and converted into a broad permanent suppression",
+  "expected_result": "Flag unsafe de-duplication and suppression because spread and kill-chain context were not reviewed.",
+  "alert_storm": {
+    "rule_id": "FAILED_AUTH_ANOMALY",
+    "alert_count": 340,
+    "unique_users": 96,
+    "unique_hosts": 41,
+    "source_ip_count": 18,
+    "tenants": [
+      "prod",
+      "corp"
+    ],
+    "time_buckets": [
+      "2026-06-06T08:00Z",
+      "2026-06-06T09:00Z",
+      "2026-06-06T10:00Z"
+    ],
+    "proposed_disposition": "duplicate noise"
+  },
+  "unsafe_tuning_request": {
+    "filter": "suppress FAILED_AUTH_ANOMALY for all admin users",
+    "owner": null,
+    "expiry": null,
+    "rollback_path": null,
+    "ticket_id": null,
+    "compensating_detection": null
+  },
+  "missing_evidence": [
+    "TRIAGE-DEDUP-01 full grouping key for each raw event",
+    "TRIAGE-DEDUP-02 cardinality analysis across users, hosts, source IPs, tenants, and time buckets",
+    "TRIAGE-DEDUP-03 fresh prior disposition tied to current rule and asset context",
+    "TRIAGE-DEDUP-04 retained outlier list and grouping rationale",
+    "TRIAGE-SUP-01 scoped owner, expiry, rollback, and ticket",
+    "TRIAGE-SUP-02 high-value user and tenant risk acceptance",
+    "TRIAGE-SUP-04 compensating detection and retest plan",
+    "TRIAGE-SUP-05 kill-chain coverage before suppression"
+  ],
+  "should_flag": [
+    {
+      "gate_id": "TRIAGE-DEDUP-02",
+      "finding": "Alert storm spans many users, hosts, source IPs, and tenants, so it cannot be collapsed as duplicate notifications without spread analysis."
+    },
+    {
+      "gate_id": "TRIAGE-SUP-01",
+      "finding": "Suppression is broad and permanent with no owner, expiry, ticket, or rollback path."
+    },
+    {
+      "gate_id": "TRIAGE-SUP-05",
+      "finding": "Kill-chain coverage was not checked before hiding recurring authentication anomaly activity."
+    }
+  ]
+}
