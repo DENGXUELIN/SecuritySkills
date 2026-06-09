@@ -1,0 +1,136 @@
+{
+  "fixture": "transit_failover_bypass_uninspected_path",
+  "skill": "segmentation",
+  "description": "Vulnerable fixture where normal-state diagrams show firewall traversal, but failover route propagation creates an uninspected transit path between restricted zones.",
+  "environment": {
+    "type": "hybrid-cloud",
+    "cloud": "aws-and-onprem",
+    "review_date": "2026-06-09"
+  },
+  "documented_design": {
+    "diagram": "network-diagram-normal-state-v7",
+    "claim": "application to data and workstation to data traffic crosses central firewall",
+    "normal_state_only": true
+  },
+  "high_risk_zone_pairs": [
+    {
+      "pair_id": "workstation-to-data-tier",
+      "source_zone": "workstation",
+      "destination_zone": "data-tier",
+      "protocol_port": "tcp/3306",
+      "owner": "unknown",
+      "expected_decision": "deny"
+    },
+    {
+      "pair_id": "app-to-cde",
+      "source_zone": "application",
+      "destination_zone": "pci-cde",
+      "protocol_port": "tcp/5432",
+      "owner": "payments-platform",
+      "expected_decision": "deny except app-db-proxy"
+    }
+  ],
+  "effective_routes": {
+    "normal_state": {
+      "next_hop": "central-firewall-primary",
+      "pep": "central-firewall-policy",
+      "evidence": "diagram-only",
+      "decision": "assumed-deny"
+    },
+    "failover_state": {
+      "trigger": "primary-direct-connect-down",
+      "next_hop": "secondary-vpn-to-transit-gateway",
+      "pep": "missing",
+      "route_source": "not-reviewed",
+      "propagated_route": "workstation-cidr-to-data-vpc",
+      "decision": "reachable"
+    }
+  },
+  "transit_and_peering_checks": {
+    "tgw_association_tables_reviewed": false,
+    "propagated_routes_reviewed": false,
+    "secondary_vpn_tunnels_reviewed": false,
+    "direct_connect_backup_reviewed": false,
+    "vpc_peering_reviewed": false,
+    "cross_account_attachments_reviewed": false,
+    "known_issue": "secondary VPN advertises data-tier CIDR without firewall next hop"
+  },
+  "denied_flow_tests": {
+    "normal_state": "not-run",
+    "failover_state": "not-run",
+    "allow_path_test": "application health checks pass after failover",
+    "enforcement_logs": "missing"
+  },
+  "ha_policy_preservation": {
+    "standby_rule_sync": "unknown",
+    "default_deny_preserved": "unknown",
+    "rule_order_preserved": "unknown",
+    "object_groups_preserved": "unknown",
+    "log_forwarding_after_failover": "missing",
+    "state_sync_after_failover": "unknown"
+  },
+  "return_and_management_paths": {
+    "asymmetric_return_checked": false,
+    "nat_paths_checked": false,
+    "load_balancer_paths_checked": false,
+    "private_link_paths_checked": false,
+    "management_plane_paths_checked": false,
+    "uninspected_return_paths_found": "unknown"
+  },
+  "monitoring_and_retest": {
+    "route_change_alerts": "missing",
+    "new_peering_retest_trigger": "missing",
+    "new_propagated_route_retest_trigger": "missing",
+    "failover_drill_cadence": "not-defined",
+    "rollback_plan": "missing",
+    "residual_risk_decision": "missing"
+  },
+  "expected_gate_results": [
+    {
+      "gate": "SEG-FAIL-01",
+      "status": "Fail",
+      "evidence": "High-risk pairs are incomplete and owner/decision evidence is missing for workstation-to-data."
+    },
+    {
+      "gate": "SEG-FAIL-02",
+      "status": "Fail",
+      "evidence": "Failover effective route evidence is not reviewed and normal state relies on diagrams."
+    },
+    {
+      "gate": "SEG-FAIL-03",
+      "status": "Fail",
+      "evidence": "Failover path uses secondary VPN to transit gateway with no PEP traversal."
+    },
+    {
+      "gate": "SEG-FAIL-04",
+      "status": "Fail",
+      "evidence": "Transit, peering, VPN, and propagated-route checks were not performed."
+    },
+    {
+      "gate": "SEG-FAIL-05",
+      "status": "Fail",
+      "evidence": "Denied-flow tests were not run before or after failover."
+    },
+    {
+      "gate": "SEG-FAIL-06",
+      "status": "Not Evaluable",
+      "evidence": "Standby deny/default-deny preservation and logging are unknown."
+    },
+    {
+      "gate": "SEG-FAIL-07",
+      "status": "Not Evaluable",
+      "evidence": "Asymmetric return and management paths were not checked."
+    },
+    {
+      "gate": "SEG-FAIL-08",
+      "status": "Fail",
+      "evidence": "No route-change monitoring, retest trigger, rollback plan, or residual-risk decision exists."
+    }
+  ],
+  "expected_assessment": {
+    "overall_status": "Fail",
+    "risk_rating": "Critical",
+    "confidence": "Low",
+    "finding": "Failover can create an uninspected transit route between restricted zones."
+  }
+}

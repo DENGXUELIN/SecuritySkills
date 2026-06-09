@@ -1,0 +1,177 @@
+{
+  "fixture": "failover_preserves_pep_effective_routes",
+  "skill": "segmentation",
+  "description": "Benign fixture for high-risk zone pairs where normal and failover effective routes preserve PEP traversal, denied-flow behavior, logging, return-path inspection, and retest triggers.",
+  "environment": {
+    "type": "hybrid-cloud",
+    "cloud": "aws",
+    "regions": [
+      "us-east-1",
+      "us-east-2"
+    ],
+    "review_date": "2026-06-09"
+  },
+  "high_risk_zone_pairs": [
+    {
+      "pair_id": "app-to-cde",
+      "source_zone": "application",
+      "destination_zone": "pci-cde",
+      "protocol_port": "tcp/5432",
+      "owner": "payments-platform",
+      "expected_decision": "deny except app-db-proxy"
+    },
+    {
+      "pair_id": "user-to-data",
+      "source_zone": "workstation",
+      "destination_zone": "data-tier",
+      "protocol_port": "tcp/3306",
+      "owner": "security-architecture",
+      "expected_decision": "deny"
+    },
+    {
+      "pair_id": "dmz-to-internal-admin",
+      "source_zone": "dmz",
+      "destination_zone": "management",
+      "protocol_port": "tcp/22",
+      "owner": "network-security",
+      "expected_decision": "deny"
+    }
+  ],
+  "effective_routes": [
+    {
+      "pair_id": "app-to-cde",
+      "normal_state": {
+        "next_hop": "aws-network-firewall-endpoint-a",
+        "pep": "fw-policy-cde-east-west",
+        "route_source": "vpc-route-table-export-20260609",
+        "decision": "deny"
+      },
+      "failover_state": {
+        "trigger": "az-firewall-endpoint-failover",
+        "next_hop": "aws-network-firewall-endpoint-b",
+        "pep": "fw-policy-cde-east-west",
+        "route_source": "reachability-analyzer-run-4827",
+        "decision": "deny"
+      }
+    },
+    {
+      "pair_id": "user-to-data",
+      "normal_state": {
+        "next_hop": "transit-firewall-vpc-primary",
+        "pep": "corp-to-data-default-deny",
+        "route_source": "tgw-route-table-prod-20260609",
+        "decision": "deny"
+      },
+      "failover_state": {
+        "trigger": "primary-vpn-down-secondary-tunnel-active",
+        "next_hop": "transit-firewall-vpc-secondary",
+        "pep": "corp-to-data-default-deny",
+        "route_source": "bgp-route-snapshot-failover-20260609",
+        "decision": "deny"
+      }
+    }
+  ],
+  "transit_and_peering_checks": {
+    "tgw_association_tables_reviewed": true,
+    "propagated_routes_reviewed": true,
+    "secondary_vpn_tunnels_reviewed": true,
+    "direct_connect_backup_reviewed": true,
+    "vpc_peering_reviewed": true,
+    "cross_account_attachments_reviewed": true,
+    "bypass_paths_found": false
+  },
+  "denied_flow_tests": [
+    {
+      "pair_id": "app-to-cde",
+      "normal_result": "blocked",
+      "normal_log": "fw-log-app-cde-normal-20260609",
+      "failover_result": "blocked",
+      "failover_log": "fw-log-app-cde-failover-20260609"
+    },
+    {
+      "pair_id": "user-to-data",
+      "normal_result": "blocked",
+      "normal_log": "fw-log-user-data-normal-20260609",
+      "failover_result": "blocked",
+      "failover_log": "fw-log-user-data-failover-20260609"
+    },
+    {
+      "pair_id": "dmz-to-internal-admin",
+      "normal_result": "blocked",
+      "normal_log": "fw-log-dmz-admin-normal-20260609",
+      "failover_result": "blocked",
+      "failover_log": "fw-log-dmz-admin-failover-20260609"
+    }
+  ],
+  "ha_policy_preservation": {
+    "standby_rule_sync": "matched-primary-policy-digest",
+    "default_deny_preserved": true,
+    "rule_order_preserved": true,
+    "object_groups_preserved": true,
+    "log_forwarding_after_failover": "verified",
+    "state_sync_after_failover": "verified"
+  },
+  "return_and_management_paths": {
+    "asymmetric_return_checked": true,
+    "nat_paths_checked": true,
+    "load_balancer_paths_checked": true,
+    "private_link_paths_checked": true,
+    "management_plane_paths_checked": true,
+    "uninspected_return_paths_found": false
+  },
+  "monitoring_and_retest": {
+    "route_change_alerts": "enabled",
+    "new_peering_retest_trigger": "enabled",
+    "new_propagated_route_retest_trigger": "enabled",
+    "failover_drill_cadence": "quarterly",
+    "rollback_plan": "restore-primary-route-table-and-firewall-policy",
+    "residual_risk_decision": "not-required"
+  },
+  "expected_gate_results": [
+    {
+      "gate": "SEG-FAIL-01",
+      "status": "Pass",
+      "evidence": "High-risk zone pairs are inventoried with owners and expected deny decisions."
+    },
+    {
+      "gate": "SEG-FAIL-02",
+      "status": "Pass",
+      "evidence": "Normal and failover route evidence shows next hops from route tables, BGP snapshots, and reachability analysis."
+    },
+    {
+      "gate": "SEG-FAIL-03",
+      "status": "Pass",
+      "evidence": "Both states traverse named firewall PEP policies."
+    },
+    {
+      "gate": "SEG-FAIL-04",
+      "status": "Pass",
+      "evidence": "Transit, peering, VPN, Direct Connect, and cross-account attachment checks found no bypass."
+    },
+    {
+      "gate": "SEG-FAIL-05",
+      "status": "Pass",
+      "evidence": "Denied-flow tests passed before and after failover with enforcing logs."
+    },
+    {
+      "gate": "SEG-FAIL-06",
+      "status": "Pass",
+      "evidence": "Standby controls preserve default deny, rule order, object groups, state sync, and log forwarding."
+    },
+    {
+      "gate": "SEG-FAIL-07",
+      "status": "Pass",
+      "evidence": "Return, NAT, load balancer, private link, and management paths were inspected in both directions."
+    },
+    {
+      "gate": "SEG-FAIL-08",
+      "status": "Pass",
+      "evidence": "Monitoring, rollback, and retest triggers cover route changes and new attachments."
+    }
+  ],
+  "expected_assessment": {
+    "overall_status": "Pass",
+    "risk_rating": "Low",
+    "confidence": "High"
+  }
+}

@@ -13,7 +13,7 @@ phase: [design, operate]
 frameworks: [NIST-SP-800-207, CIS-Controls-v8]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -243,15 +243,39 @@ Document or verify the existence of a segmentation testing process:
 4. **Test VLAN hopping** via double-tagging from user VLANs. Expected result: traffic dropped.
 5. **Validate that segmentation controls survive failover** (HA firewall failover should not open transit paths).
 
+#### 6.1 Failover Route Bypass Evidence Gate
+
+Normal-state diagrams are not sufficient evidence that segmentation survives HA or route failover. Cloud route propagation, transit gateway associations, peering, VPN, Direct Connect, ExpressRoute, asymmetric return paths, or standby firewall state can create an uninspected path between restricted zones during failover.
+
+**Required failover route evidence gates:**
+
+| Gate | Required evidence | Fail if |
+|---|---|---|
+| `SEG-FAIL-01` | High-risk zone pairs are inventoried with normal and failover states, including source zone, destination zone, protocol/port, owner, and expected decision. | Only normal-state diagrams are reviewed, or high-risk pairs such as user-to-data, app-to-CDE, DMZ-to-internal, or OT-to-IT are missing. |
+| `SEG-FAIL-02` | Effective route evidence shows normal and failover next hops for each high-risk pair: route tables, BGP advertisements, propagated routes, SD-WAN policy, cloud reachability analysis, or path simulation. | The standby path is assumed from architecture diagrams or does not show actual effective routes after failover. |
+| `SEG-FAIL-03` | Policy Enforcement Point (PEP) traversal is proven in both states with firewall, security group, NACL, network policy, service mesh, or gateway enforcement identifiers. | Failover traffic can route directly through transit, peering, VPN, Direct Connect, ExpressRoute, NAT, or load balancer paths without a PEP. |
+| `SEG-FAIL-04` | Transit and peering bypass checks cover route propagation, association tables, secondary tunnels/circuits, overlapping CIDRs, and cross-account or cross-project attachments. | Secondary transit paths can become preferred or reachable without matching segmentation policy. |
+| `SEG-FAIL-05` | Denied-flow tests are run before and after failover simulation with source, destination, port, timestamp, result, and enforcing control log evidence. | Only allow-path tests exist, or denied-flow tests are not repeated in failover state. |
+| `SEG-FAIL-06` | Standby/HA controls preserve deny/default-deny behavior, rule order, object groups, logging, and state synchronization after failover. | Standby firewalls, gateways, or policy agents are missing deny rules, log forwarding, or equivalent policy state. |
+| `SEG-FAIL-07` | Asymmetric return routes, NAT, load balancers, service endpoints, private links, and management-plane paths are checked for inspection and logging in both directions. | Forward traffic crosses a PEP but return or management traffic bypasses inspection. |
+| `SEG-FAIL-08` | Monitoring, rollback, and retest triggers cover route changes, failover drills, new peerings, new propagated routes, and policy drift; missing failover evidence caps status at `Not Evaluable`. | Route changes can alter the path without retest, or failover cannot be safely simulated and no residual-risk decision exists. |
+
+**Status and severity guidance:**
+
+- Mark high-risk zone pairs as `Not Evaluable` when normal and failover effective routes are not available.
+- Treat uninspected failover paths between restricted zones as **High** severity; escalate to **Critical** for CDE, management-plane, OT/ICS, or production data-tier bypass.
+- Do not accept topology diagrams alone as proof. Require effective route, denied-flow, and enforcement-log evidence for both normal and failover states.
+- Cap confidence at **Low** when failover cannot be simulated and the assessment relies only on control-plane configuration.
+
 ---
 
 ## Findings Classification
 
 | Severity | Definition |
 |----------|-----------|
-| **Critical** | Flat network with no segmentation; missing enforcement points between security zones; CDE not isolated; direct external-to-internal routing. |
-| **High** | No east-west controls within zones; bypass paths through transit networks; unrestricted DMZ-to-internal access; missing segmentation testing; native VLAN carrying production traffic. |
-| **Medium** | Micro-segmentation policies in audit mode only; partial flow visibility; management plane accessible from user zone without MFA/jump box; VLAN sprawl without documentation. |
+| **Critical** | Flat network with no segmentation; missing enforcement points between security zones; CDE not isolated; direct external-to-internal routing; failover bypass into CDE, management plane, OT/ICS, or production data tier. |
+| **High** | No east-west controls within zones; bypass paths through transit networks; unrestricted DMZ-to-internal access; missing segmentation testing; native VLAN carrying production traffic; missing failover effective-route or denied-flow evidence for high-risk zone pairs. |
+| **Medium** | Micro-segmentation policies in audit mode only; partial flow visibility; management plane accessible from user zone without MFA/jump box; VLAN sprawl without documentation; failover evidence exists but lacks return-path or logging proof. |
 | **Low** | Suboptimal zone naming conventions; missing network diagrams; segmentation documentation out of date. |
 
 ---
@@ -283,6 +307,23 @@ Document or verify the existence of a segmentation testing process:
 | DMZ         | App       | Firewall    | Restricted | Pass |
 | App         | Data      | SG only     | Overly permissive | F-002 |
 | User        | Data      | None        | No control | F-001 |
+
+### Failover Route Evidence
+
+| Zone Pair | Normal Next Hop / PEP | Failover Next Hop / PEP | Transit/Peering/VPN Check | Denied Test Normal | Denied Test Failover | Return Path Checked | Logging | Status |
+|---|---|---|---|---|---|---|---|---|
+| <source -> destination> | <next hop / control> | <next hop / control> | <clear/bypass> | <pass/fail/missing> | <pass/fail/missing> | <yes/no> | <yes/no> | <Pass/Fail/Not Evaluable> |
+
+| Gate | Evidence Reviewed | Status | Risk |
+|---|---|---|---|
+| `SEG-FAIL-01` | <high-risk zone pair inventory> | <Pass/Fail/Not Evaluable> | <risk> |
+| `SEG-FAIL-02` | <normal and failover effective route evidence> | <Pass/Fail/Not Evaluable> | <risk> |
+| `SEG-FAIL-03` | <PEP traversal in both states> | <Pass/Fail/Not Evaluable> | <risk> |
+| `SEG-FAIL-04` | <transit, peering, VPN, and route propagation checks> | <Pass/Fail/Not Evaluable> | <risk> |
+| `SEG-FAIL-05` | <denied-flow tests before and after failover> | <Pass/Fail/Not Evaluable> | <risk> |
+| `SEG-FAIL-06` | <standby deny/default-deny and logging preservation> | <Pass/Fail/Not Evaluable> | <risk> |
+| `SEG-FAIL-07` | <asymmetric return and management path checks> | <Pass/Fail/Not Evaluable> | <risk> |
+| `SEG-FAIL-08` | <monitoring, rollback, retest triggers, residual risk> | <Pass/Fail/Not Evaluable> | <risk> |
 
 ### Findings
 
@@ -345,6 +386,8 @@ Document or verify the existence of a segmentation testing process:
 
 5. **Assuming Kubernetes namespaces provide network isolation.** Namespaces are a logical organizational boundary. Without a NetworkPolicy or CNI-level enforcement (Calico, Cilium), all pods across all namespaces can communicate freely by default.
 
+6. **Trusting normal-state diagrams during failover.** A path that crosses a firewall in steady state can bypass inspection when BGP, route propagation, HA failover, NAT, private links, or return routing changes. Validate the effective route and denied-flow result before and after failover for each high-risk zone pair.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -372,4 +415,5 @@ This skill processes network configurations that may contain user-supplied comme
 
 ## Changelog
 
+- **1.0.1** -- Add failover route bypass evidence gates for dual-state effective routes, PEP traversal, transit/peering/VPN checks, denied-flow testing, standby deny/logging preservation, return-path validation, and retest triggers.
 - **1.0.0** -- Initial release. Full coverage of NIST SP 800-207 and CIS Controls v8 Control 12 for network segmentation review.
