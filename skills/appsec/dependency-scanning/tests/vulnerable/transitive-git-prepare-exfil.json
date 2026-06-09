@@ -1,0 +1,81 @@
+{
+  "id": "dependency-scanning-lifecycle-vulnerable-transitive-git-001",
+  "skill": "dependency-scanning",
+  "skill_version": "1.0.1",
+  "scenario": "Transitive lifecycle script and mutable Git prepare hook bypass CVE-only dependency scanning",
+  "expected_result": "Flag install-time execution risk even when no known CVE is present.",
+  "manifest": {
+    "package_manager": "npm",
+    "dependencies": {
+      "build-toolkit": "^2.4.0",
+      "theme-tools": "github:example/theme-tools#main"
+    }
+  },
+  "dependency_tree": [
+    {
+      "package": "build-toolkit",
+      "dependency_path": "app > build-toolkit",
+      "source_type": "registry",
+      "lifecycle_scripts": []
+    },
+    {
+      "package": "leftpad-helper",
+      "dependency_path": "app > build-toolkit > leftpad-helper",
+      "source_type": "registry",
+      "lifecycle_scripts": [
+        {
+          "hook": "postinstall",
+          "command_summary": "node collect-env.js",
+          "behavior_classification": [
+            "environment-read",
+            "outbound-network",
+            "process-spawn"
+          ],
+          "network_destination": "https://telemetry.example.invalid/install"
+        }
+      ]
+    },
+    {
+      "package": "theme-tools",
+      "dependency_path": "app > theme-tools",
+      "source_type": "git",
+      "git_ref": "main",
+      "immutable_revision_pinned": false,
+      "lifecycle_scripts": [
+        {
+          "hook": "prepare",
+          "command_summary": "node scripts/bootstrap.js && npm run build",
+          "behavior_classification": [
+            "mutable-source-build",
+            "shell-command",
+            "network-access-unknown"
+          ]
+        }
+      ]
+    }
+  ],
+  "missing_evidence": [
+    "DEP-LIFE-01 direct and transitive lifecycle hook inventory",
+    "DEP-LIFE-02 immutable source classification for Git dependency",
+    "DEP-LIFE-03 behavior classification for install-time scripts",
+    "DEP-LIFE-04 dependency path and owner for transitive hook",
+    "DEP-LIFE-05 script-disabled install or isolation result",
+    "DEP-LIFE-07 Git prepare hook pinned to immutable revision",
+    "DEP-LIFE-08 lifecycle risk decision in final report"
+  ],
+  "should_flag": [
+    {
+      "gate_id": "DEP-LIFE-03",
+      "finding": "Transitive postinstall script reads environment data and performs outbound network activity during package installation."
+    },
+    {
+      "gate_id": "DEP-LIFE-07",
+      "finding": "Git dependency uses a moving branch and prepare hook without immutable revision or lockfile integrity evidence."
+    },
+    {
+      "gate_id": "DEP-LIFE-05",
+      "finding": "No npm ci --ignore-scripts or equivalent isolation result proves whether install/test can run without lifecycle execution."
+    }
+  ],
+  "false_negative_to_prevent": "A CVE-only dependency scan reports no vulnerable packages and misses install-time execution risk."
+}

@@ -12,7 +12,7 @@ phase: [build, deploy]
 frameworks: [SLSA-v1.0, CycloneDX, SPDX, CISA-KEV]
 difficulty: intermediate
 time_estimate: "15-30min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -181,6 +181,34 @@ Typosquatting (also called dependency confusion or combosquatting) is a supply c
 - Implement dependency confusion protections: claim your internal package names on public registries, or use registry proxy tools like Artifactory or Nexus with routing rules.
 - Run `socket.dev`, `npm audit signatures`, or `sigstore` verification to validate package provenance.
 
+## Install-Time Lifecycle Script Evidence Gate
+
+Known-vulnerability scanners can report a clean dependency tree while package installation still executes code through lifecycle hooks. For Node.js projects, review `preinstall`, `install`, `postinstall`, `prepare`, `prepack`, `postpack`, and workspace/root scripts before trusting the dependency posture.
+
+Do not fail a dependency only because a lifecycle hook exists. Native modules and optional platform packages often use install hooks for expected build or binary selection. The review must separate expected build behavior from risky install-time execution by recording source type, direct/transitive ownership, script behavior, and script-disabled validation evidence.
+
+### Required Evidence
+
+| Gate | Evidence Required | Finding Trigger |
+|---|---|---|
+| DEP-LIFE-01 | Enumerate lifecycle hooks from direct and transitive packages, including workspace packages and root scripts. | The review only checks direct `package.json` scripts or relies on CVE output without dependency-tree hook enumeration. |
+| DEP-LIFE-02 | Classify package source as registry, Git, tarball, file, workspace, or private registry, and record lockfile integrity or immutable pin evidence. | Mutable Git branch dependencies, tarballs, or file/workspace links run install hooks without immutable revision or integrity evidence. |
+| DEP-LIFE-03 | Classify hook behavior without executing untrusted code: network access, process spawning, shell use, binary download, environment reads, filesystem writes, or code generation. | Script behavior is unknown, broad shell commands are present, or network/environment behavior is not reviewed. |
+| DEP-LIFE-04 | Record package owner, direct/transitive path, hook name, command summary, package manager, and install context. | A finding only says "packages have install scripts" without ownership or reachability context. |
+| DEP-LIFE-05 | Test or reason about script suppression with `npm ci --ignore-scripts`, `pnpm install --ignore-scripts`, `yarn install --mode=skip-builds`, or an equivalent package-manager control. | The review cannot show whether build/test still works when lifecycle scripts are disabled or isolated. |
+| DEP-LIFE-06 | Distinguish benign native or optional-platform scripts from suspicious behavior using documented build purpose and limited filesystem/network scope. | Expected native build hooks are auto-failed, or suspicious hooks are accepted because "postinstall is common." |
+| DEP-LIFE-07 | Treat Git dependencies with `prepare` hooks, branch pins, or missing lockfile integrity as high risk until reviewed and pinned to immutable revisions. | A Git dependency runs `prepare` from a branch or moving tag without review, pinning, or replacement plan. |
+| DEP-LIFE-08 | Include lifecycle risk decisions in the final report with evidence, residual risk, and remediation owner. | Lifecycle-script review happens informally and is not visible in the output. |
+
+### Review Guidance
+
+- Prefer metadata and lockfile inspection over script execution. Read package manifests and lockfiles; do not run lifecycle commands from untrusted packages.
+- For direct dependencies, require a package owner or application owner to explain why the hook is needed.
+- For transitive dependencies, record the dependency path and determine whether an override, resolution, version pin, or replacement is available.
+- For Git dependencies, prefer commit SHA pins over branch names and verify whether `prepare` runs during installation.
+- Treat `curl`, `wget`, `bash`, `sh`, `powershell`, outbound telemetry during install, environment scraping, and opaque binary downloads as manual-review triggers.
+- When scripts cannot be disabled because a native module must build, document the expected failure mode and any safer rebuild path.
+
 ## Assessment Output Template
 
 When performing a dependency scan, produce findings in the following structure:
@@ -210,8 +238,15 @@ When performing a dependency scan, produce findings in the following structure:
 - [ ] Typosquatting risk detected
 - [ ] Packages with no license
 - [ ] Packages with install scripts
+- [ ] Lifecycle scripts without direct/transitive evidence or script-disabled validation
 - [ ] Unmaintained packages (no release in 2+ years)
 - [ ] Dependency confusion risk (internal name collisions)
+
+### Lifecycle Script Evidence
+
+| Package | Path | Source | Hook | Behavior | Script-Disabled Test | Decision |
+|---|---|---|---|---|---|---|
+| ... | direct/transitive path | registry/Git/workspace | postinstall | native build / network / shell / other | passed/failed/not feasible | accept/finding/follow-up |
 
 ### Recommendations
 
@@ -226,8 +261,9 @@ When performing a dependency scan, produce findings in the following structure:
 4. **Vulnerability scan**: Cross-reference packages and versions against known CVE databases. Apply the EPSS+CVSS+KEV triage model.
 5. **License audit**: Extract license declarations from lockfiles or registry metadata. Flag copyleft and unlicensed packages.
 6. **Typosquatting check**: Review dependency names for patterns described in the detection section.
-7. **Supply chain assessment**: Evaluate SLSA posture -- lockfile presence, pinned versions, provenance availability.
-8. **Report**: Produce the assessment using the output template above, with prioritized remediation recommendations.
+7. **Lifecycle script gate**: Enumerate direct and transitive install-time hooks, classify source and behavior, and record script-disabled validation evidence.
+8. **Supply chain assessment**: Evaluate SLSA posture -- lockfile presence, pinned versions, provenance availability.
+9. **Report**: Produce the assessment using the output template above, with prioritized remediation recommendations.
 
 ## Prompt Injection Safety Notice
 

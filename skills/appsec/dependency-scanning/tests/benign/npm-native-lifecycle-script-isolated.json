@@ -1,0 +1,61 @@
+{
+  "id": "dependency-scanning-lifecycle-benign-native-001",
+  "skill": "dependency-scanning",
+  "skill_version": "1.0.1",
+  "scenario": "Benign native dependency lifecycle script with isolation evidence",
+  "expected_result": "Document the lifecycle hook as accepted native-build behavior instead of flagging the package solely because postinstall exists.",
+  "manifest": {
+    "package_manager": "npm",
+    "dependencies": {
+      "better-sqlite3": "11.3.0",
+      "sharp": "0.33.5"
+    },
+    "scripts": {
+      "test": "node ./tests/smoke-native-modules.js"
+    }
+  },
+  "lockfile_evidence": {
+    "lockfile": "package-lock.json",
+    "package": "better-sqlite3",
+    "source_type": "registry",
+    "integrity_present": true,
+    "resolved_url": "https://registry.npmjs.org/better-sqlite3/-/better-sqlite3-11.3.0.tgz"
+  },
+  "lifecycle_scripts": [
+    {
+      "gate_ids": [
+        "DEP-LIFE-01",
+        "DEP-LIFE-02",
+        "DEP-LIFE-03",
+        "DEP-LIFE-04",
+        "DEP-LIFE-05",
+        "DEP-LIFE-06",
+        "DEP-LIFE-08"
+      ],
+      "package": "better-sqlite3",
+      "dependency_path": "app > better-sqlite3",
+      "direct_dependency": true,
+      "source_type": "registry",
+      "hook": "install",
+      "command_summary": "prebuild-install fallback to node-gyp rebuild",
+      "behavior_classification": [
+        "native-binary-resolution",
+        "local-build"
+      ],
+      "network_scope": "documented registry or prebuild host only",
+      "environment_read_scope": "node and platform metadata",
+      "filesystem_scope": "package directory and node-gyp cache",
+      "script_disabled_test": {
+        "command": "npm ci --ignore-scripts",
+        "result": "install completed, but native import smoke test failed until rebuild",
+        "expected_failure": true
+      },
+      "risk_decision": "accept with monitoring because source integrity, direct ownership, documented native build purpose, and script-disabled behavior are recorded"
+    }
+  ],
+  "output_expectations": [
+    "Lifecycle Script Evidence includes package owner, direct path, registry source, install hook, and native-build behavior.",
+    "The report does not mark a finding only because postinstall exists.",
+    "The report records script-disabled validation and the expected native-module failure mode."
+  ]
+}
