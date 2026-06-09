@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [MITRE-ATT&CK-v16, Sigma, Palantir-ADS]
 difficulty: advanced
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -58,6 +58,8 @@ Before beginning, gather or confirm:
 - [ ] **Existing detection coverage:** Current rules, known gaps, previous false positive history for similar detections.
 - [ ] **Detection priority:** Is this for a known active threat, proactive coverage expansion, or compliance requirement?
 - [ ] **Organizational naming conventions:** Rule ID format, severity taxonomy, and tagging standards used by the detection engineering team.
+- [ ] **Telemetry health evidence:** Log-source last-seen timestamps, event volume trends, ingestion latency percentiles, dropped/throttled event counts, parser/schema status, and field completeness for every data source the detection depends on.
+- [ ] **Backend field mapping evidence:** Sigma-to-SIEM conversion output, conversion warnings, mapped index/table names, mapped field names, and normalized true-positive/true-negative SIEM samples from the target backend.
 
 If the ATT&CK technique is provided but other context is missing, proceed with conservative assumptions (Windows enterprise environment, Sysmon + Windows Security logs available) and note assumptions in the output.
 
@@ -269,7 +271,41 @@ Define the analyst response procedure when this alert fires.
 5. **Determine disposition:** Classify as True Positive, Benign True Positive, or False Positive.
 6. **Escalate if TP:** If malicious, escalate to Tier 2/IR team with decoded command, parent process chain, and correlated events.
 
-### Step 5: Detection Coverage Heatmap Methodology
+### Step 5: Verify Telemetry Health and Backend Field Mapping
+
+Before marking a detection as **Tested**, **Operational**, or **Robust**, verify that the telemetry pipeline can actually provide the fields and timing assumptions used by the rule. A syntactically valid Sigma rule is only Theoretical if the source table is stale, the parser has drifted, backend conversion maps to nonexistent fields, command lines are truncated, or ingestion latency exceeds the response SLA.
+
+**Telemetry health evidence gates:**
+
+| Gate | Evidence Required | Blocks If Missing |
+|------|-------------------|-------------------|
+| `DET-TEL-01` | Log-source currentness for every required source: last-seen timestamp, source owner, collection path, and data inventory query. | Operational/Robust coverage claims for stale or unowned sources |
+| `DET-TEL-02` | Event volume baseline and recent trend for the source, including zero-volume explanation for low-frequency event types. | Treating zero matches as proof of no activity |
+| `DET-TEL-03` | Ingestion latency percentiles (`p50`, `p95`, and `p99`) compared with the detection and response SLA. | Response claims that depend on late-arriving telemetry |
+| `DET-TEL-04` | Dropped, throttled, sampled, or rejected event counts from agents, collectors, queues, and SIEM ingestion. | Coverage claims when the pipeline is losing relevant events |
+| `DET-TEL-05` | Parser/schema version, parse error rate, and field completeness ratios for required fields. | Rules referencing fields removed, renamed, truncated, or sparsely populated by parser drift |
+| `DET-TEL-06` | Sigma-to-SIEM field mapping review: source index/table, translated field names, backend conversion warnings, and unmapped conditions. | Deployed queries that reference nonexistent tables, fields, or unsupported operators |
+| `DET-TEL-07` | Normalized true-positive and true-negative SIEM samples from the converted backend query, with event IDs or sample hashes retained. | Marking a rule Tested based only on Sigma linting or synthetic YAML validation |
+| `DET-TEL-08` | Exception/tuning impact evidence: allowlists, suppression logic, false-positive rate, match rate, and excluded population size. | Filters or suppressions that make a detection functionally inert |
+
+**Coverage guardrails:**
+
+- **Theoretical maximum:** Rule passes Sigma linting but lacks backend field mapping, current telemetry, or SIEM sample evidence.
+- **Tested maximum:** Rule has synthetic TP/TN tests but lacks production source health, field completeness, latency, or dropped-event evidence.
+- **Operational allowed:** Requires deployment evidence, current source health, backend mapping review, SIEM TP/TN samples, and ongoing rule-performance metrics.
+- **Robust allowed:** Requires Operational evidence plus complementary detections, real-world or purple-team catches, lifecycle review cadence, and telemetry SLO monitoring.
+- **Not Evaluable:** Use when evidence is only screenshots, rule text, dashboards without query details, or claims that cannot be tied to source currentness and field mapping.
+
+**Backend mapping review checklist:**
+
+1. Convert the Sigma rule using the exact backend and configuration used in deployment.
+2. Review conversion warnings, unsupported operators, dropped selections, and unmapped fields.
+3. Query the target SIEM schema/data inventory to confirm every mapped table and field exists.
+4. Measure field completeness for required fields over the relevant lookback window.
+5. Run normalized TP and TN samples against the converted backend query.
+6. Record event IDs, sample hashes, query timestamps, source last-seen time, and conversion tool version.
+
+### Step 6: Detection Coverage Heatmap Methodology
 
 Map detection coverage against the ATT&CK matrix to identify gaps.
 
@@ -279,9 +315,9 @@ Map detection coverage against the ATT&CK matrix to identify gaps.
 |-------|-------|------------|
 | **None** | White | No detection rule exists for this technique |
 | **Theoretical** | Light Yellow | A rule exists but has not been validated or tested |
-| **Tested** | Light Green | Rule has been validated with synthetic test data (e.g., Atomic Red Team) |
-| **Operational** | Green | Rule is deployed in production, has been tuned, and has generated actionable alerts |
-| **Robust** | Dark Green | Multiple complementary rules cover different procedure examples; rule has caught real-world activity |
+| **Tested** | Light Green | Rule has been validated with synthetic test data (e.g., Atomic Red Team) and backend field mapping evidence |
+| **Operational** | Green | Rule is deployed in production with current telemetry, acceptable latency/drop metrics, tuning evidence, and SIEM TP/TN samples |
+| **Robust** | Dark Green | Multiple complementary rules cover different procedure examples; rule has caught real-world or purple-team activity and telemetry SLOs are monitored |
 
 **Heatmap construction process:**
 
@@ -302,7 +338,7 @@ Map detection coverage against the ATT&CK matrix to identify gaps.
 | Ease of detection | Medium | Some techniques have clear observable artifacts; prioritize those first |
 | Compliance requirements | Medium | Regulatory frameworks may mandate detection of specific techniques |
 
-### Step 6: Detection-as-Code Practices
+### Step 7: Detection-as-Code Practices
 
 Manage detection rules as code artifacts in version control.
 
@@ -344,6 +380,7 @@ detections/
 4. **Review:** Require peer review (pull request) before merge
 5. **Deploy:** Push converted rules to SIEM via API (Sentinel Analytics Rules API, Splunk REST API)
 6. **Monitor:** Track rule performance metrics (fire rate, TP rate, MTTD)
+7. **Telemetry health check:** Fail or hold promotion when required log sources are stale, fields are incomplete, parser versions drift, conversion warnings are unresolved, or dropped/throttled event counts exceed the detection SLA.
 
 ---
 
@@ -356,6 +393,16 @@ detections/
 | P3 | Medium | Detection gap for a technique with available log sources but lower threat intelligence relevance. Coverage improvement opportunity. | Create and deploy detection within 30 days |
 | P4 | Low | Detection exists but has not been validated or tuned. Coverage is theoretical only. | Validate and tune within 90 days |
 
+**Telemetry health modifiers:**
+
+| Evidence Gap | Classification Impact |
+|--------------|-----------------------|
+| Stale or absent required log source (`DET-TEL-01`) | Escalate one level when the rule is claimed as Operational/Robust |
+| Missing required fields or parser/schema drift (`DET-TEL-05`) | Treat as a functional detection gap, not a documentation issue |
+| Backend conversion warnings or unmapped fields (`DET-TEL-06`) | Cap coverage at Theoretical until resolved |
+| No normalized SIEM TP/TN samples (`DET-TEL-07`) | Cap coverage at Theoretical/Tested depending on available synthetic validation |
+| Broad suppression or allowlist without impact evidence (`DET-TEL-08`) | Escalate when the excluded population can hide the target behavior |
+
 ---
 
 ## 5. Output Format
@@ -365,7 +412,7 @@ Produce detection engineering deliverables in this structure:
 ```markdown
 ## Detection Engineering Report: [ATT&CK Technique ID]
 **Date:** [YYYY-MM-DD]
-**Skill:** detection-engineering v1.0.0
+**Skill:** detection-engineering v1.0.1
 **Frameworks:** MITRE ATT&CK v16, Sigma, Palantir ADS
 
 ### ATT&CK Technique Summary
@@ -388,6 +435,20 @@ Produce detection engineering deliverables in this structure:
 | Current Coverage | [None / Theoretical / Tested / Operational / Robust] |
 | Target Coverage | [Operational / Robust] |
 | Validation Method | [Atomic Red Team test ID / manual test procedure] |
+| Telemetry Health | [Current / Stale / Dropped / Throttled / Parser Drift / Not Evaluable] |
+| Coverage Cap | [None / Theoretical / Tested / Operational / Robust] |
+
+### Telemetry and Field Mapping Evidence
+| Gate | Evidence | Result |
+|------|----------|--------|
+| DET-TEL-01 | [Log-source last-seen evidence] | [Pass / Fail / Not Evaluable] |
+| DET-TEL-02 | [Event volume baseline and trend] | [Pass / Fail / Not Evaluable] |
+| DET-TEL-03 | [Latency percentiles vs SLA] | [Pass / Fail / Not Evaluable] |
+| DET-TEL-04 | [Dropped/throttled/sampled event counts] | [Pass / Fail / Not Evaluable] |
+| DET-TEL-05 | [Parser/schema status and field completeness] | [Pass / Fail / Not Evaluable] |
+| DET-TEL-06 | [Sigma-to-SIEM mapping and conversion warnings] | [Pass / Fail / Not Evaluable] |
+| DET-TEL-07 | [Normalized TP/TN SIEM samples] | [Pass / Fail / Not Evaluable] |
+| DET-TEL-08 | [Exception/tuning impact evidence] | [Pass / Fail / Not Evaluable] |
 
 ### Deployment Notes
 - **Target SIEM:** [Platform]
@@ -493,6 +554,10 @@ Detection rules are not write-once artifacts. Log sources change, environments e
 ### Pitfall 5: Mapping Detections to ATT&CK Techniques Incorrectly
 
 Overly broad or incorrect ATT&CK mappings undermine coverage analysis. A rule that detects a specific PowerShell obfuscation technique should map to T1059.001 (PowerShell) and potentially T1027 (Obfuscated Files or Information), not to the parent T1059 alone. Use sub-technique IDs when the detection is specific to a sub-technique. Validate mappings against the ATT&CK technique definition and procedure examples.
+
+### Pitfall 6: Treating Rule Hits as Telemetry Health
+
+A detection with zero hits is not automatically healthy, and a detection with historical hits is not automatically current. Verify source last-seen timestamps, event volume, parser/schema status, field completeness, conversion warnings, dropped/throttled counts, and backend TP/TN samples before claiming Operational or Robust coverage.
 
 ---
 

@@ -1,0 +1,107 @@
+{
+  "scenario": "operational-claim-with-stale-telemetry",
+  "skill": "detection-engineering",
+  "expected_skill_version": "1.0.1",
+  "rule": {
+    "title": "Suspicious Encoded PowerShell",
+    "sigma_status": "stable",
+    "claimed_coverage": "Operational",
+    "attack_technique": "T1059.001",
+    "required_log_sources": [
+      "windows_security_4688",
+      "sysmon_process_creation"
+    ],
+    "required_fields": [
+      "CommandLine",
+      "ParentImage",
+      "User",
+      "Computer"
+    ]
+  },
+  "telemetry_health": {
+    "windows_security_4688": {
+      "last_seen": "2026-05-02T04:15:00Z",
+      "event_volume_7d": 0,
+      "owner": null,
+      "latency_p95_minutes": null,
+      "dropped_events_24h": null
+    },
+    "sysmon_process_creation": {
+      "last_seen": "2026-06-09T09:55:00Z",
+      "event_volume_7d": 125000,
+      "latency_p95_minutes": 64,
+      "dropped_events_24h": 2800,
+      "throttled_events_24h": 620
+    }
+  },
+  "parser_schema": {
+    "schema_version": "win-process-v5",
+    "previous_schema_version": "win-process-v4",
+    "parse_error_rate": 0.18,
+    "field_completeness": {
+      "CommandLine": 0.42,
+      "ParentImage": 0.97,
+      "User": 0.99,
+      "Computer": 0.99
+    },
+    "known_drift": [
+      "CommandLine truncated at 256 bytes after collector update"
+    ]
+  },
+  "backend_conversion": {
+    "target_siem": "Microsoft Sentinel",
+    "conversion_tool": "sigma-cli 0.10.0",
+    "warnings": [
+      "field CommandLine mapped to ProcessCommandLine but target table has command_line",
+      "selection_encoded used unsupported modifier and was emitted as literal text"
+    ],
+    "mapped_tables": [
+      "DeviceProcessEvents"
+    ],
+    "schema_verified": false
+  },
+  "validation_samples": {
+    "normalized_true_positive_sample": null,
+    "normalized_true_negative_sample": null,
+    "synthetic_sigma_test_only": true
+  },
+  "exceptions": {
+    "admin_allowlist_coverage": "all Tier0 admins",
+    "excluded_event_share": 0.71,
+    "ticket": null,
+    "expiry": null
+  },
+  "expected_findings": [
+    {
+      "id": "DET-TEL-01",
+      "severity": "high",
+      "reason": "a required Windows Security source has not sent data recently but the rule is claimed as Operational"
+    },
+    {
+      "id": "DET-TEL-04",
+      "severity": "medium",
+      "reason": "dropped and throttled process events exceed the response assumption"
+    },
+    {
+      "id": "DET-TEL-05",
+      "severity": "high",
+      "reason": "CommandLine field completeness and truncation make the encoded-command rule unreliable"
+    },
+    {
+      "id": "DET-TEL-06",
+      "severity": "high",
+      "reason": "backend conversion warnings indicate mapped fields or operators may not work in the target SIEM"
+    },
+    {
+      "id": "DET-TEL-07",
+      "severity": "medium",
+      "reason": "coverage is based on Sigma-only synthetic testing without normalized SIEM TP/TN samples"
+    },
+    {
+      "id": "DET-TEL-08",
+      "severity": "medium",
+      "reason": "broad admin allowlist has no impact evidence, ticket, or expiry"
+    }
+  ],
+  "expected_coverage_cap": "Theoretical"
+}

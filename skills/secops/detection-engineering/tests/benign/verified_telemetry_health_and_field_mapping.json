@@ -1,0 +1,93 @@
+{
+  "scenario": "verified-telemetry-health-and-field-mapping",
+  "skill": "detection-engineering",
+  "expected_skill_version": "1.0.1",
+  "rule": {
+    "title": "Suspicious Encoded PowerShell",
+    "sigma_status": "stable",
+    "claimed_coverage": "Operational",
+    "attack_technique": "T1059.001",
+    "required_log_sources": [
+      "windows_security_4688",
+      "sysmon_process_creation"
+    ],
+    "required_fields": [
+      "CommandLine",
+      "ParentImage",
+      "User",
+      "Computer"
+    ]
+  },
+  "telemetry_health": {
+    "windows_security_4688": {
+      "last_seen": "2026-06-09T10:04:00Z",
+      "event_volume_7d": 881245,
+      "event_volume_baseline_30d": 892100,
+      "latency_p50_minutes": 1,
+      "latency_p95_minutes": 4,
+      "latency_p99_minutes": 9,
+      "dropped_events_24h": 0,
+      "throttled_events_24h": 0,
+      "owner": "identity-logging"
+    },
+    "sysmon_process_creation": {
+      "last_seen": "2026-06-09T10:05:00Z",
+      "event_volume_7d": 1298120,
+      "event_volume_baseline_30d": 1312040,
+      "latency_p50_minutes": 1,
+      "latency_p95_minutes": 3,
+      "latency_p99_minutes": 7,
+      "dropped_events_24h": 0,
+      "throttled_events_24h": 0,
+      "owner": "endpoint-logging"
+    }
+  },
+  "parser_schema": {
+    "schema_version": "win-process-v5",
+    "parse_error_rate": 0.002,
+    "field_completeness": {
+      "CommandLine": 0.997,
+      "ParentImage": 0.996,
+      "User": 0.999,
+      "Computer": 1.0
+    },
+    "command_line_truncation_checked": true
+  },
+  "backend_conversion": {
+    "target_siem": "Microsoft Sentinel",
+    "conversion_tool": "sigma-cli 0.10.0",
+    "warnings": [],
+    "mapped_tables": [
+      "DeviceProcessEvents"
+    ],
+    "field_mapping": {
+      "CommandLine": "ProcessCommandLine",
+      "ParentImage": "InitiatingProcessFileName",
+      "User": "AccountName",
+      "Computer": "DeviceName"
+    },
+    "schema_verified": true
+  },
+  "validation_samples": {
+    "normalized_true_positive_sample": {
+      "event_id": "TP-20260609-001",
+      "sample_hash": "sha256:8f3b6e2d7d5a51f0367a4d2b2a028f9cfa9dd9c6b25d769b4d2e4f0dc938f001",
+      "query_result": "matched"
+    },
+    "normalized_true_negative_sample": {
+      "event_id": "TN-20260609-044",
+      "sample_hash": "sha256:7f8e5d7cbb9e5a4cbbfd859e4b4dcbcbf5939bc0211d5d59025f9d4d12b1e7a1",
+      "query_result": "not_matched"
+    },
+    "raw_event_ids_retained": true
+  },
+  "exceptions": {
+    "admin_allowlist_coverage": "break-glass hosts only",
+    "excluded_event_share": 0.004,
+    "ticket": "DET-4217",
+    "expiry": "2026-07-09"
+  },
+  "expected_status": "pass",
+  "expected_coverage_cap": "Operational",
+  "false_positive_guardrail": "telemetry health should not be flagged when sources are current, required fields are complete, backend mapping is verified, dropped/throttled counts are zero, and normalized SIEM TP/TN samples are retained"
+}
