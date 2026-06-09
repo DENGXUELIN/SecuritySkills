@@ -1,0 +1,80 @@
+{
+  "fixture": "diagram-only-exception-failover-gap",
+  "expected_skill_decision": {
+    "segmentation_decision": "Not Evaluable",
+    "risk_level": "high",
+    "reason": "The CDE boundary relies on diagrams, lacks denied-path evidence from representative sources, has an ownerless migration exception, and did not test failover transit routes."
+  },
+  "boundary": {
+    "name": "pci-cde",
+    "criticality": "cde",
+    "source_zones": [
+      "user",
+      "app",
+      "dmz"
+    ],
+    "destination_zone": "cde-data"
+  },
+  "test_matrix": [
+    {
+      "source_zone": "admin",
+      "destination_zone": "cde-data",
+      "protocol": "tcp",
+      "port": 443,
+      "test_source_context": {
+        "subnet": "10.99.0.0/24",
+        "security_group": "sg-admin-jump",
+        "route_table": "rtb-admin",
+        "identity": "jump-host"
+      },
+      "expected": "allow",
+      "actual": "allow",
+      "evidence_reference": "curl-output-admin-20260608",
+      "last_tested": "2026-06-08",
+      "exception": null
+    }
+  ],
+  "missing_denied_path_tests": [
+    {
+      "source_zone": "user",
+      "destination_zone": "cde-data",
+      "protocol": "tcp",
+      "port": 5432,
+      "expected": "deny"
+    },
+    {
+      "source_zone": "dmz",
+      "destination_zone": "cde-data",
+      "protocol": "tcp",
+      "port": 3306,
+      "expected": "deny"
+    }
+  ],
+  "alternate_path_tests": [
+    {
+      "path": "transit-gateway-backup-route",
+      "expected": "deny unauthorized access during firewall failover",
+      "actual": "not_tested",
+      "evidence_reference": null
+    }
+  ],
+  "exceptions": [
+    {
+      "source_zone": "app",
+      "destination_zone": "cde-data",
+      "protocol": "tcp",
+      "port": 1433,
+      "business_reason": "migration_cutover",
+      "owner": null,
+      "expiry": null,
+      "compensating_control": null,
+      "review_date": null,
+      "removal_retest_plan": null
+    }
+  ],
+  "independent_validation": {
+    "validator": null,
+    "last_validated": null,
+    "report_id": null
+  }
+}

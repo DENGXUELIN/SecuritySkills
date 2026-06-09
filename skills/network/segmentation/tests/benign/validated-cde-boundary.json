@@ -1,0 +1,74 @@
+{
+  "fixture": "validated-cde-boundary",
+  "expected_skill_decision": {
+    "segmentation_decision": "Pass",
+    "risk_level": "low",
+    "reason": "Denied and allowed paths were tested from representative workload and user zones, failover was validated, and no open exceptions bypass the CDE boundary."
+  },
+  "boundary": {
+    "name": "pci-cde",
+    "criticality": "cde",
+    "source_zones": [
+      "user",
+      "app",
+      "dmz"
+    ],
+    "destination_zone": "cde-data"
+  },
+  "test_matrix": [
+    {
+      "source_zone": "user",
+      "destination_zone": "cde-data",
+      "protocol": "tcp",
+      "port": 5432,
+      "test_source_context": {
+        "subnet": "10.10.12.0/24",
+        "security_group": "sg-user-standard",
+        "route_table": "rtb-user-prod",
+        "identity": "corp-user-vdi"
+      },
+      "expected": "deny",
+      "actual": "deny",
+      "evidence_reference": "vpc-flow-log-reject-20260608-001",
+      "last_tested": "2026-06-08",
+      "exception": null
+    },
+    {
+      "source_zone": "app",
+      "destination_zone": "cde-data",
+      "protocol": "tcp",
+      "port": 5432,
+      "test_source_context": {
+        "subnet": "10.20.4.0/24",
+        "security_group": "sg-payment-app",
+        "route_table": "rtb-app-prod",
+        "identity": "payment-api-service"
+      },
+      "expected": "allow",
+      "actual": "allow",
+      "evidence_reference": "flow-log-accept-payment-api-20260608",
+      "last_tested": "2026-06-08",
+      "exception": null
+    }
+  ],
+  "alternate_path_tests": [
+    {
+      "path": "firewall-ha-failover",
+      "expected": "deny unauthorized tcp/5432 from user to cde-data",
+      "actual": "deny",
+      "evidence_reference": "packet-capture-fw-failover-20260608"
+    },
+    {
+      "path": "transit-gateway-backup-route",
+      "expected": "deny unauthorized tcp/5432 from dmz to cde-data",
+      "actual": "deny",
+      "evidence_reference": "tgw-flow-log-reject-20260608"
+    }
+  ],
+  "exceptions": [],
+  "independent_validation": {
+    "validator": "security-assurance",
+    "last_validated": "2026-06-08",
+    "report_id": "SEG-CDE-2026-06"
+  }
+}

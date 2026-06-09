@@ -13,7 +13,7 @@ phase: [design, operate]
 frameworks: [NIST-SP-800-207, CIS-Controls-v8]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -243,6 +243,23 @@ Document or verify the existence of a segmentation testing process:
 4. **Test VLAN hopping** via double-tagging from user VLANs. Expected result: traffic dropped.
 5. **Validate that segmentation controls survive failover** (HA firewall failover should not open transit paths).
 
+#### 6.1 Segmentation Validation Evidence Gate
+
+Do not accept diagrams, intended ACLs, or "application still works" tests as proof that segmentation is effective. Require explicit test evidence for both denied and allowed paths from representative source locations, including failover and exception paths.
+
+| Gate | Required evidence | Fail / Not Evaluable condition |
+|------|-------------------|--------------------------------|
+| `SEG-VAL-01` | Test matrix includes source zone, destination zone, protocol, port, expected result, and actual result. | Boundary is asserted but no test matrix exists. |
+| `SEG-VAL-02` | Test source identity is representative: host/pod/subnet, route table, security group, namespace, workload role, or user zone. | Tests run only from admin/jump networks that bypass real paths. |
+| `SEG-VAL-03` | Denied-path proof includes firewall deny logs, flow-log rejects, packet capture, service-mesh decision logs, or command output. | Only allowed paths are tested; blocked paths have no evidence reference. |
+| `SEG-VAL-04` | Allowed-path proof covers required business flows and owner approval. | Required flows are assumed from policy text with no application or flow evidence. |
+| `SEG-VAL-05` | Exceptions have owner, expiry, business reason, compensating control, review date, and removal retest plan. | Temporary migration or incident routes are ownerless, expiry-less, or permanent. |
+| `SEG-VAL-06` | Alternate paths are tested: failover firewall, transit gateway, peering, VPN, Direct Connect, service mesh bypass, and HA routes. | Steady-state path is tested but failover or bypass path is not. |
+| `SEG-VAL-07` | PCI CDE/crown-jewel boundaries have independent validation evidence and last-tested date. | Critical boundary relies on diagrams or self-attestation only. |
+| `SEG-VAL-08` | Post-change retest proves route table/security group/network-policy updates did not weaken the boundary. | Segmentation changed after approval with no retest or stale evidence. |
+
+**Classification rule:** Mark CDE or crown-jewel boundaries **High** when denied-path proof, representative source context, or independent validation is missing. Mark segmentation **Not Evaluable** when actual result, evidence reference, exception scope, or alternate-path status cannot be proven.
+
 ---
 
 ## Findings Classification
@@ -283,6 +300,11 @@ Document or verify the existence of a segmentation testing process:
 | DMZ         | App       | Firewall    | Restricted | Pass |
 | App         | Data      | SG only     | Overly permissive | F-002 |
 | User        | Data      | None        | No control | F-001 |
+
+### Segmentation Validation Evidence
+| Source Zone | Destination Zone | Protocol/Port | Test Source Context | Expected | Actual | Evidence Reference | Last Tested | Exception / Expiry | Alternate Path Tested? | Decision |
+|-------------|------------------|---------------|---------------------|----------|--------|--------------------|-------------|--------------------|------------------------|----------|
+| User | Data | TCP/5432 | subnet/sg/route-table | Deny | Deny | flow-log/reject-id | YYYY-MM-DD | None | Yes/No | Pass/Fail/Not Evaluable |
 
 ### Findings
 
@@ -345,6 +367,12 @@ Document or verify the existence of a segmentation testing process:
 
 5. **Assuming Kubernetes namespaces provide network isolation.** Namespaces are a logical organizational boundary. Without a NetworkPolicy or CNI-level enforcement (Calico, Cilium), all pods across all namespaces can communicate freely by default.
 
+6. **Testing only permitted paths.** Verifying that applications still work does not prove segmentation. A valid test must also prove unauthorized paths are denied and logged from representative source zones.
+
+7. **Letting temporary exceptions become architecture.** Emergency routes, peering links, or firewall permits created for migration or incident response need owners, expiry dates, compensating controls, and re-test evidence after removal.
+
+8. **Ignoring failover and alternate routing paths.** HA firewalls, transit gateways, service mesh bypass, VPN failover, and direct connect routes can create paths that are absent from steady-state diagrams. Include failover scenarios in validation.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -372,4 +400,5 @@ This skill processes network configurations that may contain user-supplied comme
 
 ## Changelog
 
+- **1.0.1** -- Added segmentation validation evidence gates, denied/allowed path proof, exception and failover checks, output fields, and fixture-backed examples for validated versus diagram-only segmentation.
 - **1.0.0** -- Initial release. Full coverage of NIST SP 800-207 and CIS Controls v8 Control 12 for network segmentation review.
