@@ -1,19 +1,21 @@
 ---
 name: post-incident-review
 description: >
-  Conducts a structured post-incident review following NIST SP 800-61 Rev 2
-  Post-Incident Activity guidance. Auto-invoked when an incident has been
-  resolved and the team needs to conduct a blameless retrospective, reconstruct
-  the timeline, perform root cause analysis, document lessons learned, and
-  track remediation actions. Produces a PIR report with metrics (MTTD, MTTR,
-  MTTC), control failure mapping, and actionable improvement plan.
+  Conducts a structured post-incident review following NIST SP 800-61 Rev 3
+  incident response improvement guidance and NIST Cybersecurity Framework 2.0
+  outcomes. Auto-invoked when an incident has been resolved and the team needs
+  to conduct a blameless retrospective, reconstruct the timeline, perform root
+  cause analysis, verify remediation closure, document lessons learned, and
+  track evidence-backed improvement actions. Produces a PIR report with metrics
+  (MTTD, MTTR, MTTC), control failure mapping, decision-log review, evidence
+  retention ownership, and a verified remediation closure plan.
 tags: [incident-response, pir, lessons-learned]
 role: [soc-analyst, security-engineer, vciso]
 phase: [recover]
-frameworks: [NIST-SP-800-61r2]
+frameworks: [NIST-SP-800-61r3, NIST-CSF-2.0]
 difficulty: beginner
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -21,12 +23,12 @@ injection-hardened: true
 argument-hint: "[target-file-or-directory]"
 ---
 
-# Post-Incident Review -- NIST SP 800-61 Rev 2
+# Post-Incident Review -- NIST SP 800-61 Rev 3 / NIST CSF 2.0
 
-> **Framework:** NIST SP 800-61 Rev 2 (Section 3.4: Post-Incident Activity)
+> **Frameworks:** NIST SP 800-61 Rev 3 (Incident Response Recommendations and Considerations for Cybersecurity Risk Management: A CSF 2.0 Community Profile), NIST Cybersecurity Framework 2.0
 > **Role:** SOC Analyst, Security Engineer, vCISO
 > **Time:** 30-60 min
-> **Output:** Post-incident review report with blameless retrospective, root cause analysis, control failure mapping, metrics (MTTD, MTTR, MTTC), lessons learned, and remediation tracking plan
+> **Output:** Post-incident review report with blameless retrospective, root cause analysis, control failure mapping, metrics (MTTD, MTTR, MTTC), decision-log review, evidence retention ownership, lessons learned, and verified remediation closure plan
 
 ---
 
@@ -52,12 +54,18 @@ Before conducting the PIR, gather or confirm:
 
 - [ ] **Incident report** -- The completed incident response report from the ir-playbook (incident ID, classification, severity, timeline, IOCs, actions taken).
 - [ ] **Timeline of events** -- Chronological record of all significant events from initial compromise through detection, containment, eradication, and recovery.
+- [ ] **Incident decision log** -- Severity, materiality, containment, notification, evidence, and recovery decisions with decision maker, timestamp, alternatives considered, and rationale.
 - [ ] **Team participants** -- Names and roles of all personnel involved in the response (IR team, management, legal, communications, external responders).
 - [ ] **Communication logs** -- Records of notifications, escalations, and status updates sent during the incident.
 - [ ] **Evidence and forensic findings** -- Summary of forensic analysis results, root cause indicators, and attacker TTPs identified.
+- [ ] **Evidence retention owner** -- Person or team accountable for evidence retention, legal hold alignment, storage location, retention period, and final disposition.
 - [ ] **Existing controls** -- Documentation of security controls that were in place at the time of the incident (detection rules, access controls, network segmentation, patching cadence).
 - [ ] **Previous PIR reports** -- Any prior post-incident reviews for similar incident types, to identify recurring patterns.
 - [ ] **Metrics data** -- Timestamps needed to compute MTTD, MTTR, and MTTC (see Step 4).
+- [ ] **Action tracking system** -- The authoritative Jira, ServiceNow, Azure DevOps, GRC, or equivalent system where remediation actions, approvals, verification evidence, and closure state are maintained.
+- [ ] **Risk owner and action owner acceptance** -- Named action owners and risk owners who can accept remediation accountability, residual risk, and closure decisions.
+- [ ] **Verification and recurrence evidence sources** -- Retest results, detection replays, configuration checks, recurrence monitoring, and post-closure review dates used to prove the root cause was addressed.
+- [ ] **Benchmark provenance** -- Source, publication date, scope, and methodology for external benchmarks; internal rolling baselines when external benchmark context is stale or mismatched.
 
 ---
 
@@ -91,9 +99,9 @@ The PIR must follow a blameless methodology. The objective is to understand what
 | **Action items** | 10 min | Define specific, assignable remediation actions with owners and deadlines. |
 | **Close** | 5 min | Confirm action items, assign PIR report owner, schedule follow-up review. |
 
-### Step 2: Timeline Reconstruction
+### Step 2: Timeline Reconstruction and Closure Governance
 
-Build a comprehensive timeline of the incident from initial compromise through closure. Include attacker actions, defender actions, and key decision points.
+Build a comprehensive timeline of the incident from initial compromise through closure. Include attacker actions, defender actions, key decision points, notification clocks, evidence-retention decisions, and remediation closure governance.
 
 **Timeline template:**
 
@@ -114,6 +122,22 @@ Build a comprehensive timeline of the incident from initial compromise through c
 - When and why was containment strategy X chosen over alternative Y?
 - Were there decision delays? What caused them (missing information, unavailable personnel, unclear authority)?
 - Were any decisions reversed during the response? What new information triggered the reversal?
+- Who owned evidence retention, and when was retention/legal-hold scope confirmed?
+- Who accepted action ownership and residual risk ownership for remediation items?
+- What closure criteria and verification evidence were defined before an action could be marked complete?
+
+**Verified remediation closure checks:**
+
+| ID | Closure Evidence Gate | Required Evidence | Closure Decision |
+|---|---|---|---|
+| PIR-CLOSURE-01 | Decision log completeness | Severity/materiality, notification, containment, evidence, recovery, and closure decisions have timestamped decision makers and rationale | Complete / Gap |
+| PIR-CLOSURE-02 | Evidence retention ownership | Retention owner, retention period, storage location, legal-hold status, and final disposition path are named | Complete / Gap |
+| PIR-CLOSURE-03 | Action owner acceptance | Each remediation has an owner who accepted the action, deadline, and measurable completion criteria | Accepted / Not accepted |
+| PIR-CLOSURE-04 | Risk owner approval | Residual-risk acceptance or deadline exceptions have named risk owner approval and expiry/review date | Approved / Missing |
+| PIR-CLOSURE-05 | Closure criteria | Each action defines what condition proves the root cause or contributing factor is fixed | Defined / Missing |
+| PIR-CLOSURE-06 | Verification evidence | Retest, config validation, detection replay, log proof, tabletop result, or third-party validation is attached | Verified / Ticket-only |
+| PIR-CLOSURE-07 | Recurrence check | Monitoring query, recurrence review date, or follow-up PIR check confirms the issue did not immediately recur | Scheduled / Missing |
+| PIR-CLOSURE-08 | Benchmark provenance | Metrics benchmarks identify source, publication date, scope, and methodology, or use internal baseline instead | Current / Stale |
 
 ### Step 3: Root Cause Analysis
 
@@ -186,6 +210,8 @@ Organize contributing factors into categories to ensure comprehensive analysis:
 
 Compute the following metrics for the incident. These metrics enable trend analysis across incidents and benchmark against industry data.
 
+Every external benchmark must include source, publication date, scope, and methodology. Do not present unsourced "industry average" values as authoritative. Prefer the organization's own rolling 6- to 12-month incident baseline when external reports do not match the incident type, industry, geography, detection source, or response model.
+
 #### Mean Time to Detect (MTTD)
 
 ```
@@ -194,9 +220,7 @@ MTTD = Time of Detection - Time of Initial Compromise
      = [Result in hours/days]
 ```
 
-MTTD measures how long the attacker operated undetected. Industry benchmarks (IBM Cost of a Data Breach Report, Mandiant M-Trends):
-- Median dwell time (all industries): ~10 days (improving annually)
-- Internally detected incidents: typically shorter MTTD than externally notified
+MTTD measures how long the attacker operated undetected. If using industry dwell-time benchmarks, record the report name, report year, population measured, and whether the metric covers all incidents, internally detected incidents, externally notified incidents, or a specific sector. If that context is unavailable, label the benchmark as "Not comparable" and use internal trend data instead.
 
 #### Mean Time to Contain (MTTC)
 
@@ -266,10 +290,32 @@ Convert analysis findings into specific, measurable, assignable, and time-bound 
 
 **Remediation action template:**
 
-| ID | Finding | Action | Owner | Priority | Deadline | Tracking |
-|---|---|---|---|---|---|---|
-| REM-001 | [Specific finding from RCA or control failure mapping] | [Specific remediation action] | [Name and team] | [P0/P1/P2/P3] | [YYYY-MM-DD] | [Ticket ID] |
-| REM-002 | [Finding] | [Action] | [Owner] | [Priority] | [Deadline] | [Ticket ID] |
+| ID | Finding | Action | Action Owner Accepted | Risk Owner | Priority | Deadline | Closure Criteria | Verification Evidence | Status | Recurrence Check | Tracking |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| REM-001 | [Specific finding from RCA or control failure mapping] | [Specific remediation action] | [Yes/No + owner/date] | [Name/team] | [P0/P1/P2/P3] | [YYYY-MM-DD] | [Observable condition proving closure] | [Retest/config/log/tabletop evidence] | [Open/Accepted/Verified Closed/Risk Accepted/Not Evaluable] | [Date/query/control] | [Ticket ID] |
+| REM-002 | [Finding] | [Action] | [Owner/date] | [Risk owner] | [Priority] | [Deadline] | [Criteria] | [Evidence] | [Status] | [Check] | [Ticket ID] |
+
+**Verified Remediation Closure Gate:**
+
+Ticket creation is not remediation. A remediation item may be marked **Verified Closed** only when the PIR record includes owner acceptance, closure criteria, verification evidence, and recurrence monitoring. Use these statuses consistently:
+
+| Status | Meaning | Allowed Closure? |
+|---|---|---|
+| Open | Action is identified but owner acceptance, work, or evidence is incomplete | No |
+| Accepted | Action owner accepted scope/deadline, but remediation is not yet independently verified | No |
+| Verified Closed | Closure criteria are met and verification evidence is attached | Yes |
+| Risk Accepted | Risk owner accepted residual risk with expiry/review date and compensating controls | Conditional |
+| Not Evaluable | Evidence is insufficient to decide whether remediation happened or worked | No |
+
+Minimum closure evidence by action type:
+
+| Action Type | Minimum Verification Evidence |
+|---|---|
+| Detection improvement | Rule/query change, known-positive replay, false-positive check, production deployment reference, and monitoring owner |
+| Configuration or access change | Before/after configuration export, approval record, affected-scope list, and post-change validation |
+| Patch or hardening fix | Asset/version inventory, deployed version proof, retest result, rollback plan, and exception list |
+| Process or playbook update | Updated playbook/control, reviewer approval, tabletop or drill evidence, and next review date |
+| Legal, evidence, or communication process | Evidence owner, retention/legal-hold decision, distribution list, notification clock review, and final disposition plan |
 
 **Remediation prioritization:**
 
@@ -292,6 +338,18 @@ Convert analysis findings into specific, measurable, assignable, and time-bound 
 | P3 | Low | Minor improvement opportunity or best-practice recommendation. | Backlog item for next planning cycle. |
 | P4 | Informational | Observation or context that does not require action but should be documented for organizational awareness. | Documented in PIR report. No remediation required. |
 
+Escalate closure-governance gaps when they prevent the organization from knowing whether remediation actually occurred:
+
+| Closure Gap | Minimum Severity | Rationale |
+|---|---|---|
+| Direct root cause remains open without verified closure evidence | P0 | The incident can recur and leadership has no evidence-backed closure decision |
+| Remediation was marked done based only on ticket closure, no retest or configuration evidence | P1 | The PIR cannot prove the corrective action worked |
+| No action owner accepted the remediation item | P1 | Work may be unowned despite appearing in the PIR |
+| No risk owner approved residual risk or exception | P1 | Risk acceptance is not valid without accountable authority |
+| Closure criteria are missing or subjective | P1 | Verification cannot be performed consistently |
+| Evidence retention owner is missing for a legally or regulatorily relevant incident | P1 | Evidence may be lost before litigation, insurance, or regulatory review |
+| External benchmarks are stale or unsourced | P2 | Metrics may mislead leadership, but the incident may still be actionable using internal baselines |
+
 ---
 
 ## 5. Output Format
@@ -302,9 +360,13 @@ Produce the post-incident review report with these exact sections:
 ## Post-Incident Review: [Incident ID]
 **Date of Review:** [YYYY-MM-DD]
 **Date of Incident:** [YYYY-MM-DD]
-**Skill:** post-incident-review v1.0.0
-**Framework:** NIST SP 800-61 Rev 2
+**Skill:** post-incident-review v1.0.1
+**Frameworks:** NIST SP 800-61 Rev 3; NIST Cybersecurity Framework 2.0
 **PIR Facilitator:** [Name or "AI-assisted -- human facilitator required"]
+**PIR Owner:** [Name/team accountable for report completion]
+**Evidence Retention Owner:** [Name/team, retention period, storage location, legal hold status]
+**Action Tracking System:** [Jira/ServiceNow/Azure DevOps/GRC/etc.]
+**Risk Owner:** [Name/team accountable for residual risk decisions]
 
 ### Executive Summary
 [3-5 sentences. State the incident type, severity, duration, business impact,
@@ -320,20 +382,36 @@ root cause, and the number/priority of remediation actions identified.]
 | Duration | [Total hours/days from compromise to recovery] |
 | Business Impact | [Description] |
 | Data Impact | [Description or "None confirmed"] |
+| Evidence Retention Status | [Owner / retention period / legal-hold status] |
+| Closure Decision | [Verified Closed / Risk Accepted / Not Evaluable] |
 
 ### Timeline
 | # | Timestamp (UTC) | Event Type | Description | Source |
 |---|---|---|---|---|
 | 1 | [timestamp] | [type] | [description] | [source] |
 
+### Decision Log Review
+| Decision | Timestamp (UTC) | Decision Maker | Rationale | Alternatives Considered | Evidence Source | Complete? |
+|---|---|---|---|---|---|---|
+| Severity classification | [timestamp] | [name/role] | [why] | [options] | [source] | [Yes/No] |
+| Containment strategy | [timestamp] | [name/role] | [why] | [options] | [source] | [Yes/No] |
+| Notification / escalation | [timestamp] | [name/role] | [why] | [options] | [source] | [Yes/No] |
+| Evidence retention | [timestamp] | [name/role] | [why] | [options] | [source] | [Yes/No] |
+
+### Evidence Retention Review
+| Evidence Class | Owner | Location | Retention Period | Legal Hold / Regulatory Driver | Final Disposition | Gap |
+|---|---|---|---|---|---|---|
+| Logs / forensic images / tickets / communications | [owner] | [location] | [period] | [driver] | [plan] | [None/gap] |
+
 ### Metrics
-| Metric | Value | Benchmark |
-|---|---|---|
-| Dwell Time (Compromise to Detection) | [duration] | [industry benchmark] |
-| MTTD (Initial Compromise to Detection) | [duration] | [comparison to org average] |
-| MTTC (Detection to Containment) | [duration] | [comparison to org average] |
-| MTTR (Detection to Recovery) | [duration] | [comparison to org average] |
-| Escalation Time | [duration] | [SLA target] |
+| Metric | Value | Benchmark / Baseline | Source / Date / Methodology |
+|---|---|---|---|
+| Dwell Time (Compromise to Detection) | [duration] | [industry benchmark or internal baseline] | [source/date/scope/methodology] |
+| MTTD (Initial Compromise to Detection) | [duration] | [comparison to org average] | [source/date/scope/methodology] |
+| MTTC (Detection to Containment) | [duration] | [comparison to org average] | [source/date/scope/methodology] |
+| MTTR (Detection to Recovery) | [duration] | [comparison to org average] | [source/date/scope/methodology] |
+| Escalation Time | [duration] | [SLA target] | [policy/source/date] |
+| Notification Time | [duration] | [SLA/regulatory target] | [policy/source/date] |
 
 ### Root Cause Analysis
 **Method:** [5 Whys / Fishbone / Both]
@@ -354,12 +432,26 @@ root cause, and the number/priority of remediation actions identified.]
 - [Gap or failure identified during retrospective]
 
 ### Remediation Plan
-| ID | Finding | Action | Owner | Priority | Deadline | Ticket |
-|---|---|---|---|---|---|---|
-| REM-001 | [Finding] | [Action] | [Owner] | [P0-P3] | [Date] | [ID] |
+| ID | Finding | Action | Action Owner Accepted | Risk Owner | Priority | Deadline | Closure Criteria | Verification Evidence | Status | Recurrence Check | Ticket |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| REM-001 | [Finding] | [Action] | [Yes/No + owner/date] | [Owner] | [P0-P3] | [Date] | [Criteria] | [Evidence] | [Open/Accepted/Verified Closed/Risk Accepted/Not Evaluable] | [Date/query] | [ID] |
+
+### Verified Remediation Closure
+| Gate | Result | Evidence | Gap / Follow-Up |
+|---|---|---|---|
+| PIR-CLOSURE-01 Decision Log Review | [Pass/Fail] | [source] | [gap] |
+| PIR-CLOSURE-02 Evidence Retention Owner | [Pass/Fail] | [source] | [gap] |
+| PIR-CLOSURE-03 Action Owner Acceptance | [Pass/Fail] | [source] | [gap] |
+| PIR-CLOSURE-04 Risk Owner Approval | [Pass/Fail] | [source] | [gap] |
+| PIR-CLOSURE-05 Closure Criteria | [Pass/Fail] | [source] | [gap] |
+| PIR-CLOSURE-06 Verification Evidence | [Pass/Fail] | [source] | [gap] |
+| PIR-CLOSURE-07 Recurrence Check | [Pass/Fail] | [source] | [gap] |
+| PIR-CLOSURE-08 Benchmark Source / Date / Methodology | [Pass/Fail] | [source] | [gap] |
 
 ### Follow-Up Schedule
 - **Remediation Review Date:** [YYYY-MM-DD -- typically 30 days after PIR]
+- **Recurrence Check Date:** [YYYY-MM-DD -- confirm no repeat incident/control failure]
+- **Evidence Retention Review Date:** [YYYY-MM-DD -- confirm retention/legal-hold status and disposition]
 - **PIR Report Distribution:** [List of recipients]
 - **Playbook Updates Required:** [Yes/No -- list specific playbooks]
 - **Detection Rule Updates Required:** [Yes/No -- list specific rules]
@@ -370,23 +462,27 @@ root cause, and the number/priority of remediation actions identified.]
 
 ## 6. Framework Reference
 
-### NIST SP 800-61 Rev 2 -- Post-Incident Activity
+### NIST SP 800-61 Rev 3 -- Incident Response and CSF 2.0 Profile
 
-NIST SP 800-61 Rev 2 Section 3.4 ("Post-Incident Activity") identifies the post-incident review as one of the most important -- and most frequently omitted -- parts of incident response. Key guidance:
+NIST SP 800-61 Rev 3 is the primary current reference for this skill. It supersedes Rev 2 and reframes incident response as recommendations and considerations aligned to the NIST Cybersecurity Framework 2.0. Use Rev 3 for current PIR structure, governance, communications, coordination, and continuous-improvement expectations.
 
-**Lessons Learned Meetings (Section 3.4.1):**
-- Should be held within several days of the end of the incident for major incidents
-- Participants should include all parties involved in the response
-- Questions to address: What exactly happened and at what times? How well did staff and management perform? What information was needed sooner? Were any steps or actions taken that might have inhibited the recovery? What would the staff and management do differently the next time a similar incident occurs? How could information sharing with other organizations have been improved? What corrective actions can prevent similar incidents in the future? What precursors or indicators should be watched for in the future? What additional tools or resources are needed to detect, analyze, and mitigate future incidents?
+Rev 3 emphasizes that incident response outcomes should feed cybersecurity risk management, not just produce a retrospective document. For PIR work, that means the report should preserve decision rationale, retain evidence under a named owner, convert lessons into accountable remediation actions, and verify that closed actions actually reduced recurrence risk.
 
-**Using Collected Incident Data (Section 3.4.2):**
-- Organizations should focus on collecting actionable data: number of incidents handled, time per incident, objective assessment of each incident, documentation completeness
-- This data supports trend analysis, resource allocation, and detection capability improvement
+### NIST Cybersecurity Framework 2.0
 
-**Evidence Retention (Section 3.4.3):**
-- Organizations should establish a policy for retaining evidence from incidents
-- Retention considerations: prosecution requirements, data retention regulations, organizational policy, cost of storage
-- General guidance: retain evidence for a minimum of the statute of limitations period for applicable laws
+Map PIR findings to CSF 2.0 outcomes where useful:
+
+| CSF 2.0 Area | PIR Use |
+|---|---|
+| Govern | Confirm decision rights, risk ownership, evidence retention, exception approval, and leadership reporting |
+| Identify / Protect | Feed root-cause lessons into asset, vulnerability, access, architecture, and process improvements |
+| Detect | Convert missed or delayed detections into verified detection engineering work with replay evidence |
+| Respond | Improve escalation, containment, communications, evidence handling, and coordination workflows |
+| Recover | Validate restoration, recurrence checks, resilience improvements, and stakeholder communication |
+
+### Legacy NIST SP 800-61 Rev 2 Context
+
+NIST SP 800-61 Rev 2 Section 3.4 remains useful legacy context for lessons-learned prompts, incident data collection, and evidence retention considerations. Do not cite Rev 2 as the primary current framework when Rev 3 is expected. Use it only to supplement the Rev 3 / CSF 2.0 review, especially when older organizational playbooks still reference "Post-Incident Activity" language.
 
 ### Blameless Retrospective Methodology
 
@@ -412,6 +508,8 @@ When the PIR focuses on who made mistakes rather than what systemic conditions e
 
 Documenting lessons learned and remediation actions in a PIR report that is then filed and forgotten produces zero security improvement. Every remediation action must be entered into the organization's work tracking system (Jira, ServiceNow, Azure DevOps) with an owner, priority, deadline, and scheduled review date. The PIR facilitator should schedule a follow-up review (typically 30 days after the PIR) to verify remediation progress.
 
+Ticket creation is not remediation. A ticket can show that work was requested, but it does not prove the root cause was corrected. Require closure criteria, verification evidence, owner acceptance, risk owner approval where needed, and recurrence checks before marking an item **Verified Closed**.
+
 ### Pitfall 4: Stopping Root Cause Analysis at the Proximate Cause
 
 "The attacker exploited an unpatched vulnerability" is a proximate cause, not a root cause. The root cause analysis should continue: Why was the system unpatched? Was there a patch management gap? Was the system excluded from scanning? Was the patch tested and rolled back? Was the vulnerability not prioritized? Stopping at the first "why" produces surface-level remediations (patch this specific system) rather than systemic fixes (improve vulnerability prioritization and patch management process).
@@ -419,6 +517,18 @@ Documenting lessons learned and remediation actions in a PIR report that is then
 ### Pitfall 5: Waiting Too Long to Conduct the PIR
 
 NIST recommends conducting the PIR within several days of incident closure. Waiting weeks or months causes participants to forget critical details, misremember the sequence of events, and lose the emotional context that drives honest reflection. Schedule the PIR meeting before the incident is closed, ideally within 3-5 business days of recovery completion.
+
+### Pitfall 6: Treating Unsourced Benchmarks as Facts
+
+Incident metrics are often misused when "industry average" values are copied without source, date, sector, incident population, or methodology. A stale benchmark can make a response look stronger or weaker than it really was. Always record **Source / Date / Methodology** for external benchmarks and prefer internal rolling baselines when external data is not comparable.
+
+### Pitfall 7: Omitting the Decision Log
+
+PIRs that only reconstruct events miss why responders chose a severity, containment strategy, notification path, recovery order, or evidence-retention approach. Without a decision log, the organization cannot tell whether delays were caused by missing authority, missing information, unclear thresholds, or a deliberate risk tradeoff.
+
+### Pitfall 8: Leaving Evidence Retention Ownerless
+
+Evidence can disappear after ticket closure through log rotation, expired storage, tool retention limits, or unclear legal-hold scope. Assign an evidence retention owner and record the retention period, storage location, legal/regulatory driver, and final disposition plan before the PIR is closed.
 
 ---
 
@@ -436,12 +546,13 @@ This skill processes incident response data including timelines, forensic findin
 
 ## 9. References
 
-1. **NIST SP 800-61 Rev 2** -- Computer Security Incident Handling Guide (Section 3.4: Post-Incident Activity) -- https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final
-2. **NIST Cybersecurity Framework (CSF) -- Recover Function** -- https://www.nist.gov/cyberframework
-3. **Etsy Blameless Post-Mortem Culture** -- Allspaw, J. "Blameless PostMortems and a Just Culture" -- https://codeascraft.com/2012/05/22/blameless-postmortems/
-4. **Google SRE Book -- Chapter 15: Postmortem Culture** -- https://sre.google/sre-book/postmortem-culture/
-5. **IBM Cost of a Data Breach Report** -- https://www.ibm.com/security/data-breach
-6. **Mandiant M-Trends Annual Report** -- https://www.mandiant.com/m-trends
-7. **SANS Incident Handler's Handbook -- Lessons Learned Phase** -- https://www.sans.org/white-papers/33901/
-8. **ISO/IEC 27035-2:2023** -- Information Security Incident Management -- Part 2: Guidelines to Plan and Prepare for Incident Response -- https://www.iso.org/standard/78974.html
-9. **VERIS (Vocabulary for Event Recording and Incident Sharing)** -- http://veriscommunity.net/
+1. **NIST SP 800-61 Rev 3** -- Incident Response Recommendations and Considerations for Cybersecurity Risk Management: A CSF 2.0 Community Profile -- https://csrc.nist.gov/pubs/sp/800/61/r3/final
+2. **NIST Cybersecurity Framework 2.0** -- https://www.nist.gov/cyberframework
+3. **NIST SP 800-61 Rev 2** -- Computer Security Incident Handling Guide (legacy Section 3.4 context) -- https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final
+4. **Etsy Blameless Post-Mortem Culture** -- Allspaw, J. "Blameless PostMortems and a Just Culture" -- https://codeascraft.com/2012/05/22/blameless-postmortems/
+5. **Google SRE Book -- Chapter 15: Postmortem Culture** -- https://sre.google/sre-book/postmortem-culture/
+6. **IBM Cost of a Data Breach Report** -- https://www.ibm.com/security/data-breach
+7. **Mandiant M-Trends Annual Report** -- https://www.mandiant.com/m-trends
+8. **SANS Incident Handler's Handbook -- Lessons Learned Phase** -- https://www.sans.org/white-papers/33901/
+9. **ISO/IEC 27035-2:2023** -- Information Security Incident Management -- Part 2: Guidelines to Plan and Prepare for Incident Response -- https://www.iso.org/standard/78974.html
+10. **VERIS (Vocabulary for Event Recording and Incident Sharing)** -- http://veriscommunity.net/

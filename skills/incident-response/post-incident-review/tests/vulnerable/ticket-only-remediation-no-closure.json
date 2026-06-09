@@ -1,0 +1,120 @@
+{
+  "schema_version": "post-incident-review-fixture/v1",
+  "skill_version": "1.0.1",
+  "case_id": "IR-2026-0179",
+  "fixture_type": "vulnerable",
+  "expected_skill_decision": "not_evaluable_ticket_only_remediation",
+  "incident_summary": {
+    "category": "ransomware_containment",
+    "severity": "SEV-1",
+    "status": "closed",
+    "closure_decision": "not_evaluable",
+    "frameworks_claimed": [
+      "NIST-SP-800-61r3"
+    ]
+  },
+  "decision_log": {
+    "reviewed": false,
+    "source": null,
+    "gaps": [
+      "severity decision has no named decision maker",
+      "containment approach was changed without rationale",
+      "notification clock start is not recorded",
+      "evidence retention decision is missing"
+    ]
+  },
+  "evidence_retention": {
+    "owner": null,
+    "legal_hold_status": "unknown",
+    "retention_period": "standard tool retention",
+    "storage_location": "not recorded",
+    "final_disposition": "not recorded",
+    "gaps": [
+      "EDR telemetry expires in 30 days",
+      "chat export not preserved",
+      "forensic image location not listed",
+      "no legal or regulatory retention owner"
+    ]
+  },
+  "metrics_benchmark": {
+    "metrics": [
+      {
+        "name": "MTTD",
+        "value": "unknown",
+        "baseline": "industry average",
+        "source_name": null,
+        "publication_date": null,
+        "methodology_scope": null
+      },
+      {
+        "name": "MTTR",
+        "value": "2 days",
+        "baseline": "better than normal",
+        "source_name": "slide deck",
+        "publication_date": null,
+        "methodology_scope": "not recorded"
+      }
+    ]
+  },
+  "verified_remediation_closure": {
+    "closure_gate_results": {
+      "PIR-CLOSURE-01": "fail",
+      "PIR-CLOSURE-02": "fail",
+      "PIR-CLOSURE-03": "fail",
+      "PIR-CLOSURE-04": "fail",
+      "PIR-CLOSURE-05": "fail",
+      "PIR-CLOSURE-06": "fail",
+      "PIR-CLOSURE-07": "fail",
+      "PIR-CLOSURE-08": "fail"
+    },
+    "remediation_actions": [
+      {
+        "id": "REM-001",
+        "finding": "RDP was exposed from a broad admin network during the incident.",
+        "action": "Close RDP exposure.",
+        "action_owner_accepted": false,
+        "action_owner": "platform team maybe",
+        "risk_owner": null,
+        "risk_owner_approved": false,
+        "priority": "P0",
+        "deadline": "2026-06-01",
+        "closure_criteria": null,
+        "verification_evidence": [
+          "ticket marked done"
+        ],
+        "status": "closed_in_ticket",
+        "recurrence_check": {
+          "scheduled": false,
+          "completed": false,
+          "date": null,
+          "query": null,
+          "result": null
+        },
+        "tracking": "SEC-5001"
+      },
+      {
+        "id": "REM-002",
+        "finding": "Backup restore failed during recovery.",
+        "action": "Improve backups.",
+        "action_owner_accepted": false,
+        "action_owner": null,
+        "risk_owner": null,
+        "risk_owner_approved": false,
+        "priority": "P1",
+        "deadline": null,
+        "closure_criteria": "team says backups are better",
+        "verification_evidence": [],
+        "status": "open",
+        "recurrence_check": {
+          "scheduled": false,
+          "completed": false,
+          "date": null,
+          "query": null,
+          "result": null
+        },
+        "tracking": "OPS-8820"
+      }
+    ],
+    "reason_not_evaluable": "Ticket closure is used as the only proof of remediation; no owner acceptance, risk owner approval, closure criteria, verification evidence, recurrence check, evidence retention owner, or benchmark source/date/methodology is present."
+  }
+}

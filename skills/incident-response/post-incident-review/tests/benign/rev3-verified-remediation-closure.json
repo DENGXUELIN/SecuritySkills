@@ -1,0 +1,155 @@
+{
+  "schema_version": "post-incident-review-fixture/v1",
+  "skill_version": "1.0.1",
+  "case_id": "IR-2026-0142",
+  "fixture_type": "benign",
+  "expected_skill_decision": "pir_complete_verified_closure",
+  "incident_summary": {
+    "category": "credential_theft",
+    "severity": "SEV-2",
+    "status": "monitoring",
+    "closure_decision": "verified_closed",
+    "frameworks": [
+      "NIST-SP-800-61r3",
+      "NIST-CSF-2.0"
+    ]
+  },
+  "decision_log": {
+    "reviewed": true,
+    "source": "IR-2026-0142-decision-log",
+    "entries": [
+      {
+        "decision": "severity_classification",
+        "timestamp_utc": "2026-05-18T09:20:00Z",
+        "decision_maker_role": "incident_commander",
+        "rationale": "Two production user accounts showed confirmed session hijacking with no confirmed data export.",
+        "alternatives_considered": [
+          "SEV-1",
+          "SEV-3"
+        ],
+        "evidence_source": "triage-notes-2026-05-18"
+      },
+      {
+        "decision": "containment_strategy",
+        "timestamp_utc": "2026-05-18T09:42:00Z",
+        "decision_maker_role": "security_engineering_lead",
+        "rationale": "Force refresh-token revocation first to avoid broad production outage while stopping active sessions.",
+        "alternatives_considered": [
+          "global_logout",
+          "network_block_only"
+        ],
+        "evidence_source": "containment-approval-IR-2026-0142"
+      },
+      {
+        "decision": "evidence_retention",
+        "timestamp_utc": "2026-05-18T10:12:00Z",
+        "decision_maker_role": "legal_liaison",
+        "rationale": "Authentication logs, EDR events, and communications retained for regulatory and insurance review.",
+        "alternatives_considered": [
+          "standard_90_day_retention"
+        ],
+        "evidence_source": "legal-hold-LH-2026-0142"
+      }
+    ]
+  },
+  "evidence_retention": {
+    "owner": "security-operations-records",
+    "legal_hold_status": "active",
+    "retention_period": "3 years",
+    "storage_location": "case-vault/IR-2026-0142",
+    "final_disposition": "legal_review_before_disposal",
+    "artifact_classes": [
+      "authentication_logs",
+      "edr_events",
+      "incident_chat_export",
+      "ticket_history",
+      "forensic_summary"
+    ]
+  },
+  "metrics_benchmark": {
+    "metrics": [
+      {
+        "name": "MTTD",
+        "value": "2h 11m",
+        "baseline": "internal identity incident median: 3h 05m",
+        "source_name": "internal incident metrics warehouse",
+        "publication_date": "2026-06-01",
+        "methodology_scope": "rolling 12-month SEV-1/SEV-2 identity incidents"
+      },
+      {
+        "name": "MTTC",
+        "value": "31m",
+        "baseline": "internal containment target: 60m",
+        "source_name": "IR response SLA",
+        "publication_date": "2026-01-15",
+        "methodology_scope": "approved incident response service target"
+      }
+    ]
+  },
+  "verified_remediation_closure": {
+    "closure_gate_results": {
+      "PIR-CLOSURE-01": "pass",
+      "PIR-CLOSURE-02": "pass",
+      "PIR-CLOSURE-03": "pass",
+      "PIR-CLOSURE-04": "pass",
+      "PIR-CLOSURE-05": "pass",
+      "PIR-CLOSURE-06": "pass",
+      "PIR-CLOSURE-07": "pass",
+      "PIR-CLOSURE-08": "pass"
+    },
+    "remediation_actions": [
+      {
+        "id": "REM-001",
+        "finding": "Refresh tokens were valid after password reset.",
+        "action": "Bind password reset to global refresh-token revocation.",
+        "action_owner_accepted": true,
+        "action_owner": "identity-platform-team",
+        "risk_owner": "customer-identity-service-owner",
+        "risk_owner_approved": true,
+        "priority": "P0",
+        "deadline": "2026-05-25",
+        "closure_criteria": "Password reset invalidates all active refresh tokens for affected tenants.",
+        "verification_evidence": [
+          "unit-test-refresh-token-revocation-2026-05-22",
+          "staging-session-replay-2026-05-22",
+          "production-config-export-2026-05-23"
+        ],
+        "status": "verified_closed",
+        "recurrence_check": {
+          "scheduled": true,
+          "completed": true,
+          "date": "2026-06-06",
+          "query": "identity-refresh-token-post-reset-reuse",
+          "result": "zero matching events"
+        },
+        "tracking": "SEC-4421"
+      },
+      {
+        "id": "REM-002",
+        "finding": "Detection rule missed anomalous token reuse from a new ASN.",
+        "action": "Deploy token-reuse detection with known-positive replay and false-positive review.",
+        "action_owner_accepted": true,
+        "action_owner": "detection-engineering",
+        "risk_owner": "soc-manager",
+        "risk_owner_approved": true,
+        "priority": "P1",
+        "deadline": "2026-06-10",
+        "closure_criteria": "Known-positive replay alerts within five minutes and false-positive rate stays below the approved threshold.",
+        "verification_evidence": [
+          "known-positive-replay-alert-2026-06-03",
+          "false-positive-sample-review-2026-06-05",
+          "siem-rule-deployment-record-2026-06-03"
+        ],
+        "status": "verified_closed",
+        "recurrence_check": {
+          "scheduled": true,
+          "completed": false,
+          "date": "2026-07-05",
+          "query": "token-reuse-recurrence-watch",
+          "result": "scheduled"
+        },
+        "tracking": "DET-1187"
+      }
+    ]
+  }
+}
