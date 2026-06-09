@@ -1,0 +1,63 @@
+{
+  "fixture": "fresh-authenticated-scan-evidence",
+  "expected_skill_decision": {
+    "decision": "Fresh Authenticated",
+    "risk_level": "low",
+    "reason": "The scan minted short-lived credentials in CI, verified authenticated state in each phase, refreshed CSRF tokens, excluded destructive routes, measured coverage, and reset seeded test state."
+  },
+  "dast_auth_evidence": {
+    "tool": "zap-automation-framework",
+    "environment": "ephemeral-staging",
+    "session_source": "pipeline_login_script",
+    "credential_source": "ci_secret_reference",
+    "human_cookie_reused": false
+  },
+  "phase_freshness": {
+    "spider": {
+      "logged_in_checks": 12,
+      "logged_out_checks": 12,
+      "reauth_triggers": 1,
+      "authenticated_urls": 184,
+      "anonymous_urls": 17
+    },
+    "ajax_spider": {
+      "logged_in_checks": 9,
+      "logged_out_checks": 9,
+      "reauth_triggers": 0,
+      "authenticated_urls": 92,
+      "anonymous_urls": 11
+    },
+    "active_scan": {
+      "logged_in_checks": 18,
+      "logged_out_checks": 18,
+      "reauth_triggers": 2,
+      "authenticated_urls": 143,
+      "anonymous_urls": 0
+    }
+  },
+  "csrf_state_controls": {
+    "csrf_refresh_enabled": true,
+    "nonce_refresh_enabled": true,
+    "destructive_routes_excluded": [
+      "/logout",
+      "/account/delete",
+      "/billing/cancel"
+    ],
+    "seeded_tenant": "dast-tenant-2026-06-08",
+    "state_reset_evidence": "snapshot-restored"
+  },
+  "role_tenant_coverage": {
+    "roles_tested": [
+      "standard-user",
+      "tenant-admin"
+    ],
+    "tenant_isolation_checked": true,
+    "fixture_cleanup_passed": true
+  },
+  "waf_rate_limit": {
+    "blocked_requests": 0,
+    "throttled_requests": 3,
+    "retry_policy_configured": true,
+    "scan_window_approved": true
+  }
+}

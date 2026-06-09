@@ -12,7 +12,7 @@ phase: [build, deploy]
 frameworks: [OWASP-Top-10-2021, OWASP-Testing-Guide-v4.2]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -331,6 +331,25 @@ env:
 
 ---
 
+#### 4.2 Authenticated Session Freshness and State Evidence
+
+Authentication configured at scan startup is not enough. Require phase-level evidence that the scanner remained authenticated during spider, Ajax spider, OpenAPI/GraphQL import, and active-scan phases, and that CSRF/state-changing routes were handled safely.
+
+| Gate | Evidence Required | Fail / Not Evaluable When |
+|------|-------------------|---------------------------|
+| `DAST-AUTH-EVID-01` Session source | Browser/script/API login or short-lived token minted by the pipeline, with no copied human browser cookie | Static cookie, copied bearer token, or manually pasted CSRF token is used |
+| `DAST-AUTH-EVID-02` Phase freshness | Logged-in and logged-out checks during spider, Ajax spider, API import, and active scan; re-auth triggers recorded | Auth is checked only before the first request or session expiry is not measured |
+| `DAST-AUTH-EVID-03` Authenticated coverage count | Authenticated URLs, anonymous URLs, excluded URLs, and auth-required URLs by scan phase | Report cannot separate authenticated coverage from public crawl coverage |
+| `DAST-AUTH-EVID-04` CSRF / state token refresh | Token extraction/refresh evidence for form, SPA, and API state-changing requests | Active scan replays stale CSRF tokens, nonces, or anti-forgery headers |
+| `DAST-AUTH-EVID-05` Logout / destructive route controls | Explicit exclusions or disposable seeded data for logout, lockout, account deletion, password reset, billing, admin, and destructive endpoints | Spider can log itself out or mutate shared staging data |
+| `DAST-AUTH-EVID-06` Role / tenant isolation | Role, tenant, seeded user, and fixture cleanup evidence for every authenticated context | Admin-only or single-tenant scan is claimed as broad authenticated coverage |
+| `DAST-AUTH-EVID-07` WAF / rate-limit constraints | Blocked request count, throttling evidence, retry policy, and WAF allowlist or scan window | Missing findings are treated as clean while the scanner was blocked or throttled |
+| `DAST-AUTH-EVID-08` State reset / cleanup | Snapshot restore, fixture cleanup, tenant reset, or disposable environment evidence after active scan | Active scanning can leave persistent test data or broken workflows |
+
+Classify authenticated DAST evidence as **Fresh Authenticated**, **Stale Session**, **CSRF Unsafe**, **Coverage Unknown**, **State Unsafe**, or **Not Evaluable**. A clean report with missing `DAST-AUTH-EVID-*` evidence is not proof that authenticated attack surface was tested.
+
+---
+
 ### Step 5: CI/CD DAST Integration
 
 #### 5.1 Pipeline Integration Patterns
@@ -486,6 +505,12 @@ DAST tools report findings per-URL, producing hundreds of duplicate alerts for t
 | **Medium** | No passive scanning on PRs; no scheduled full scan; OpenAPI spec out of date; no triage workflow; no deduplication; ZAP action unpinned; missing GraphQL scanning; missing security header rules. |
 | **Low** | Suboptimal scan duration settings; cosmetic report formatting; non-critical passive rules disabled. |
 
+**Authenticated-session evidence classification:**
+
+- **High:** Static copied session/CSRF token, stale session during active scan, destructive route reachable, or authenticated coverage count unknown.
+- **Medium:** Session is fresh but role/tenant coverage, WAF evidence, or state reset evidence is incomplete.
+- **Low:** Auth evidence is complete but scan cadence, reporting, or cleanup documentation needs improvement.
+
 ---
 
 ## Output Format
@@ -519,6 +544,17 @@ DAST tools report findings per-URL, producing hundreds of duplicate alerts for t
 | Active scanning (staging) | Yes/No | <workflow file> |
 | API scanning | Yes/No | <OpenAPI/GraphQL import> |
 | Results deduplication | Yes/No | <dedup method> |
+
+### Authenticated Session Evidence
+| Evidence Area | Status | Spider | Ajax / API | Active Scan | Limitations |
+|---------------|--------|--------|------------|-------------|-------------|
+| Session Source | Pass / Fail / Not Evaluable | <login/token source> | <login/token source> | <login/token source> | <gaps> |
+| Session Freshness | Pass / Fail / Not Evaluable | <logged-in/out checks> | <logged-in/out checks> | <logged-in/out checks> | <gaps> |
+| Authenticated Coverage Count | Pass / Fail / Not Evaluable | <auth vs anonymous URLs> | <auth vs anonymous URLs> | <auth vs anonymous URLs> | <gaps> |
+| CSRF / State Token Refresh | Pass / Fail / Not Evaluable | <token evidence> | <token evidence> | <token evidence> | <gaps> |
+| Logout / Destructive Controls | Pass / Fail / Not Evaluable | <exclusions/seed data> | <exclusions/seed data> | <exclusions/seed data> | <gaps> |
+| WAF / Rate-limit Constraints | Pass / Fail / Not Evaluable | <blocked/throttled counts> | <blocked/throttled counts> | <blocked/throttled counts> | <gaps> |
+| State Reset / Cleanup | Pass / Fail / Not Evaluable | <cleanup proof> | <cleanup proof> | <cleanup proof> | <gaps> |
 
 ### Findings
 
@@ -584,6 +620,10 @@ DAST tools report findings per-URL, producing hundreds of duplicate alerts for t
 
 5. **Running only scheduled weekly scans instead of integrating into CI.** Weekly scans create a feedback loop measured in days. Passive baseline scans in CI (on every PR) give developers immediate feedback on security header regressions and configuration issues, while weekly full scans provide comprehensive active testing coverage.
 
+6. **Treating authentication configured as authenticated coverage.** Static cookies, copied bearer tokens, and one-time login checks can expire before active scanning. Require phase-level freshness and authenticated URL counts.
+
+7. **Ignoring CSRF and scan state cleanup.** Active scans can fail CSRF-protected requests or mutate seeded data. Require token refresh evidence, destructive-route exclusions, and reset/cleanup proof.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -614,4 +654,5 @@ This skill processes DAST configuration files that may contain target URLs, auth
 
 ## Changelog
 
+- **1.0.1** -- Added authenticated session freshness and state evidence gates, authenticated coverage output, CSRF refresh checks, WAF/rate-limit evidence, and state reset requirements.
 - **1.0.0** -- Initial release. Full coverage of DAST configuration review against OWASP Top 10:2021 and OWASP Testing Guide v4.2, with ZAP-specific patterns.

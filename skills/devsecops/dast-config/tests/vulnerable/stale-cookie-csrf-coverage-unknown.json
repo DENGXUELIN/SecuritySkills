@@ -1,0 +1,59 @@
+{
+  "fixture": "stale-cookie-csrf-coverage-unknown",
+  "expected_skill_decision": {
+    "decision": "Coverage Unknown",
+    "risk_level": "high",
+    "reason": "The scan uses copied cookies and static CSRF tokens, checks login only once, cannot separate authenticated from anonymous coverage, and leaves destructive routes in scope."
+  },
+  "dast_auth_evidence": {
+    "tool": "zap-automation-framework",
+    "environment": "shared-staging",
+    "session_source": "copied_browser_cookie",
+    "credential_source": "manual",
+    "human_cookie_reused": true
+  },
+  "phase_freshness": {
+    "spider": {
+      "logged_in_checks": 1,
+      "logged_out_checks": 0,
+      "reauth_triggers": 0,
+      "authenticated_urls": null,
+      "anonymous_urls": null
+    },
+    "ajax_spider": {
+      "logged_in_checks": 0,
+      "logged_out_checks": 0,
+      "reauth_triggers": 0,
+      "authenticated_urls": null,
+      "anonymous_urls": null
+    },
+    "active_scan": {
+      "logged_in_checks": 0,
+      "logged_out_checks": 0,
+      "reauth_triggers": 0,
+      "authenticated_urls": null,
+      "anonymous_urls": null
+    }
+  },
+  "csrf_state_controls": {
+    "csrf_refresh_enabled": false,
+    "nonce_refresh_enabled": false,
+    "static_token_reused": true,
+    "destructive_routes_excluded": [],
+    "seeded_tenant": null,
+    "state_reset_evidence": null
+  },
+  "role_tenant_coverage": {
+    "roles_tested": [
+      "admin"
+    ],
+    "tenant_isolation_checked": false,
+    "fixture_cleanup_passed": false
+  },
+  "waf_rate_limit": {
+    "blocked_requests": 187,
+    "throttled_requests": 94,
+    "retry_policy_configured": false,
+    "scan_window_approved": false
+  }
+}
