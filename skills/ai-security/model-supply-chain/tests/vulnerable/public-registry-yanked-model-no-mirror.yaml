@@ -1,0 +1,46 @@
+case_id: MODEL-RET-VULN-001
+description: Pinned public model and adapter cannot be rebuilt or rolled back after upstream removal because continuity evidence is missing.
+model_release:
+  name: vendor-domain-lora-classifier
+  release_id: latest
+  environment: production
+upstream_source:
+  registry: huggingface
+  repository: vendor/domain-lora
+  revision: 8f2b4c1d9a0e
+  sha256_recorded: true
+  access_terms_snapshot: null
+artifact_identity:
+  adapter_digest_pinned: true
+  base_model_reference: example/safety-classifier
+  base_model_revision: null
+  tokenizer_digest: null
+  config_digest: null
+mirror_and_retention:
+  internal_mirror: none
+  registry_retention: best_effort_cache
+  object_lock: false
+  rollback_artifact: latest
+  model_card_snapshot: live_url_only
+rebuild_drill:
+  clean_environment_tested: false
+  upstream_removed_or_gated_scenario: not_tested
+expected_findings:
+  - gate: MODEL-RET-01
+    severity: High
+    reason: Production rebuild and rollback depend on a public registry with no immutable internal mirror.
+  - gate: MODEL-RET-03
+    severity: High
+    reason: Runtime-critical tokenizer, config, base model, and model-card snapshots are not retained.
+  - gate: MODEL-RET-04
+    severity: High
+    reason: The adapter is pinned but its base model and tokenizer identity are mutable or unavailable.
+  - gate: MODEL-RET-05
+    severity: Medium
+    reason: License and access terms are referenced by live URL only.
+  - gate: MODEL-RET-06
+    severity: High
+    reason: Rollback uses latest instead of an immutable internal release ID and digest.
+  - gate: MODEL-RET-07
+    severity: Medium
+    reason: No clean-environment rebuild or rollback drill proves continuity without the upstream registry.
