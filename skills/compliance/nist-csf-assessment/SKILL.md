@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [NIST-CSF-2.0]
 difficulty: intermediate
 time_estimate: "90-180min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -379,6 +379,30 @@ For each subcategory where Current < Target:
 - Assign ownership
 - Map to informative references (specific controls from ISO 27001, NIST SP 800-53, CIS Controls, etc.)
 
+#### 5.4 Target Profile Measurability Gates
+
+For each high-priority target profile gap, require execution evidence before
+treating the target as actionable. Target scores without metrics, owners, dates,
+or evidence sources are planning gaps rather than executable roadmap items.
+
+Required gates:
+
+- **CSF-TARGET-01:** Outcome metric or KRI/KPI is defined for the target gap.
+- **CSF-TARGET-02:** Baseline value and evidence date are recorded.
+- **CSF-TARGET-03:** Target value, threshold, or measurable acceptance criterion
+  is documented.
+- **CSF-TARGET-04:** Accountable owner and delivery team are named.
+- **CSF-TARGET-05:** Due date, milestone cadence, or reassessment checkpoint is
+  time-bounded.
+- **CSF-TARGET-06:** Evidence source or system of record is identified.
+- **CSF-TARGET-07:** Dependencies, budget, third-party actions, data-quality
+  blockers, or governance decisions are captured.
+- **CSF-TARGET-08:** Progress review cadence and next-evidence collection method
+  are defined.
+
+Classify high-priority gaps that fail any of these gates as **Profile Planning
+Gap** findings until the execution evidence is complete.
+
 ---
 
 ### Step 6: Informative References Mapping
@@ -406,6 +430,7 @@ Use the NIST CSF 2.0 Reference Tool for comprehensive mappings.
 | **Significant Gap** | Capability exists but is ad-hoc, inconsistent, or significantly below target profile; Tier 1 when Tier 3 is the target | Material risk; requires dedicated project and resource allocation |
 | **Moderate Gap** | Capability is documented and partially implemented but not consistently applied organization-wide; Tier 2 when Tier 3 is the target | Manageable risk; requires process maturation and broader adoption |
 | **Minor Gap** | Capability is well-established but lacks optimization, metrics, or continuous improvement characteristics; Tier 3 when Tier 4 is the target | Low immediate risk; addressed through continuous improvement program |
+| **Profile Planning Gap** | Target profile gap lacks a metric, baseline, target value, owner, date, evidence source, dependency, or progress cadence | Target profile is not executable; risk of repeated unmet gaps in the next assessment |
 | **Aligned** | Current state meets or exceeds target profile for the subcategory | No action required; maintain current practices |
 
 ---
@@ -424,6 +449,7 @@ Use the NIST CSF 2.0 Reference Tool for comprehensive mappings.
 - **Target Organizational Tier**: [Tier 1-4]
 - **Critical Gaps**: [count]
 - **Significant Gaps**: [count]
+- **Profile Planning Gaps**: [count]
 - **Subcategories Assessed**: [count]
 - **Subcategories at Target**: [count]
 
@@ -459,6 +485,12 @@ Use the NIST CSF 2.0 Reference Tool for comprehensive mappings.
 | GV.OC-01 | Organizational mission informs CSRM | [0-4] | [0-4] | [delta] | [H/M/L] | [refs] |
 | ... | ... | ... | ... | ... | ... | ... |
 
+## Target Profile Execution Plan
+
+| Subcategory | Priority Gap | Metric / KRI | Baseline and Evidence Date | Target Threshold | Owner | Due Date / Cadence | Evidence Source | Dependencies |
+|-------------|--------------|--------------|----------------------------|------------------|-------|--------------------|-----------------|--------------|
+| GV.OV-03 | Board risk reporting not measured | % of board meetings with cyber risk KPI pack | 25%, 2026-05-31 | 100% quarterly | CISO | 2026-09-30 | board packet archive | risk appetite update |
+
 ### IDENTIFY (ID)
 [same table format]
 
@@ -476,6 +508,7 @@ Use the NIST CSF 2.0 Reference Tool for comprehensive mappings.
 
 ## Gap Analysis Summary
 - Total subcategories with gaps: [count]
+- Profile planning gaps: [count]
 - Average gap magnitude: [score]
 - Functions with largest gaps: [list]
 - Quick wins (low effort, high impact): [list]
@@ -575,6 +608,8 @@ Tier 4 — Adaptive
 3. **Assessing subcategories in isolation without considering dependencies.** CSF functions are interdependent. Detection capabilities (DE) are meaningless without response capabilities (RS). Protection (PR) without asset identification (ID.AM) leaves gaps. The assessment must consider the maturity chain across functions, not just individual subcategory scores.
 
 4. **Failing to develop actionable organizational profiles.** The current and target profiles are the primary outputs of a CSF assessment. Many organizations conduct the assessment but do not formalize profiles into living documents that drive investment decisions, resource allocation, and progress tracking. Without profiles, the assessment becomes a one-time exercise rather than a continuous improvement tool.
+
+5. **Treating target scores as an execution plan.** A target profile row that only says "move GV.OV-03 from 2 to 3" is not measurable. It needs a metric, baseline, target threshold, owner, due date, evidence source, dependencies, and review cadence.
 
 ---
 

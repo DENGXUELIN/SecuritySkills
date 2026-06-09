@@ -1,0 +1,53 @@
+---
+case: target-profile-aspirational-scores-only
+expected_result: fail
+description: Target profile states higher scores but lacks execution evidence, making the roadmap unverifiable.
+assessment_scope: enterprise
+target_profile:
+  - subcategory: GV.OV-03
+    current_score: 2
+    target_score: 3
+    priority: high
+    gap: Improve governance oversight.
+    metric: ""
+    baseline_value: ""
+    baseline_evidence_date: ""
+    target_value: ""
+    accountable_owner: ""
+    due_date: ""
+    evidence_source: ""
+    dependencies: []
+    progress_review: ""
+    expected_findings:
+      - CSF-TARGET-01
+      - CSF-TARGET-02
+      - CSF-TARGET-03
+      - CSF-TARGET-04
+      - CSF-TARGET-05
+      - CSF-TARGET-06
+      - CSF-TARGET-07
+      - CSF-TARGET-08
+      - Profile Planning Gap
+  - subcategory: DE.CM-01
+    current_score: 1
+    target_score: 3
+    priority: high
+    gap: Improve monitoring.
+    metric: network_monitoring_maturity
+    baseline_value: ""
+    baseline_evidence_date: ""
+    target_value: better
+    accountable_owner: SOC
+    due_date: someday
+    evidence_source: ""
+    dependencies:
+      - unknown budget
+    progress_review: ""
+    expected_findings:
+      - CSF-TARGET-02
+      - CSF-TARGET-03
+      - CSF-TARGET-05
+      - CSF-TARGET-06
+      - CSF-TARGET-08
+      - Profile Planning Gap
+profile_planning_gap_count: 2

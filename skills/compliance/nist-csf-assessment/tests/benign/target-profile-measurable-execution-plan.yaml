@@ -1,0 +1,65 @@
+---
+case: target-profile-measurable-execution-plan
+expected_result: pass
+description: High-priority NIST CSF target gaps include metrics, baselines, owners, dates, evidence sources, dependencies, and review cadence.
+assessment_scope: enterprise
+target_profile:
+  - subcategory: GV.OV-03
+    current_score: 2
+    target_score: 3
+    priority: high
+    gap: Cybersecurity risk management performance is not reviewed against agreed KPI thresholds every quarter.
+    metric: board_meetings_with_cyber_risk_kpi_pack_percent
+    baseline_value: 25
+    baseline_unit: percent
+    baseline_evidence_date: 2026-05-31
+    target_value: 100
+    target_unit: percent
+    accountable_owner: CISO
+    delivery_team: governance-risk-compliance
+    due_date: 2026-09-30
+    milestone_cadence: monthly
+    evidence_source: board-packet archive and GRC KPI dashboard
+    dependencies:
+      - risk appetite statement refresh
+      - board calendar confirmation
+    progress_review: monthly GRC steering committee
+    gates:
+      CSF-TARGET-01: pass
+      CSF-TARGET-02: pass
+      CSF-TARGET-03: pass
+      CSF-TARGET-04: pass
+      CSF-TARGET-05: pass
+      CSF-TARGET-06: pass
+      CSF-TARGET-07: pass
+      CSF-TARGET-08: pass
+  - subcategory: DE.CM-01
+    current_score: 1
+    target_score: 3
+    priority: high
+    gap: Network monitoring coverage does not include all critical network segments.
+    metric: critical_segments_with_validated_telemetry_percent
+    baseline_value: 62
+    baseline_unit: percent
+    baseline_evidence_date: 2026-05-24
+    target_value: 95
+    target_unit: percent
+    accountable_owner: SOC Manager
+    delivery_team: security-operations
+    due_date: 2026-12-31
+    milestone_cadence: monthly
+    evidence_source: SIEM coverage dashboard and CMDB segment inventory
+    dependencies:
+      - CMDB segment owner cleanup
+      - network TAP procurement approval
+    progress_review: monthly detection coverage review
+    gates:
+      CSF-TARGET-01: pass
+      CSF-TARGET-02: pass
+      CSF-TARGET-03: pass
+      CSF-TARGET-04: pass
+      CSF-TARGET-05: pass
+      CSF-TARGET-06: pass
+      CSF-TARGET-07: pass
+      CSF-TARGET-08: pass
+profile_planning_gap_count: 0
