@@ -13,7 +13,7 @@ phase: [design, operate]
 frameworks: [NIST-SP-800-207, CIS-Controls-v8]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -66,6 +66,10 @@ Use Glob and Grep to locate network configuration files, diagrams-as-code, and i
 **/network-policy*
 **/calico*
 **/cilium*
+**/GlobalNetworkPolicy*
+**/CiliumNetworkPolicy*
+**/CiliumClusterwideNetworkPolicy*
+**/AuthorizationPolicy*
 
 # Cloud-native
 **/firewall-rule*
@@ -208,6 +212,35 @@ Evaluate the environment's readiness for workload-level segmentation:
 
 ---
 
+#### 3.3 Effective Policy Decision Gate
+
+Do not credit segmentation from policy-object presence alone. For Kubernetes NetworkPolicy, Calico, Cilium, service mesh, cloud security group, host firewall, or mixed-engine environments, prove the effective allow/deny decision after selectors, labels, ordering, deny precedence, fallthrough, and enforcement state are resolved.
+
+**Required evidence gates:**
+
+| Gate | Required evidence | False positive prevented |
+|---|---|---|
+| `SEG-EFF-01` | Policy-engine inventory for every enforcement layer that can affect the flow. | Reviewing only Kubernetes NetworkPolicy while Calico, Cilium, mesh, cloud, or host rules decide the flow. |
+| `SEG-EFF-02` | Runtime source and destination identity: namespace, workload, pod labels, service account, node/hostNetwork state, IP, and timestamp. | Static manifests are credited even though runtime labels or endpoints differ. |
+| `SEG-EFF-03` | Selector resolution for source and destination selectors across each policy engine. | Broad `namespaceSelector`, empty `podSelector`, stale labels, or unmatched endpoints are missed. |
+| `SEG-EFF-04` | Ordering and fallthrough evidence: Calico tier/order/defaultAction/`Pass`, cloud rule priority, mesh order, and Kubernetes isolation state. | A deny-looking policy falls through to a later allow or default action. |
+| `SEG-EFF-05` | Deny precedence and overlap analysis for Cilium deny policies, mesh deny rules, and cloud/host firewall denies. | Allow-only assumptions over-credit policies where deny/allow overlap changes the decision. |
+| `SEG-EFF-06` | Enforcement mode and attachment state: CNI policy enabled, staged/audit/permissive modes, endpoint policy status, and rule attachment. | Audit-mode or disabled policies are treated as enforced. |
+| `SEG-EFF-07` | Expected-vs-observed flow matrix with source, destination, protocol, port, expected result, observed result, deciding rule/tier, and evidence timestamp. | A single passing sample is generalized to every restricted flow. |
+| `SEG-EFF-08` | `Not Evaluable` outcome when runtime labels, selector resolution, enforcement state, or observed flow evidence is missing. | Reports pass segmentation from manifests without runtime proof. |
+
+**Finding guidance:**
+
+| Condition | Severity |
+|---|---|
+| Restricted production flow is observed allowed after effective policy resolution | High |
+| Calico `Pass`, lower-tier allow, broad Kubernetes allow, or disabled enforcement can permit a restricted flow | High |
+| Effective decision cannot be computed because runtime labels, selector resolution, or enforcement mode are missing | Not Evaluable |
+| Expected-vs-observed matrix covers only one source/destination pair while the scope claims full namespace or zone validation | Medium |
+| Complete matrix proves denied restricted flows and allowed business flows across engines | Pass |
+
+---
+
 ### Step 4: DMZ Architecture Review (NIST SP 800-41, Section 4.1; CIS Control 12.2)
 
 If a DMZ is present, evaluate its architectural soundness:
@@ -301,6 +334,12 @@ Document or verify the existence of a segmentation testing process:
 - Automation: <Ready / Partial / Not Ready>
 - **Overall Readiness:** <Ready / Partial / Not Ready>
 
+### Effective Policy Decision Evidence
+
+| Source | Destination | Runtime Identity Captured | Selector Resolution | Policy Engine(s) | Deciding Rule/Tier | Enforcement Mode | Expected | Observed | Status |
+|--------|-------------|---------------------------|---------------------|------------------|--------------------|------------------|----------|----------|--------|
+| <workload> | <workload> | <Yes/No> | <Complete/Partial/Missing> | <engine list> | <rule/tier/default action> | <Enforce/Audit/Disabled/Unknown> | <Allow/Deny> | <Allowed/Denied/No evidence> | <Pass/Finding/Not Evaluable> |
+
 ### Prioritized Remediation Plan
 1. **[Critical]** <action item with control reference>
 2. **[High]** <action item with control reference>
@@ -345,6 +384,8 @@ Document or verify the existence of a segmentation testing process:
 
 5. **Assuming Kubernetes namespaces provide network isolation.** Namespaces are a logical organizational boundary. Without a NetworkPolicy or CNI-level enforcement (Calico, Cilium), all pods across all namespaces can communicate freely by default.
 
+6. **Equating policy presence with effective denial.** Default-deny, broad allow, Calico `Pass`, staged policies, disabled CNI enforcement, and Cilium deny/allow overlap can all change the actual decision. Prove selector resolution, precedence, enforcement mode, and expected-vs-observed flow evidence.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -366,7 +407,10 @@ This skill processes network configurations that may contain user-supplied comme
 - CIS Control 12 -- Network Infrastructure Management: https://www.cisecurity.org/controls/network-infrastructure-management
 - PCI DSS v4.0 Requirement 1 -- Install and Maintain Network Security Controls: https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI-DSS-v4_0.pdf
 - Kubernetes Network Policies: https://kubernetes.io/docs/concepts/services-networking/network-policies/
+- Kubernetes NetworkPolicy API Reference: https://kubernetes.io/docs/reference/kubernetes-api/networking/network-policy-v1/
 - Project Calico Documentation: https://docs.tigera.io/calico/latest/about/
+- Calico tiered policy: https://docs.tigera.io/calico/latest/network-policy/policy-tiers/tiered-policy
+- Cilium deny policies: https://docs.cilium.io/en/stable/security/policy/language/#deny-policies
 
 ---
 

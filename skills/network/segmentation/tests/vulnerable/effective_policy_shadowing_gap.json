@@ -1,0 +1,117 @@
+{
+  "case": "vulnerable_effective_policy_shadowing_gap",
+  "skill": "segmentation",
+  "expected_result": "Fail",
+  "scope_claim": "payments namespace is default deny and restricted to approved frontend traffic",
+  "policy_engines": [
+    {
+      "engine": "kubernetes-networkpolicy",
+      "enforcement_mode": "unknown",
+      "objects": [
+        {
+          "kind": "NetworkPolicy",
+          "name": "default-deny",
+          "namespace": "payments",
+          "pod_selector": {},
+          "policy_types": [
+            "Ingress",
+            "Egress"
+          ]
+        },
+        {
+          "kind": "NetworkPolicy",
+          "name": "allow-all-namespaces-to-api",
+          "namespace": "payments",
+          "pod_selector": {
+            "app": "api"
+          },
+          "ingress_from": [
+            {
+              "namespaceSelector": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "engine": "calico",
+      "enforcement_mode": "staged",
+      "objects": [
+        {
+          "kind": "GlobalNetworkPolicy",
+          "name": "security-tier-payments",
+          "tier": "security",
+          "order": 100,
+          "selector": "app == 'payments'",
+          "action": "Pass",
+          "defaultAction": "Pass"
+        },
+        {
+          "kind": "GlobalNetworkPolicy",
+          "name": "application-tier-allow",
+          "tier": "application",
+          "order": 10,
+          "selector": "app == 'payments'",
+          "action": "Allow",
+          "source_selector": "role in {'frontend','batch'}"
+        }
+      ]
+    },
+    {
+      "engine": "cilium",
+      "enforcement_mode": "enabled",
+      "objects": [
+        {
+          "kind": "CiliumNetworkPolicy",
+          "name": "deny-untrusted-to-api",
+          "endpointSelector": {
+            "app": "api"
+          },
+          "ingressDeny": [
+            {
+              "fromEndpoints": {
+                "zone": "untrusted"
+              }
+            }
+          ]
+        },
+        {
+          "kind": "CiliumNetworkPolicy",
+          "name": "allow-frontend-to-api",
+          "endpointSelector": {
+            "app": "api"
+          },
+          "ingress": [
+            {
+              "fromEndpoints": {
+                "role": "frontend"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "runtime_evidence": {
+    "source_labels_captured": false,
+    "destination_labels_captured": false,
+    "selector_resolution": "missing",
+    "endpoint_policy_trace": null,
+    "flow_logs": []
+  },
+  "expected_findings": [
+    "SEG-EFF-01: multiple policy engines affect the same flow",
+    "SEG-EFF-02: runtime source and destination identities are missing",
+    "SEG-EFF-03: selector resolution is missing",
+    "SEG-EFF-04: Calico Pass and lower-tier allow can change the effective decision",
+    "SEG-EFF-05: Cilium deny/allow overlap lacks endpoint decision evidence",
+    "SEG-EFF-06: enforcement mode is unknown or staged for relevant engines",
+    "SEG-EFF-07: expected-vs-observed flow evidence is missing",
+    "SEG-EFF-08: manifest-only evidence must be Not Evaluable"
+  ],
+  "review_decision": {
+    "status": "Fail",
+    "severity_floor": "High",
+    "rationale": "The review claims segmentation from policy presence, but broad Kubernetes allow, Calico Pass fallthrough, Cilium overlap, missing runtime labels, and missing observed flow evidence prevent proving the restricted flow is denied."
+  }
+}

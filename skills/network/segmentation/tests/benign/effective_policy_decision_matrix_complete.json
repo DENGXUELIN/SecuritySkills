@@ -1,0 +1,108 @@
+{
+  "case": "benign_effective_policy_decision_matrix_complete",
+  "skill": "segmentation",
+  "expected_result": "Pass",
+  "scope_claim": "payments database access is restricted to approved API workloads",
+  "policy_engines": [
+    {
+      "engine": "calico",
+      "enforcement_mode": "enforce",
+      "tier_order_documented": true,
+      "default_action_documented": true
+    },
+    {
+      "engine": "kubernetes-networkpolicy",
+      "enforcement_mode": "enforce",
+      "namespace_isolation_documented": true
+    }
+  ],
+  "runtime_inventory": {
+    "timestamp": "2026-06-06T10:52:00Z",
+    "sources": [
+      {
+        "name": "payments/api-7d9f",
+        "namespace": "payments",
+        "service_account": "payments-api",
+        "labels": {
+          "app": "api",
+          "role": "payments-api"
+        },
+        "hostNetwork": false,
+        "ip": "10.40.2.41"
+      },
+      {
+        "name": "batch/recon-2a91",
+        "namespace": "batch",
+        "service_account": "batch-recon",
+        "labels": {
+          "app": "recon",
+          "role": "batch"
+        },
+        "hostNetwork": false,
+        "ip": "10.41.7.18"
+      }
+    ],
+    "destinations": [
+      {
+        "name": "payments/db-0",
+        "namespace": "payments",
+        "labels": {
+          "app": "db",
+          "data_class": "cde"
+        },
+        "ip": "10.40.9.12"
+      }
+    ]
+  },
+  "effective_decision_matrix": [
+    {
+      "source": "payments/api-7d9f",
+      "destination": "payments/db-0",
+      "selector_resolution": "role=payments-api to app=db,data_class=cde",
+      "policy_engines": [
+        "calico",
+        "kubernetes-networkpolicy"
+      ],
+      "deciding_rule": "calico application tier order 10 allow payments-api to db:5432",
+      "enforcement_mode": "enforce",
+      "protocol": "tcp",
+      "port": 5432,
+      "expected": "Allow",
+      "observed": "Allowed",
+      "evidence": "flowlogs/payments-api-db-2026-06-06.json",
+      "status": "Pass"
+    },
+    {
+      "source": "batch/recon-2a91",
+      "destination": "payments/db-0",
+      "selector_resolution": "role=batch does not match approved payments-api selector",
+      "policy_engines": [
+        "calico",
+        "kubernetes-networkpolicy"
+      ],
+      "deciding_rule": "calico security tier order 50 deny then namespace default deny",
+      "enforcement_mode": "enforce",
+      "protocol": "tcp",
+      "port": 5432,
+      "expected": "Deny",
+      "observed": "Denied",
+      "evidence": "flowlogs/batch-db-denied-2026-06-06.json",
+      "status": "Pass"
+    }
+  ],
+  "covered_gates": [
+    "SEG-EFF-01",
+    "SEG-EFF-02",
+    "SEG-EFF-03",
+    "SEG-EFF-04",
+    "SEG-EFF-05",
+    "SEG-EFF-06",
+    "SEG-EFF-07",
+    "SEG-EFF-08"
+  ],
+  "review_decision": {
+    "status": "Pass",
+    "severity_floor": "None",
+    "rationale": "The evidence includes engine inventory, runtime identities, selector resolution, ordering/precedence, enforcement state, and expected-vs-observed flow results for allowed and denied paths."
+  }
+}
