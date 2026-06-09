@@ -13,7 +13,7 @@ phase: [design, build, review]
 frameworks: [OWASP-Agentic-AI, MITRE-ATLAS, NIST-AI-RMF]
 difficulty: advanced
 time_estimate: "45-90min"
-version: "1.0.1"
+version: "1.0.2"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -67,6 +67,7 @@ Before beginning the assessment, gather the following. If any item is unavailabl
 | Human approval gates | Workflow configs, UI code, approval logic | Determines if HITL can be bypassed |
 | Multi-agent communication | Message bus configs, inter-agent protocols, shared state | Identifies trust boundary violations |
 | Error handling and retry logic | Exception handlers, circuit breaker configs | Reveals cascading failure potential |
+| Side-effecting tool semantics | Tool specs, outbox tables, idempotency middleware, workflow engine config | Determines whether retries can duplicate refunds, emails, IAM grants, deployments, or webhooks |
 | Authentication and identity | Auth middleware, token management, agent identity configs | Exposes identity gaps |
 | Rate limiting and quotas | API gateway configs, token budgets, cost controls | Determines resource exhaustion risk |
 | Data flow diagrams | Architecture docs, network diagrams | Shows exfiltration paths |
@@ -278,6 +279,8 @@ In 2023, security researcher Johann Rehberger demonstrated that Bing Chat (now C
 - Absence of circuit breakers or timeout mechanisms in agent orchestration logic.
 - Error handling that catches exceptions but not semantic errors (the agent returned a confidently wrong answer — no exception is thrown).
 - Retry logic without jitter or backoff that can amplify failures under load.
+- Side-effecting tools that retry after timeout without an idempotency key, operation ledger, or outbox record.
+- Human-approved actions whose approval hash is not bound to the exact canonical tool payload that is retried.
 - Multi-agent systems without a health-check or consensus mechanism for critical decisions.
 
 **Real-World Failure Mode:**
@@ -292,6 +295,27 @@ In 2024, a financial services firm reported an incident (disclosed at a CISO rou
 4. Implement idempotent operations and rollback mechanisms for agents that take real-world actions (send emails, update databases, trigger payments).
 5. Set hard limits on chain depth. Define maximum pipeline length and require human review for chains exceeding the limit.
 6. Implement structured error propagation — agents must explicitly signal uncertainty rather than passing through low-confidence outputs as if they were facts.
+
+**Side-Effect Idempotency Evidence Gate:**
+
+For every tool that creates external side effects, record an `AI-IDEM-*` evidence row before marking AG07 or AG09 as controlled. Treat missing evidence as **NOT EVALUABLE** for low-impact actions and **HIGH** for payments, access grants, deployments, customer communication, destructive changes, or irreversible external calls.
+
+| Gate | Evidence Required | Unsafe Pattern |
+|---|---|---|
+| AI-IDEM-01 | Tool inventory classifies read-only, reversible, compensating, and irreversible side effects | High-impact tools are reviewed only as generic API calls |
+| AI-IDEM-02 | Idempotency key or operation ID is derived from actor, target, action type, and canonical payload hash | Retry creates a new downstream operation ID |
+| AI-IDEM-03 | Durable outbox, operation ledger, or workflow history records pending, submitted, succeeded, failed, and replayed states | Agent memory or chat transcript is the only record of attempted action |
+| AI-IDEM-04 | Timeout-after-success behavior is tested and proves the second attempt becomes an idempotent replay | Client timeout triggers the same refund, email, deployment, or grant again |
+| AI-IDEM-05 | Human approval, risk score, and approval TTL bind to the exact canonical payload hash and actor identity | Retry payload can change after approval |
+| AI-IDEM-06 | Compensation feasibility is documented per tool, including irreversible effects that cannot be undone | Rollback plan assumes emails, webhooks, transfers, or external notifications can be deleted |
+| AI-IDEM-07 | Multi-agent deduplication uses a shared ledger across orchestrators, workers, and fallback agents | Two agents can submit the same side effect with different local state |
+| AI-IDEM-08 | Retry budget, backoff, circuit breaker, and alerting distinguish safe idempotent replay from retry storms | Rate limits exist but duplicate side effects are still possible inside the limit |
+
+**False Positive Calibration:**
+
+- Longer retry windows are acceptable when the operation ledger proves exactly-once or safe at-least-once semantics for the side effect.
+- A compensation tool is not equivalent to idempotency when the external effect is irreversible or may already have reached a third party.
+- Approval evidence is only reusable when the retried payload, actor, target, risk score, and approval TTL still match the approved canonical payload hash.
 
 **Framework Mapping:**
 
@@ -343,6 +367,8 @@ In 2024, a red team exercise at a technology company (published in their securit
 - Absence of token budgets or API call limits per agent session.
 - Recursive agent patterns (agent spawns sub-agents that spawn sub-agents) without depth limits.
 - Retry logic without exponential backoff or maximum retry counts.
+- Retry loops that repeatedly invoke non-idempotent side-effecting tools after partial failure or ambiguous downstream status.
+- No distinction between API rate limiting and duplicate side-effect prevention.
 - Agents that process user-supplied data where the data volume is unbounded (e.g., "summarize this 10GB file").
 - No cost monitoring or alerting on LLM API spend.
 - Agents with access to auto-scaling infrastructure where runaway calls can trigger unbounded scale-up.
@@ -360,6 +386,7 @@ In multiple documented incidents throughout 2023-2024, developers using autonomo
 5. Monitor and alert on token consumption rate, API call frequency, and cost accumulation in real time.
 6. Use pre-provisioned, non-auto-scaling infrastructure for agent workloads where possible, or set hard caps on auto-scaling limits.
 7. Implement dead-letter queues for agent tasks that exceed resource limits, enabling post-mortem analysis without continued resource consumption.
+8. Route retries for side-effecting tools through the shared operation ledger used by AI-IDEM-03, and alert when duplicate attempts, replay spikes, or approval-expired retries exceed policy.
 
 **Framework Mapping:**
 
@@ -428,6 +455,10 @@ Grep: "send_message|delegate|dispatch|publish|subscribe|queue" in **/*.{py,ts,js
 
 # Human approval gates
 Grep: "approve|confirm|human_in_the_loop|hitl|review|authorize" in **/*.{py,ts,js,yaml,yml}
+
+# Side-effecting retries and operation ledgers
+Grep: "idempotency|operation_id|outbox|ledger|retry|backoff|timeout|compensat" in **/*.{py,ts,js,yaml,yml,json}
+Grep: "refund|email|deploy|grant|webhook|delete|transfer|payment|ticket" in **/*.{py,ts,js,yaml,yml,json}
 ```
 
 ### Hands-On Assessment Tooling
@@ -494,6 +525,8 @@ Structure the final report as follows:
 - Memory stores: [types]
 - Human approval gates: [present/absent, description]
 - Multi-agent communication: [method]
+- Side-effecting tools: [count and highest-impact action types]
+- Operation ledger / outbox: [present/absent, scope, durability]
 
 ## Findings by Threat Category
 
@@ -513,6 +546,11 @@ Structure the final report as follows:
 |---|---|---|---|
 | AG01 | [rating] | [one-line summary] | [priority] |
 | ... | ... | ... | ... |
+
+## Side-Effect Idempotency Evidence
+| Tool / Action | Side Effect | Idempotency Key / Operation ID | Ledger Scope | Approval Binding | Retry Policy | Compensation Feasibility | Decision |
+|---|---|---|---|---|---|---|---|
+| [tool] | [refund/email/grant/deploy/etc.] | [source and payload hash binding] | [per-agent/shared/external] | [hash, actor, TTL] | [max attempts/backoff/circuit breaker] | [reversible/partial/irreversible] | [safe to retry / unsafe / not evaluable] |
 
 ## Recommendations
 1. [Highest priority recommendation]
@@ -585,6 +623,10 @@ Persistent agent memory is a high-value target because it persists across sessio
 ### 5. Assuming Tool Calls Are Safe Because the Tool Is Legitimate
 
 A tool functioning correctly is not the same as a tool being used correctly. The agent controls what parameters it passes, what sequence it calls tools in, and how it interprets results. A legitimate database query tool becomes an exfiltration vector when the agent is manipulated into querying sensitive tables and sending the results to an external webhook. Secure the tool invocation, not just the tool implementation.
+
+### 6. Confusing Retry Limits With Idempotency
+
+A maximum retry count or API rate limit reduces volume, but it does not prove duplicate side effects are safe. A single retry after a lost response can still duplicate a refund, email, IAM grant, deployment, or customer notification. High-impact tools need a durable operation ledger, payload-bound idempotency key, approval binding, and tested timeout-after-success behavior.
 
 ---
 
