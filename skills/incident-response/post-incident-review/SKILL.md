@@ -13,7 +13,7 @@ phase: [recover]
 frameworks: [NIST-SP-800-61r2]
 difficulty: beginner
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -150,6 +150,28 @@ Root Cause: [Systemic root cause statement]
 - If the chain branches (multiple contributing factors at one level), follow each branch
 - Avoid stopping at "human error" -- always ask what system condition enabled the error
 
+**Root Cause Depth and Recurrence Evidence Gate:**
+
+Do not accept a root cause statement unless it explains whether the incident was a single-instance failure, a team pattern, or an organization-wide control pattern, and whether the remediation prevents recurrence beyond the affected asset.
+
+```
+PIR-RCA-01: RCA stops at proximate cause instead of systemic cause
+PIR-RCA-02: Root cause scope is missing (single-instance, team-pattern, org-wide)
+PIR-RCA-03: Recurrence likelihood is not assessed against similar systems, teams, or prior incidents
+PIR-RCA-04: Recurrence-prevention evidence is scoped only to the affected asset/repo/system
+PIR-RCA-05: Action items do not map back to the RCA branch they are intended to prevent
+```
+
+**Required RCA depth fields:**
+
+| Field | Required Evidence |
+|---|---|
+| RCA depth score | Proximate, contributing, systemic-team, or systemic-org |
+| Scope of root cause | Single asset, team pattern, shared platform, or organization-wide |
+| Recurrence likelihood | Low, Medium, High, or Unknown with supporting similar-incident or inventory evidence |
+| Recurrence prevention evidence | Policy, automation, control, detection, ownership, or rollout proof beyond the affected asset |
+| RCA-to-action linkage | Remediation item IDs mapped to each RCA branch |
+
 #### Method 2: Fishbone (Ishikawa) Diagram
 
 Organize contributing factors into categories to ensure comprehensive analysis:
@@ -227,6 +249,28 @@ MTTR measures the total response duration from detection through return to norma
 | **Escalation Time** | Escalation - Detection | Time from detection to appropriate escalation |
 | **Notification Time** | Notification - Detection | Time from detection to stakeholder/regulatory notification |
 | **Recurrence Rate** | Count of similar incidents in last 12 months | Whether root causes from prior incidents were effectively addressed |
+
+**Blast radius metrics:**
+
+| Metric | What It Measures |
+|---|---|
+| Affected systems | Count and criticality of hosts, workloads, accounts, applications, regions, or tenants impacted |
+| Data records affected | Confirmed, estimated, or unknown records exposed/altered/unavailable |
+| Business process impact | Payments, auth, customer support, production deploy, regulated workflow, or other process disrupted |
+| Revenue / service impact | Downtime, degraded service, fraud loss, remediation cost, or customer-impact estimate |
+| Regulatory notification | Whether legal/privacy notification is required, jurisdiction, and clock start |
+| Blast radius confidence | Confirmed, estimated, unknown, or still investigating |
+
+**Blast Radius, Detection Feedback, and Coordination Gates:**
+
+```
+PIR-BLAST-01: Affected systems, data records, business process impact, or notification obligation are unknown without an investigation owner
+PIR-BLAST-02: Remediation priority is assigned without blast-radius evidence or confidence level
+PIR-DETECT-01: PIR identifies detection gaps but no detection engineering feedback loop is documented
+PIR-DETECT-02: Detection updates are listed without ATT&CK coverage, known-positive replay, or validation evidence
+PIR-COMMS-01: Escalation, owner handoff, or legal/privacy notification delay is documented without a coordination improvement
+PIR-COMMS-02: Escalation matrix, on-call ownership, or notification workflow accuracy is not assessed
+```
 
 ### Step 5: Control Failure Mapping
 
@@ -342,6 +386,30 @@ root cause, and the number/priority of remediation actions identified.]
 
 **Root Cause Statement:** [1-2 sentence definitive statement of the systemic root cause]
 
+**Root Cause Depth:** [proximate / contributing / systemic-team / systemic-org]
+**Scope of Root Cause:** [single-instance / team-pattern / shared-platform / org-wide]
+**Recurrence Likelihood:** [Low / Medium / High / Unknown]
+**Recurrence Prevention Evidence:** [controls proving the class of incident is addressed beyond this asset]
+
+### Blast Radius
+| Dimension | Value | Confidence | Evidence |
+|---|---|---|---|
+| Affected systems | [count/list] | [confirmed/estimated/unknown] | [source] |
+| Data records affected | [count/range/none/unknown] | [confidence] | [source] |
+| Business process impact | [process] | [confidence] | [source] |
+| Revenue / service impact | [impact] | [confidence] | [source] |
+| Regulatory notification | [required/not required/unknown] | [confidence] | [legal/privacy source] |
+
+### Detection Engineering Feedback Loop
+| Control / Rule | Action | ATT&CK Coverage | Validation Evidence | Owner | Deadline |
+|---|---|---|---|---|---|
+| [rule/playbook/log source] | [created/tuned/retired/no-change] | [TTPs covered/missed] | [test/replay/result] | [owner] | [date] |
+
+### Communication and Coordination Assessment
+| Event | Expected SLA | Actual Time | Owner / Team | Issue Found | Improvement |
+|---|---|---|---|---|---|
+| [escalation/notification/handoff] | [SLA] | [duration] | [team] | [gap] | [action] |
+
 ### Control Failure Mapping
 | Control Category | Expected Control | Status | Failure Mode | Improvement |
 |---|---|---|---|---|
@@ -420,6 +488,18 @@ Documenting lessons learned and remediation actions in a PIR report that is then
 
 NIST recommends conducting the PIR within several days of incident closure. Waiting weeks or months causes participants to forget critical details, misremember the sequence of events, and lose the emotional context that drives honest reflection. Schedule the PIR meeting before the incident is closed, ideally within 3-5 business days of recovery completion.
 
+### Pitfall 6: Treating One Fixed Asset as Recurrence Prevention
+
+Patching one host, correcting one CMDB record, or merging one dependency update may close the incident ticket without addressing the class of failure. Require root-cause scope, similar-asset checks, and rollout evidence.
+
+### Pitfall 7: Omitting Blast Radius from Remediation Priority
+
+MTTD, MTTC, and MTTR do not explain business impact by themselves. Remediation priority should be grounded in affected systems, data records, business processes, service impact, and notification obligations.
+
+### Pitfall 8: Leaving Detection and Coordination Lessons as Narrative
+
+Detection rule updates, ATT&CK coverage gaps, escalation matrix drift, legal/privacy notification timing, and handoff failures should become explicit evidence tables with owners and deadlines.
+
 ---
 
 ## 8. Prompt Injection Safety Notice
@@ -445,3 +525,12 @@ This skill processes incident response data including timelines, forensic findin
 7. **SANS Incident Handler's Handbook -- Lessons Learned Phase** -- https://www.sans.org/white-papers/33901/
 8. **ISO/IEC 27035-2:2023** -- Information Security Incident Management -- Part 2: Guidelines to Plan and Prepare for Incident Response -- https://www.iso.org/standard/78974.html
 9. **VERIS (Vocabulary for Event Recording and Incident Sharing)** -- http://veriscommunity.net/
+
+---
+
+## Version History
+
+| Version | Date | Changes |
+|---|---|---|
+| 1.0.1 | 2026-06-09 | Added RCA depth/scope, blast radius, detection feedback, and communication coordination evidence gates |
+| 1.0.0 | 2025-03-06 | Initial release |

@@ -1,0 +1,79 @@
+{
+  "case_id": "vulnerable-proximate-rca-no-blast-radius-or-feedback",
+  "skill": "post-incident-review",
+  "expected_result": "findings",
+  "incident": {
+    "type": "dependency exploitation",
+    "severity": "SEV-2",
+    "reported_business_impact": "contained",
+    "data_impact": "unknown"
+  },
+  "root_cause_analysis": {
+    "method": "5 Whys",
+    "chain": [
+      "Attacker exploited vulnerable library in production",
+      "Library version was two years old",
+      "Dependabot PR was never merged",
+      "PR required manual approval and was deprioritized"
+    ],
+    "root_cause_statement": "The application had an old dependency.",
+    "scope": null,
+    "recurrence_likelihood": null,
+    "similar_assets_checked": false,
+    "recurrence_prevention_evidence": [
+      "merged one Dependabot PR in the affected repository"
+    ],
+    "rca_to_action_map": {}
+  },
+  "blast_radius": {
+    "affected_systems": "unknown",
+    "data_records_affected": "unknown",
+    "business_process_impact": "not assessed",
+    "regulatory_notification_required": "not assessed",
+    "confidence": "unknown"
+  },
+  "detection_feedback_loop": {
+    "new_rules_created": [],
+    "existing_rules_tuned": [],
+    "attack_coverage_map": null,
+    "known_positive_replay": "not_run"
+  },
+  "communication_assessment": {
+    "soc_to_owner_delay_hours": 8,
+    "escalation_matrix_current": false,
+    "legal_notification_workflow": "missing",
+    "coordination_improvement": null
+  },
+  "expected_findings": [
+    {
+      "id": "PIR-RCA-01",
+      "severity": "High",
+      "reason": "RCA stops at an old dependency/proximate cause instead of a systemic update policy failure."
+    },
+    {
+      "id": "PIR-RCA-02",
+      "severity": "Medium",
+      "reason": "Root cause scope is not classified as single-instance, team-pattern, or org-wide."
+    },
+    {
+      "id": "PIR-RCA-04",
+      "severity": "High",
+      "reason": "Recurrence prevention evidence fixes only the affected repository."
+    },
+    {
+      "id": "PIR-BLAST-01",
+      "severity": "High",
+      "reason": "Affected systems, data records, business impact, and notification obligation are unknown."
+    },
+    {
+      "id": "PIR-DETECT-01",
+      "severity": "Medium",
+      "reason": "No detection engineering feedback loop or ATT&CK coverage validation is documented."
+    },
+    {
+      "id": "PIR-COMMS-01",
+      "severity": "Medium",
+      "reason": "Escalation matrix drift caused delayed system-owner notification and no corrective action is assigned."
+    }
+  ]
+}

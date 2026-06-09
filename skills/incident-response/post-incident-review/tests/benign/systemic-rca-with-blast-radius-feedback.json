@@ -1,0 +1,78 @@
+{
+  "case_id": "benign-systemic-rca-with-blast-radius-feedback",
+  "skill": "post-incident-review",
+  "expected_result": "acceptable_pir_evidence",
+  "incident": {
+    "type": "internet-facing vulnerability exploitation",
+    "severity": "SEV-2",
+    "affected_systems": 3,
+    "data_records_affected": 0,
+    "business_process_impact": "customer portal read-only outage",
+    "regulatory_notification_required": false
+  },
+  "root_cause_analysis": {
+    "method": "5 Whys plus fishbone",
+    "depth": "systemic-team",
+    "scope": "shared-platform",
+    "root_cause_statement": "Patch SLA enforcement depended on manually maintained CMDB criticality, and the onboarding workflow did not reconcile internet exposure from asset discovery.",
+    "recurrence_likelihood": "Medium",
+    "recurrence_prevention_evidence": [
+      "internet exposure inventory now reconciles to CMDB criticality daily",
+      "patch SLA policy applies to all internet-facing assets regardless of manual priority",
+      "15 similar services were checked and remediated"
+    ],
+    "rca_to_action_map": {
+      "REM-001": "automated exposure-to-CMDB reconciliation",
+      "REM-002": "patch SLA enforcement policy",
+      "REM-003": "similar-asset review"
+    }
+  },
+  "blast_radius": {
+    "affected_systems": {
+      "value": 3,
+      "confidence": "confirmed",
+      "evidence": "EDR host list and load balancer logs"
+    },
+    "data_records_affected": {
+      "value": 0,
+      "confidence": "confirmed",
+      "evidence": "database audit logs and DLP review"
+    },
+    "service_impact": "43 minutes of read-only mode",
+    "notification": "privacy counsel confirmed no notification required"
+  },
+  "detection_feedback_loop": [
+    {
+      "rule": "Apache Struts exploit attempt",
+      "action": "created",
+      "attack_coverage": [
+        "T1190",
+        "T1505"
+      ],
+      "validation_evidence": "known-positive replay passed",
+      "owner": "soc-detections"
+    }
+  ],
+  "communication_assessment": [
+    {
+      "event": "SOC to service owner escalation",
+      "expected_sla_minutes": 30,
+      "actual_minutes": 24,
+      "escalation_matrix_current": true,
+      "decision": "acceptable"
+    }
+  ],
+  "gate_results": {
+    "PIR-RCA-01": "pass",
+    "PIR-RCA-02": "pass",
+    "PIR-RCA-03": "pass",
+    "PIR-RCA-04": "pass",
+    "PIR-RCA-05": "pass",
+    "PIR-BLAST-01": "pass",
+    "PIR-BLAST-02": "pass",
+    "PIR-DETECT-01": "pass",
+    "PIR-DETECT-02": "pass",
+    "PIR-COMMS-01": "pass",
+    "PIR-COMMS-02": "pass"
+  }
+}
