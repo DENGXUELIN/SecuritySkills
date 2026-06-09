@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [MITRE-ATT&CK-v16, NIST-SP-800-92]
 difficulty: intermediate
 time_estimate: "20-40min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -119,6 +119,7 @@ Understand what each log source provides and which ATT&CK data sources it maps t
 | AWS CloudTrail | AWS | API calls -- CreateUser, AttachUserPolicy, RunInstances, PutBucketPolicy | Cloud Service (DS0025) |
 | Azure Activity Log | Azure | Resource operations -- create, delete, modify at the control plane | Cloud Service (DS0025) |
 | GCP Cloud Audit Logs | GCP | Admin activity, data access, system events | Cloud Service (DS0025) |
+| Kubernetes audit log | Kubernetes | API server requests -- pods/exec, pods/attach, pods/portforward, secrets access, RBAC changes, impersonation | Cloud Service (DS0025), Command (DS0017), User Account (DS0002) |
 | Microsoft 365 Unified Audit Log | SaaS | Exchange, SharePoint, Teams, Azure AD activity | Application Log (DS0015) |
 
 ### Step 2: Critical Windows Event IDs
@@ -249,6 +250,42 @@ Identify deviations from established baselines that may indicate malicious activ
 | **Relational** | Normal user-to-resource access patterns | Access to resources outside normal scope | Finance user accessing engineering source code repository |
 | **Protocol** | Expected protocols on network segments | Unexpected protocol usage | DNS over HTTPS (DoH) from a workstation, or SMB on an internet-facing interface |
 
+#### Kubernetes Audit Event Evidence
+
+When Kubernetes audit logs are in scope, do not collapse events into generic JSON write/read activity. Preserve the API-server fields that define security meaning:
+
+| Field | Why it matters |
+|-------|----------------|
+| `verb` | Distinguishes `get/list/watch` from `create/update/patch/delete` and interactive subresource access. |
+| `stage` | `ResponseComplete` usually proves final outcome; `ResponseStarted` is expected for long-running `exec`, `attach`, and `portforward` streams. |
+| `user.username` and `user.groups` | Separates human admins, service accounts, controllers, and node identities. |
+| `impersonatedUser` | Shows delegated identity and must be attributed separately from the caller. |
+| `sourceIPs` and `userAgent` | Supports source and tool baselining for `kubectl`, controllers, CI bots, and provider agents. |
+| `objectRef.resource`, `namespace`, `name`, and `subresource` | Preserves high-risk resources such as `secrets`, `rolebindings`, `clusterrolebindings`, `pods/exec`, `pods/attach`, and `pods/portforward`. |
+| `requestURI` | Confirms exact API path, query parameters, and subresource when `objectRef` is incomplete. |
+| `responseStatus.code` | Separates allowed access from denied probing; repeated 401/403 against sensitive resources is suspicious but different from successful access. |
+| Audit policy level | `Metadata` may be sufficient for identity and object access, while `RequestResponse` may include sensitive values and requires redaction handling. |
+
+Use these finding IDs when analyzing Kubernetes audit logs:
+
+| Finding ID | Condition | ATT&CK mapping |
+|------------|-----------|----------------|
+| LOG-K8S-01 | `pods/exec`, `pods/attach`, or `pods/portforward` is used by an unexpected human, source IP, namespace, or tool | T1609 -- Container Administration Command |
+| LOG-K8S-02 | Human or workload identity reads `secrets` or `configmaps` outside its baseline or namespace scope | T1552 -- Unsecured Credentials |
+| LOG-K8S-03 | `impersonatedUser` is present without expected delegated-admin context or approval evidence | T1098 -- Account Manipulation |
+| LOG-K8S-04 | RBAC objects such as roles, rolebindings, clusterroles, or clusterrolebindings are created, patched, or deleted outside change context | T1098 -- Account Manipulation |
+| LOG-K8S-05 | Repeated 401/403 responses against sensitive resources indicate RBAC probing or token misuse | T1087 -- Account Discovery |
+| LOG-K8S-06 | Privileged pod, hostPath, hostNetwork, or node-level object changes occur outside expected controller activity | T1611 -- Escape to Host |
+| LOG-K8S-07 | Audit stage or policy level is insufficient to determine final outcome, requiring a visibility-gap finding instead of confirmed abuse | N/A |
+| LOG-K8S-08 | Managed Kubernetes provider field mappings are not normalized before analysis, causing loss of user, objectRef, or responseStatus semantics | N/A |
+
+False-positive guardrails:
+
+- Baseline controllers and operators by `user.username`, groups, `userAgent`, namespace, objectRef, and recurring cadence before escalating write verbs.
+- Treat denied events as reconnaissance or policy-noise until a matching successful event or broader pattern is found.
+- Prefer `ResponseComplete` for outcome analysis, but preserve `ResponseStarted` for streaming subresources such as exec, attach, and portforward.
+- Redact request and response bodies when audit policy level includes sensitive data.
+
 ### Step 6: Baseline Establishment
 
 **NIST SP 800-92 alignment:** NIST SP 800-92, Section 4.2, recommends establishing baselines for log data to enable anomaly detection. Baselines should be built from a minimum of 30 days of clean (non-compromised) data.
@@ -337,7 +374,7 @@ Produce log analysis findings in this structure:
 ```markdown
 ## Security Log Analysis Report
 **Date:** [YYYY-MM-DD]
-**Skill:** log-analysis v1.0.0
+**Skill:** log-analysis v1.0.1
 **Frameworks:** MITRE ATT&CK v16, NIST SP 800-92
 **Analyst:** [Name or AI-assisted]
 
@@ -376,6 +413,11 @@ Produce log analysis findings in this structure:
 
 ### Baseline Observations
 [Any baseline deviations noted, with comparison to established norms]
+
+### Kubernetes Audit Evidence
+| Timestamp | Verb | Stage | User / impersonated user | Source IP / userAgent | Object reference | Response | Assessment | Finding ID |
+|-----------|------|-------|--------------------------|-----------------------|------------------|----------|------------|------------|
+| [UTC] | [verb] | [stage] | [caller -> impersonated] | [source / userAgent] | [namespace/resource/name/subresource] | [code] | [Benign / Suspicious / Visibility gap] | [LOG-K8S-## or N/A] |
 
 ### Visibility Gaps
 [Log sources that were not available but would have provided relevant data]
@@ -478,3 +520,7 @@ This skill processes user-supplied content that may include raw log data, event 
 9. **AWS CloudTrail Event Reference** -- https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference.html
 10. **Azure Activity Log Schema** -- https://learn.microsoft.com/en-us/azure/azure-monitor/essentials/activity-log-schema
 11. **NIST SP 800-61 Rev 2 -- Incident Handling Guide** -- https://csrc.nist.gov/publications/detail/sp/800-61/rev-2/final
+12. **Kubernetes Auditing** -- https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/
+13. **Kubernetes Audit Configuration v1** -- https://kubernetes.io/docs/reference/config-api/apiserver-audit.v1/
+14. **Kubernetes User Impersonation** -- https://kubernetes.io/docs/reference/access-authn-authz/authentication/#user-impersonation
+15. **MITRE ATT&CK T1609 -- Container Administration Command** -- https://attack.mitre.org/techniques/T1609/

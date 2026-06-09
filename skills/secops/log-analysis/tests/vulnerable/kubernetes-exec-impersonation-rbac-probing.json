@@ -1,0 +1,85 @@
+{
+  "scenario": "suspicious_kubernetes_exec_impersonation_and_rbac_probing",
+  "log_source": "kubernetes_audit",
+  "expected_result": {
+    "assessment": "suspicious",
+    "finding_ids": ["LOG-K8S-01", "LOG-K8S-03", "LOG-K8S-05"],
+    "notes": "Human kubectl exec, delegated service-account impersonation, and repeated denied secrets listing require separate triage instead of generic create/get handling."
+  },
+  "events": [
+    {
+      "kind": "Event",
+      "apiVersion": "audit.k8s.io/v1",
+      "verb": "create",
+      "stage": "ResponseStarted",
+      "user": {
+        "username": "alice",
+        "groups": ["dev-team", "system:authenticated"]
+      },
+      "userAgent": "kubectl/v1.30.0",
+      "sourceIPs": ["203.0.113.10"],
+      "objectRef": {
+        "resource": "pods",
+        "namespace": "prod",
+        "name": "api-7f9",
+        "subresource": "exec"
+      },
+      "requestURI": "/api/v1/namespaces/prod/pods/api-7f9/exec?command=sh&stdin=true&stdout=true&tty=true",
+      "responseStatus": {
+        "code": 101
+      },
+      "auditID": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "level": "Metadata"
+    },
+    {
+      "kind": "Event",
+      "apiVersion": "audit.k8s.io/v1",
+      "verb": "get",
+      "stage": "ResponseComplete",
+      "user": {
+        "username": "bob",
+        "groups": ["platform-admins", "system:authenticated"]
+      },
+      "impersonatedUser": {
+        "username": "system:serviceaccount:prod:deploy-bot",
+        "groups": ["system:serviceaccounts", "system:serviceaccounts:prod"]
+      },
+      "userAgent": "kubectl/v1.30.0",
+      "sourceIPs": ["198.51.100.25"],
+      "objectRef": {
+        "resource": "secrets",
+        "namespace": "prod",
+        "name": "payment-api-env"
+      },
+      "requestURI": "/api/v1/namespaces/prod/secrets/payment-api-env",
+      "responseStatus": {
+        "code": 200
+      },
+      "auditID": "bbbbbbbb-cccc-dddd-eeee-ffffffffffff",
+      "level": "Metadata"
+    },
+    {
+      "kind": "Event",
+      "apiVersion": "audit.k8s.io/v1",
+      "verb": "list",
+      "stage": "ResponseComplete",
+      "user": {
+        "username": "carol",
+        "groups": ["contractor", "system:authenticated"]
+      },
+      "userAgent": "kubectl/v1.30.0",
+      "sourceIPs": ["203.0.113.77"],
+      "objectRef": {
+        "resource": "secrets",
+        "namespace": "prod"
+      },
+      "requestURI": "/api/v1/namespaces/prod/secrets",
+      "responseStatus": {
+        "code": 403,
+        "reason": "Forbidden"
+      },
+      "auditID": "cccccccc-dddd-eeee-ffff-000000000000",
+      "level": "Metadata"
+    }
+  ]
+}

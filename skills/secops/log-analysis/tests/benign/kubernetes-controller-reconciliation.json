@@ -1,0 +1,32 @@
+{
+  "scenario": "benign_kubernetes_controller_reconciliation",
+  "log_source": "kubernetes_audit",
+  "expected_result": {
+    "assessment": "benign_baselined_controller_activity",
+    "finding_ids": [],
+    "notes": "Controller-manager lease updates are normal when user, userAgent, namespace, objectRef, stage, and responseStatus match baseline."
+  },
+  "event": {
+    "kind": "Event",
+    "apiVersion": "audit.k8s.io/v1",
+    "verb": "update",
+    "stage": "ResponseComplete",
+    "user": {
+      "username": "system:kube-controller-manager",
+      "groups": ["system:authenticated"]
+    },
+    "userAgent": "kube-controller-manager/v1.30.0",
+    "sourceIPs": ["10.0.0.12"],
+    "objectRef": {
+      "resource": "leases",
+      "namespace": "kube-system",
+      "name": "kube-controller-manager"
+    },
+    "requestURI": "/apis/coordination.k8s.io/v1/namespaces/kube-system/leases/kube-controller-manager",
+    "responseStatus": {
+      "code": 200
+    },
+    "auditID": "11111111-2222-3333-4444-555555555555",
+    "level": "Metadata"
+  }
+}
