@@ -1,0 +1,93 @@
+{
+  "case_id": "IR-2026-0610",
+  "expected_skill_decision": "disk_acquisition_feasible",
+  "incident_context": {
+    "severity": "P1",
+    "legal_hold": "issued",
+    "examiner": "forensics-team",
+    "collection_window_utc": "2026-06-10T03:00:00Z/2026-06-10T07:00:00Z"
+  },
+  "targets": [
+    {
+      "source_id": "LAPTOP-HR-119",
+      "platform": "Windows 11",
+      "state": "powered_on",
+      "volume_id": "bitlocker-volume-c",
+      "protector_inventory": {
+        "encryption": "BitLocker",
+        "protectors": [
+          {
+            "type": "TPM",
+            "protector_id": "TPM-22"
+          },
+          {
+            "type": "RecoveryPassword",
+            "protector_id": "RP-8842"
+          }
+        ],
+        "partial_encryption_map": "C: encrypted, recovery partition readable, external USB evidence drive not encrypted"
+      },
+      "fve_escrow_evidence": {
+        "gate_ids": [
+          "FVE-ESCROW-01",
+          "FVE-ESCROW-02",
+          "FVE-ESCROW-03",
+          "FVE-ESCROW-04",
+          "FVE-ESCROW-05",
+          "FVE-ESCROW-07",
+          "FVE-ESCROW-08"
+        ],
+        "escrow_location": "Intune device recovery-key record",
+        "accessor_role": "forensic-key-custodian",
+        "custody_reference": "COC-2026-0610-004",
+        "key_version": "RP-8842",
+        "test_unlock": {
+          "method": "read-only mount validation on isolated forensic workstation",
+          "result": "pass",
+          "timestamp_utc": "2026-06-10T03:42:00Z"
+        },
+        "live_session_fallback": {
+          "required": false,
+          "reason": "offline recovery key is independently escrowed and test unlock passed"
+        }
+      },
+      "acquisition_decision": {
+        "decision": "proceed_with_powered_off_full_disk_image",
+        "notes": "Capture memory first because system is powered on, then shut down under custody and image the full disk with verified recovery-password unlock."
+      }
+    },
+    {
+      "source_id": "aws-ebs-vol-0abc",
+      "platform": "AWS EC2",
+      "state": "cloud_volume",
+      "snapshot_id": "snap-0def",
+      "fve_escrow_evidence": {
+        "gate_ids": [
+          "FVE-ESCROW-01",
+          "FVE-ESCROW-03",
+          "FVE-ESCROW-04",
+          "FVE-ESCROW-06",
+          "FVE-ESCROW-08"
+        ],
+        "kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/forensic-case-key",
+        "kms_grant_id": "grant-ir-2026-0610",
+        "forensic_role": "arn:aws:iam::111122223333:role/ForensicSnapshotReader",
+        "decrypt_copy_proof": {
+          "copy_snapshot_id": "snap-copy-0fed",
+          "dry_run": "DecodeAuthorizationMessage allowed CreateGrant, Decrypt, ReEncryptFrom",
+          "export_hash_sha256": "b8d4f0d34c91772df0ef51ebc4dd559ff77fe9a12aa1293de75b3b6b54207e35"
+        }
+      },
+      "acquisition_decision": {
+        "decision": "snapshot_evidence_complete",
+        "notes": "Encrypted snapshot was copied under forensic role and hash recorded before analysis."
+      }
+    }
+  ],
+  "output_expectations": {
+    "include_encryption_feasibility_gate": true,
+    "disk_evidence_status": "complete_after_memory_capture",
+    "cloud_evidence_status": "complete_with_decrypt_copy_proof",
+    "not_evaluable": false
+  }
+}

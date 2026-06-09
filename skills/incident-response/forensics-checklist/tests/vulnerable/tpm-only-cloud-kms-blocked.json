@@ -1,0 +1,93 @@
+{
+  "case_id": "IR-2026-0611",
+  "expected_skill_decision": "not_evaluable_until_escrow_or_live_fallback",
+  "incident_context": {
+    "severity": "P1",
+    "legal_hold": "issued",
+    "examiner": "forensics-team",
+    "collection_window_utc": "2026-06-11T02:00:00Z/2026-06-11T06:00:00Z"
+  },
+  "targets": [
+    {
+      "source_id": "LAPTOP-FIN-077",
+      "platform": "Windows 11",
+      "state": "powered_on",
+      "volume_id": "bitlocker-volume-c",
+      "protector_inventory": {
+        "encryption": "BitLocker",
+        "protectors": [
+          {
+            "type": "TPM",
+            "protector_id": "TPM-ONLY"
+          }
+        ],
+        "partial_encryption_map": "unknown"
+      },
+      "claimed_collection_plan": {
+        "step": "shut down laptop and image internal SSD tonight",
+        "encryption_note": "BitLocker enabled; recovery key available in IT portal"
+      },
+      "fve_escrow_evidence": {
+        "gate_ids_present": [
+          "FVE-ESCROW-01"
+        ],
+        "gate_ids_missing": [
+          "FVE-ESCROW-02",
+          "FVE-ESCROW-03",
+          "FVE-ESCROW-04",
+          "FVE-ESCROW-05",
+          "FVE-ESCROW-07",
+          "FVE-ESCROW-08"
+        ],
+        "escrow_location": "not found in Intune or Entra device record",
+        "user_only_source": "user personal cloud note inaccessible after containment",
+        "test_unlock": {
+          "result": "not_tested",
+          "reason": "no recovery password or key ID available"
+        },
+        "live_session_fallback": {
+          "required": true,
+          "missing_from_plan": true
+        }
+      },
+      "acquisition_decision": {
+        "decision": "do_not_power_off",
+        "severity": "P1",
+        "notes": "Capture memory, volatile state, pagefile or hibernation artifacts, and authorized live logical evidence before shutdown. Powered-off full-disk imaging is blocked until independent escrow is proven."
+      }
+    },
+    {
+      "source_id": "aws-ebs-vol-0bad",
+      "platform": "AWS EC2",
+      "state": "cloud_volume",
+      "snapshot_id": "snap-0bad",
+      "claimed_collection_plan": {
+        "step": "snapshot created and marked as disk evidence complete",
+        "encryption_note": "AWS managed encryption"
+      },
+      "fve_escrow_evidence": {
+        "gate_ids_missing": [
+          "FVE-ESCROW-03",
+          "FVE-ESCROW-04",
+          "FVE-ESCROW-06",
+          "FVE-ESCROW-08"
+        ],
+        "kms_key_id": "arn:aws:kms:us-east-1:111122223333:key/app-prod-key",
+        "forensic_role": "arn:aws:iam::111122223333:role/ForensicSnapshotReader",
+        "kms_grant_or_policy": "forensic role denied kms:Decrypt and ec2:CopySnapshot",
+        "decrypt_copy_proof": null
+      },
+      "acquisition_decision": {
+        "decision": "snapshot_not_complete",
+        "severity": "P1",
+        "notes": "Snapshot creation without decrypt or copy authority is not sufficient cloud disk evidence."
+      }
+    }
+  ],
+  "output_expectations": {
+    "include_encryption_feasibility_gate": true,
+    "disk_evidence_status": "blocked_live_fallback_required",
+    "cloud_evidence_status": "blocked_kms_decrypt_missing",
+    "not_evaluable": true
+  }
+}
