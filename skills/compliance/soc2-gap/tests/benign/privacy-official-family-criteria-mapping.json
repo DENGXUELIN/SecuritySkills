@@ -1,0 +1,55 @@
+{
+  "case_id": "benign-privacy-official-family-criteria-mapping",
+  "skill": "soc2-gap",
+  "expected_result": "acceptable_privacy_criteria_mapping",
+  "scope": {
+    "security": "in_scope",
+    "privacy": "in_scope",
+    "source_version": "2017 AICPA Trust Services Criteria with 2022 revised points of focus"
+  },
+  "privacy_evidence_mapping": [
+    {
+      "evidence": "current public privacy notice and notice-change log",
+      "criteria_id": "P1.1",
+      "evidence_family": "notice",
+      "result": "valid"
+    },
+    {
+      "evidence": "consent management platform export with consequences of opt-out shown",
+      "criteria_id": "P2.1",
+      "evidence_family": "choice_and_consent",
+      "result": "valid"
+    },
+    {
+      "evidence": "DSAR access workflow with identity verification and completed access request log",
+      "criteria_id": "P5.1",
+      "evidence_family": "access",
+      "result": "valid"
+    },
+    {
+      "evidence": "authorized disclosure register and subprocessor transfer log",
+      "criteria_id": "P6.2",
+      "evidence_family": "authorized_disclosure_records",
+      "result": "valid"
+    },
+    {
+      "evidence": "breach notification playbook and regulator notification decision record",
+      "criteria_id": "P6.6",
+      "evidence_family": "breach_notification",
+      "result": "valid"
+    },
+    {
+      "evidence": "privacy complaint register and quarterly privacy monitoring review",
+      "criteria_id": "P8.1",
+      "evidence_family": "monitoring_and_enforcement",
+      "result": "valid"
+    }
+  ],
+  "invalid_privacy_ids": [],
+  "gate_results": {
+    "SOC2-PRIV-ID-01": "pass",
+    "SOC2-PRIV-ID-02": "pass",
+    "SOC2-PRIV-ID-03": "pass",
+    "SOC2-PRIV-ID-04": "pass"
+  }
+}

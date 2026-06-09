@@ -1,0 +1,53 @@
+{
+  "case_id": "vulnerable-privacy-flattened-p1-fabricated-ids",
+  "skill": "soc2-gap",
+  "expected_result": "findings",
+  "scope": {
+    "security": "in_scope",
+    "privacy": "in_scope",
+    "source_version": "2017 AICPA Trust Services Criteria with 2022 revised points of focus"
+  },
+  "privacy_evidence_mapping": [
+    {
+      "evidence": "consent platform opt-in and opt-out export",
+      "criteria_id": "P1.2",
+      "claimed_family": "choice_and_consent",
+      "correct_criteria_id": "P2.1"
+    },
+    {
+      "evidence": "DSAR access and correction tickets",
+      "criteria_id": "P1.5",
+      "claimed_family": "access",
+      "correct_criteria_id": "P5.1/P5.2"
+    },
+    {
+      "evidence": "subprocessor disclosure list and breach notification playbook",
+      "criteria_id": "P1.6",
+      "claimed_family": "disclosure_and_notification",
+      "correct_criteria_id": "P6.2/P6.4/P6.6"
+    },
+    {
+      "evidence": "privacy complaint log and quarterly monitoring review",
+      "criteria_id": "P1.8",
+      "claimed_family": "monitoring_and_enforcement",
+      "correct_criteria_id": "P8.1"
+    }
+  ],
+  "expected_findings": [
+    {
+      "id": "SOC2-PRIV-ID-01",
+      "severity": "High",
+      "reason": "Fabricated Privacy criterion IDs P1.2, P1.5, P1.6, and P1.8 appear in auditor-facing output."
+    },
+    {
+      "id": "SOC2-PRIV-ID-02",
+      "severity": "Medium",
+      "reason": "Consent, DSAR, and monitoring evidence are mapped to the wrong Privacy criteria families."
+    },
+    {
+      "id": "SOC2-PRIV-ID-03",
+      "severity": "Medium",
+      "reason": "Authorized disclosures, vendor commitments, and breach notification evidence are collapsed into one generic P1.6 row."
+    }
+  ]
+}
