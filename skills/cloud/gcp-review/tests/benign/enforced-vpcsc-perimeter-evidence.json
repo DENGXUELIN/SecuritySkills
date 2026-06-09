@@ -1,0 +1,63 @@
+{
+  "fixture": "enforced-vpcsc-perimeter-evidence",
+  "expected_skill_decision": {
+    "decision": "Enforced",
+    "risk_level": "low",
+    "reason": "Sensitive managed services are inside enforced perimeters with scoped access levels, narrow ingress/egress policies, clean dry-run disposition, and audit/change evidence."
+  },
+  "vpcsc_evidence": {
+    "evidence_date": "2026-06-08",
+    "decision": "Enforced",
+    "reviewer_confidence": "high"
+  },
+  "perimeter_inventory": [
+    {
+      "perimeter_name": "perimeters/prod-sensitive-data",
+      "mode": "enforced",
+      "protected_projects": [
+        "projects/prod-analytics",
+        "projects/prod-ml"
+      ],
+      "restricted_services": [
+        "bigquery.googleapis.com",
+        "storage.googleapis.com",
+        "pubsub.googleapis.com",
+        "aiplatform.googleapis.com"
+      ],
+      "data_classification": "restricted"
+    }
+  ],
+  "access_levels": [
+    {
+      "name": "accessPolicies/123/accessLevels/corp_managed_workforce",
+      "identity_required": true,
+      "device_required": true,
+      "ip_range_required": true,
+      "region_required": true,
+      "workforce_pool_required": true
+    }
+  ],
+  "ingress_egress_policies": {
+    "broad_rules": [],
+    "method_scoped": true,
+    "approved_principals": [
+      "group:data-platform-reviewers",
+      "serviceAccount:projects/prod-analytics/serviceAccounts/dataflow-runner"
+    ],
+    "approved_destination_projects": [
+      "projects/prod-analytics"
+    ]
+  },
+  "dry_run_violations": {
+    "mode": "enforced",
+    "open_violations": 0,
+    "oldest_unresolved_days": 0,
+    "owner": "data-platform"
+  },
+  "bridge_perimeters": [],
+  "audit_change_evidence": {
+    "access_context_manager_audit_logs_present": true,
+    "change_ticket": "GCP-VPSC-2026-0041",
+    "rollback_owner": "cloud-security"
+  }
+}

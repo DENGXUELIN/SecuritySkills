@@ -1,0 +1,70 @@
+{
+  "fixture": "dry-run-broad-egress-perimeter",
+  "expected_skill_decision": {
+    "decision": "Not Evaluable",
+    "risk_level": "high",
+    "reason": "Sensitive BigQuery and GCS services are only in dry-run mode with broad egress, stale violations, and a bridge to lower-trust projects."
+  },
+  "vpcsc_evidence": {
+    "evidence_date": "2026-06-08",
+    "decision": "Not Evaluable",
+    "reviewer_confidence": "low"
+  },
+  "perimeter_inventory": [
+    {
+      "perimeter_name": "perimeters/analytics-dry-run",
+      "mode": "dry-run",
+      "protected_projects": [
+        "projects/prod-analytics"
+      ],
+      "restricted_services": [
+        "bigquery.googleapis.com"
+      ],
+      "data_classification": "restricted"
+    }
+  ],
+  "access_levels": [
+    {
+      "name": "accessPolicies/123/accessLevels/corp_ip_only",
+      "identity_required": false,
+      "device_required": false,
+      "ip_range_required": true,
+      "region_required": false,
+      "workforce_pool_required": false
+    }
+  ],
+  "ingress_egress_policies": {
+    "broad_rules": [
+      {
+        "principal": "*",
+        "destination_project": "*",
+        "service": "*",
+        "method": "*",
+        "justification": null
+      }
+    ],
+    "method_scoped": false,
+    "approved_principals": [],
+    "approved_destination_projects": []
+  },
+  "dry_run_violations": {
+    "mode": "dry-run",
+    "open_violations": 218,
+    "oldest_unresolved_days": 94,
+    "owner": null
+  },
+  "bridge_perimeters": [
+    {
+      "source": "perimeters/prod-sensitive-data",
+      "target": "perimeters/dev-shared-services",
+      "source_classification": "restricted",
+      "target_classification": "internal",
+      "trust_mismatch": true
+    }
+  ],
+  "audit_change_evidence": {
+    "access_context_manager_audit_logs_present": false,
+    "change_ticket": null,
+    "rollback_owner": null
+  }
+}

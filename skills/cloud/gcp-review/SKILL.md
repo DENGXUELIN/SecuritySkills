@@ -13,7 +13,7 @@ phase: [assess, operate]
 frameworks: [CIS-GCP-v2.0.0]
 difficulty: intermediate
 time_estimate: "60-90min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -88,6 +88,25 @@ For detailed CIS benchmark checklist items with specific Terraform patterns, gre
 
 ---
 
+### Step 8A: VPC Service Controls and Managed-Service Exfiltration Evidence
+
+For sensitive BigQuery, Cloud Storage, Pub/Sub, Dataflow, Vertex AI, Cloud SQL, Secret Manager, and similar managed-service data paths, do not rely on VPC firewall findings alone. Require VPC Service Controls and Access Context Manager evidence before marking managed-service exfiltration boundaries as hardened. If VPC-SC evidence is missing, mark the perimeter claim **Not Evaluable**.
+
+| Gate | Evidence Required | Fail / Not Evaluable When |
+|------|-------------------|---------------------------|
+| `GCP-VPCSC-EVID-01` Perimeter inventory | Perimeter name, mode, protected projects, restricted services, data classification, and last export date | Sensitive projects or services are outside any perimeter, or the perimeter inventory is stale |
+| `GCP-VPCSC-EVID-02` Restricted service coverage | Restricted service list mapped to BigQuery, GCS, Pub/Sub, Dataflow, Vertex AI, Secret Manager, Cloud KMS, and other in-scope APIs | Sensitive service APIs are omitted or only network firewall evidence is provided |
+| `GCP-VPCSC-EVID-03` Access levels | Access Context Manager levels with identity, device, IP, region, workforce, and service-account criteria | Access level relies only on broad IP ranges or lacks identity/device context for privileged data access |
+| `GCP-VPCSC-EVID-04` Ingress / egress policy scope | Principal, source project, destination project, service, method, and justification for every rule | Rules allow any principal, any project, all services, or all methods without explicit approval |
+| `GCP-VPCSC-EVID-05` Dry-run and violation disposition | Dry-run mode, violation volume, oldest unresolved violation, owner, disposition, and enforcement timeline | Dry-run violations are ignored, old, ownerless, or used as permanent non-enforcing policy |
+| `GCP-VPCSC-EVID-06` Bridge perimeter trust | Bridge perimeter participants, environment, data classification, trust level, and justification | Bridge connects production to lower-trust dev/test/shared services without a documented trust match |
+| `GCP-VPCSC-EVID-07` Audit and change evidence | VPC Service Controls audit logs, policy change records, reviewer, approval, and rollback plan | No audit metadata or change record proves who changed the perimeter and why |
+| `GCP-VPCSC-EVID-08` Perimeter decision | Decision: Enforced, Dry-run only, Partial, Not Evaluable, or Not Required, with limitations | Report says data exfiltration is controlled while required VPC-SC evidence is missing |
+
+Recommended local evidence inputs include `gcloud access-context-manager perimeters describe`, `gcloud access-context-manager levels describe`, VPC Service Controls dry-run violation exports, Cloud Audit Logs for `AccessContextManager` changes, and Terraform resources such as `google_access_context_manager_service_perimeter`, `google_access_context_manager_access_level`, and `google_access_context_manager_service_perimeter_resource`.
+
+---
+
 ### Step 9: Compile Assessment Report
 
 
@@ -105,6 +124,12 @@ Produce the final report using the structure defined in the Output Format sectio
 | **Low** | Hardening recommendation or defense-in-depth measure | OS Login not enabled, serial port access not explicitly disabled, BigQuery tables without CMEK |
 | **Informational** | Best practice observation, no direct security impact | Default network still exists (non-production), naming conventions, documentation gaps |
 
+**VPC-SC / managed-service exfiltration classification:**
+
+- **High:** Sensitive managed-service data is outside an enforced perimeter, dry-run violations are ignored, or broad ingress/egress allows cross-project exfiltration.
+- **Medium:** Perimeter exists but access levels, bridge-perimeter trust, audit evidence, or method-level ingress/egress scope is incomplete.
+- **Low:** Perimeter is enforced and scoped, but review cadence, stale violation cleanup, or change-record completeness needs improvement.
+
 ---
 
 ## Output Format
@@ -117,6 +142,8 @@ Produce the final report using the structure defined in the Output Format sectio
 - Date: <assessment date>
 - Framework: CIS Google Cloud Platform Foundation Benchmark v2.0.0
 - Files reviewed: <list of IaC files>
+- VPC-SC decision: <Enforced / Dry-run only / Partial / Not Evaluable / Not Required>
+- VPC-SC evidence date: <YYYY-MM-DD or Not Provided>
 
 ### Executive Summary
 - Total CIS recommendations evaluated: <N>
@@ -137,6 +164,18 @@ Produce the final report using the structure defined in the Output Format sectio
 | 5 | Storage | X | Y | Z | nn% |
 | 6 | Cloud SQL | X | Y | Z | nn% |
 | 7 | BigQuery | X | Y | Z | nn% |
+
+### VPC Service Controls Evidence
+
+| Evidence Area | Status | Scope | Owner | Last Verified | Limitations |
+|---------------|--------|-------|-------|---------------|-------------|
+| Perimeter Inventory | Pass / Fail / Not Evaluable | <perimeters/projects/services> | <team> | <date> | <gaps> |
+| Restricted Services | Pass / Fail / Not Evaluable | <services> | <team> | <date> | <gaps> |
+| Access Levels | Pass / Fail / Not Evaluable | <identity/device/IP/region/workforce criteria> | <team> | <date> | <gaps> |
+| Ingress / Egress Policy Scope | Pass / Fail / Not Evaluable | <principal/project/service/method matrix> | <team> | <date> | <gaps> |
+| Dry-run Violations | Pass / Fail / Not Evaluable | <volume/oldest/disposition> | <team> | <date> | <gaps> |
+| Bridge Perimeter Trust | Pass / Fail / Not Evaluable | <participants/classification> | <team> | <date> | <gaps> |
+| Audit / Change Evidence | Pass / Fail / Not Evaluable | <audit events/change tickets> | <team> | <date> | <gaps> |
 
 ### Detailed Findings
 
@@ -194,6 +233,8 @@ Produce the final report using the structure defined in the Output Format sectio
 4. **Cloud SQL authorized_networks vs. private IP.** CIS 6.5 flags `0.0.0.0/0` in authorized networks, but CIS 6.6 goes further and recommends disabling public IP entirely in favor of private networking.
 5. **BigQuery dataset-level vs. table-level CMEK.** CIS 7.2 checks table-level encryption, while CIS 7.3 checks the dataset default. Both should be evaluated independently.
 6. **Default compute service account identification.** The default SA follows the pattern `PROJECT_NUMBER-compute@developer.gserviceaccount.com`. Grep for this pattern, not just the string "default."
+7. **Treating firewall controls as managed-service perimeters.** VPC firewall rules do not constrain BigQuery, GCS, Pub/Sub, Vertex AI, or Dataflow API data movement. Require VPC Service Controls evidence for sensitive managed-service exfiltration boundaries.
+8. **Ignoring dry-run violations.** A dry-run perimeter can log violations while enforcing nothing. Old or ownerless dry-run violations should block claims that the perimeter is enforced.
 
 ---
 
@@ -225,4 +266,5 @@ Produce the final report using the structure defined in the Output Format sectio
 
 ## Changelog
 
+- **1.0.1** -- Added VPC Service Controls and Access Context Manager evidence gates, VPC-SC output fields, dry-run violation checks, and bridge perimeter trust guidance.
 - **1.0.0** -- Initial release. Full coverage of CIS Google Cloud Platform Foundation Benchmark v2.0.0 sections 1 through 7.
