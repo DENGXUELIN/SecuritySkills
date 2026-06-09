@@ -13,7 +13,7 @@ phase: [operate, respond]
 frameworks: [MITRE-ATT&CK-v16, NIST-SP-800-61-Rev2]
 difficulty: beginner
 time_estimate: "10-20min per alert"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -52,6 +52,7 @@ Before beginning triage, gather or confirm:
 
 - [ ] **Alert details:** Rule name, severity, timestamp, source system (SIEM, EDR, IDS, cloud security).
 - [ ] **Alert data:** The raw event(s) that triggered the alert -- including all available fields (source IP, destination IP, username, hostname, process name, command line, file hash, URL).
+- [ ] **Timeline fidelity evidence:** Event time, ingestion/index time, timezone, clock skew, source latency, dedup keys, raw event IDs, and missing-source notes for correlated data sources.
 - [ ] **ATT&CK mapping:** If the alert rule maps to a MITRE ATT&CK technique, note the technique ID.
 - [ ] **Asset context:** What is the affected asset? (Server, workstation, cloud instance, network device.) What is its business criticality? (Revenue-generating, customer-facing, development, test.)
 - [ ] **User context:** Who is the associated user? (Role, department, normal working hours, recent activity patterns.)
@@ -103,6 +104,50 @@ Connect the alert data with surrounding context to build a picture of what happe
 | Credential Access (TA0006) | Lateral Movement (TA0008) -- were stolen credentials used to move? |
 | Lateral Movement (TA0008) | Collection (TA0009), Exfiltration (TA0010) -- what was the objective? |
 | Command and Control (TA0011) | All tactics -- C2 implies an active intrusion; look for the full chain |
+
+#### Timeline Fidelity Evidence Gate
+
+Before using "no related events in +/- 30 minutes" as evidence for a BTP/FP disposition, validate that the timeline is reliable across SIEM, EDR, identity, cloud, DNS, proxy, and network sources. Missing or delayed telemetry is a timeline gap, not proof that activity did not occur.
+
+Verify:
+
+1. **Event vs. ingestion time:** Record both event time and ingestion/index time where available. Search by event time for activity reconstruction and use ingestion time to detect late arrival.
+2. **Timezone normalization:** Normalize all timestamps to UTC and document daylight-saving-time or local-time ambiguity.
+3. **Clock skew:** Record max observed skew for endpoints, network devices, identity providers, cloud audit streams, and collectors.
+4. **Source latency:** Expand correlation windows when source latency or batch delivery exceeds the base +/- 30 minute window.
+5. **Deduplication:** Deduplicate alert fan-out using stable raw event IDs, process GUIDs, cloud request IDs, alert IDs, or provider correlation IDs before priority changes.
+6. **Gap notation:** Mark unavailable, stale, delayed, or unqueried sources as explicit timeline gaps.
+
+```
+TRIAGE-TIME-01: BTP/FP disposition relies on absence of events without event-time and ingestion-time evidence
+TRIAGE-TIME-02: Timezone, DST, or local-time ambiguity is unresolved across correlated sources
+TRIAGE-TIME-03: Source clock skew is unknown or exceeds the ordering tolerance used for correlation
+TRIAGE-TIME-04: Source latency or batch delivery exceeds the base window but no expanded-window search is performed
+TRIAGE-TIME-05: Duplicate fan-out events are counted or suppressed without stable dedup keys
+TRIAGE-TIME-06: Raw event IDs, query references, or source names are missing, preventing timeline replay
+TRIAGE-TIME-07: Missing EDR, cloud, DNS, proxy, identity, or network data is treated as "no related activity"
+TRIAGE-TIME-08: Priority or disposition changes are made from ingestion-time-only correlation
+```
+
+```
+Timeline Fidelity Evidence:
+- Alert ID:                 [SIEM alert ID]
+- Source:                   [SIEM | EDR | Identity | Cloud | DNS | Proxy | Network]
+- Event Time Field:         [field name or missing]
+- Ingestion/Index Field:    [field name or missing]
+- Timezone / UTC Handling:  [normalized | ambiguous | not provided]
+- Clock Skew:               [duration or not measured]
+- Latency / Delay:          [p50/p95/max or not measured]
+- Dedup Key:                [raw event ID / process GUID / request ID / alert ID / none]
+- Window Decision:          [base window sufficient | expanded window used | gap]
+- Disposition Impact:       [supports decision | lowers confidence | blocks FP closure]
+```
+
+**False-positive guardrails:**
+
+- Do not flag a clean timeline when all sources use UTC, clock skew is within tolerance, late-arrival sources were searched with an expanded window, and raw event IDs are retained.
+- Do not inflate priority from duplicate alert fan-out when dedup keys prove the events represent the same underlying activity.
+- Do not force a wider search for every low-risk alert; expand only when source latency, skew, or missing-source evidence affects the disposition.
 
 ### Phase 3: Classify
 
@@ -194,7 +239,7 @@ Produce the triage decision as a structured report:
 ```markdown
 ## Alert Triage Report
 **Date:** [YYYY-MM-DD HH:MM UTC]
-**Skill:** alert-triage v1.0.0
+**Skill:** alert-triage v1.0.1
 **Frameworks:** MITRE ATT&CK v16, NIST SP 800-61 Rev 2
 **Analyst:** [Name or AI-assisted]
 
@@ -233,6 +278,11 @@ Produce the triage decision as a structured report:
 - **Lateral:** [Related alerts on other hosts/users]
 - **Threat Intel:** [IOC match results]
 - **Kill Chain Position:** [Where this falls in the attack lifecycle]
+
+### Timeline Fidelity
+| Source | Event Time | Ingestion / Index Time | UTC / Skew | Latency | Dedup Key | Window Decision | Disposition Impact |
+|--------|------------|------------------------|------------|---------|-----------|-----------------|--------------------|
+| [source] | [timestamp/field] | [timestamp/field] | [normalized/skew] | [p95/max] | [id] | [base/expanded/gap] | [supports/lowers confidence/blocks FP] |
 
 ### Recommended Actions
 - [ ] [Action 1 -- e.g., isolate host, disable account, block IP]
@@ -319,6 +369,10 @@ Investigating an alert in isolation without checking for activity before and aft
 
 Waiting for complete certainty before escalating a high-priority alert costs response time. NIST SP 800-61 recommends erring on the side of over-notification. If 20 minutes of investigation has not resolved the disposition and the alert involves a critical asset or privileged account, escalate to Tier 2 or the IR team with your current findings and continue investigation in parallel.
 
+### Pitfall 6: Treating Timeline Gaps as Negative Evidence
+
+An empty +/- 30 minute query does not prove no related activity occurred when logs arrived late, timestamps were local, source clocks drifted, duplicated fan-out was collapsed incorrectly, or key data sources were unavailable. Document timeline gaps and avoid final FP closure when the missing source could materially change disposition.
+
 ---
 
 ## 8. Prompt Injection Safety Notice
@@ -344,3 +398,9 @@ This skill processes user-supplied content that may include alert payloads, log 
 7. **Microsoft Sentinel Incident Triage** -- https://learn.microsoft.com/en-us/azure/sentinel/investigate-incidents
 8. **Splunk Enterprise Security Notable Event Triage** -- https://docs.splunk.com/Documentation/ES/latest/User/TriageNotableEvents
 9. **NIST Cybersecurity Framework (CSF) 2.0 -- Detect Function** -- https://www.nist.gov/cyberframework
+
+---
+
+## 10. Changelog
+
+- **1.0.1** -- Add timeline fidelity gates for event time, ingestion time, timezone normalization, source latency, clock skew, deduplication, and replayable raw-event evidence.

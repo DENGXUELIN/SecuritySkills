@@ -1,0 +1,50 @@
+{
+  "scenario": "timeline-fidelity-verified-correlation",
+  "skill": "alert-triage",
+  "expected_skill_version": "1.0.1",
+  "alert": {
+    "id": "SIEM-88422",
+    "rule": "suspicious-powershell",
+    "event_time": "2026-06-08T17:00:00Z",
+    "ingestion_time": "2026-06-08T17:01:10Z",
+    "timezone_normalized": true
+  },
+  "timeline_sources": [
+    {
+      "source": "siem",
+      "event_time_field": "TimeGenerated",
+      "ingestion_time_field": "ingestion_time",
+      "timezone": "UTC",
+      "latency_p95_minutes": 2,
+      "dedup_key": "alert_id",
+      "coverage_decision": "reliable"
+    },
+    {
+      "source": "edr",
+      "event_time_field": "event.timestamp",
+      "ingestion_time_field": "ingest.timestamp",
+      "timezone": "UTC",
+      "latency_p95_minutes": 18,
+      "dedup_key": "process_guid",
+      "coverage_decision": "expanded_window"
+    },
+    {
+      "source": "cloud_audit",
+      "event_time_field": "eventTime",
+      "ingestion_time_field": "receiveTime",
+      "timezone": "UTC",
+      "latency_p95_minutes": 45,
+      "dedup_key": "request_id",
+      "coverage_decision": "expanded_window"
+    }
+  ],
+  "correlation": {
+    "base_window": "plus_minus_30_minutes",
+    "expanded_window": "plus_minus_2_hours",
+    "raw_event_ids_retained": true,
+    "duplicate_alerts_collapsed": true,
+    "timeline_gaps": []
+  },
+  "expected_status": "pass",
+  "false_positive_guardrail": "timeline fidelity should not be flagged when timestamps are normalized, latency is handled with expanded windows, dedup keys are present, and raw event IDs are retained"
+}

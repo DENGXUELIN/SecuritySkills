@@ -1,0 +1,54 @@
+{
+  "scenario": "timeline-gap-false-positive-closure",
+  "skill": "alert-triage",
+  "expected_skill_version": "1.0.1",
+  "alert": {
+    "id": "SIEM-88421",
+    "rule": "suspicious-powershell",
+    "event_time": "2026-06-08T10:00:00-07:00",
+    "ingestion_time": "2026-06-08T17:01:30Z",
+    "timezone_normalized": false
+  },
+  "correlation_query": {
+    "window": "plus_minus_30_minutes",
+    "searched_by": "ingestion_time",
+    "raw_event_ids_retained": false,
+    "disposition": "false_positive"
+  },
+  "delayed_sources": [
+    {
+      "source": "edr",
+      "event_time": "2026-06-08T17:08:00Z",
+      "ingestion_time": "2026-06-08T18:22:00Z",
+      "related_activity": "credential_dump_process"
+    },
+    {
+      "source": "cloud_audit",
+      "event_time": "2026-06-08T17:16:00Z",
+      "ingestion_time": "2026-06-08T19:10:00Z",
+      "related_activity": "suspicious_role_assignment"
+    }
+  ],
+  "timeline_quality": {
+    "clock_skew_checked": false,
+    "dedup_key_used": false,
+    "missing_source_recorded_as_gap": false
+  },
+  "expected_findings": [
+    {
+      "id": "TRIAGE-TIME-01",
+      "severity": "medium",
+      "reason": "false-positive closure relies on absence of events without event-time and ingestion-time evidence"
+    },
+    {
+      "id": "TRIAGE-TIME-04",
+      "severity": "medium",
+      "reason": "late-arriving EDR and cloud audit events were not searched with an expanded window"
+    },
+    {
+      "id": "TRIAGE-TIME-08",
+      "severity": "medium",
+      "reason": "correlation used ingestion-time-only search for activity reconstruction"
+    }
+  ]
+}
