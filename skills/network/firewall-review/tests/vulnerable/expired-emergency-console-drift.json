@@ -1,0 +1,53 @@
+{
+  "fixture": "expired-emergency-console-drift",
+  "expected_skill_decision": {
+    "decision": "Expired",
+    "risk_level": "high",
+    "reason": "Emergency broad access remains active after expiry, has no rollback or owner review, zero-hit cleanup lacks a pre-reset baseline, and deployed cloud policy drifted from IaC."
+  },
+  "firewall_rule": {
+    "rule_id": "sg-console-emergency-ssh-anywhere",
+    "platform": "aws_security_group",
+    "direction": "ingress",
+    "source": "0.0.0.0/0",
+    "destination": "prod-admin-bastion",
+    "port": 22,
+    "action": "allow"
+  },
+  "lifecycle_evidence": {
+    "owner": null,
+    "business_purpose": "emergency access",
+    "change_ticket": null,
+    "approver": null,
+    "implementation_date": "2026-02-01",
+    "expiry": "2026-02-03",
+    "risk_owner": null,
+    "compensating_controls": [],
+    "hit_counter_baseline": {
+      "baseline_timestamp": null,
+      "last_hit": null,
+      "counter_reset_after_baseline": true
+    },
+    "flow_log_validation": {
+      "window_days": 7,
+      "matching_flows": 0,
+      "asset_owner_confirmed": false
+    },
+    "rollback": {
+      "owner": null,
+      "staged_disable": false,
+      "validation_test": null,
+      "rollback_minutes": null
+    },
+    "logging_validation": {
+      "siem_sample_seen": false,
+      "last_log_sample": null
+    },
+    "drift_status": {
+      "source_of_truth": "terraform",
+      "deployed_matches_iac": false,
+      "console_override": true,
+      "last_compared": "2026-06-08"
+    }
+  }
+}

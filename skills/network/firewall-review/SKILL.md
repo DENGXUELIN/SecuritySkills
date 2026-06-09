@@ -13,7 +13,7 @@ phase: [operate]
 frameworks: [CIS-Controls-v8, NIST-SP-800-41-Rev1]
 difficulty: intermediate
 time_estimate: "30-60min"
-version: "1.0.0"
+version: "1.0.1"
 author: unitoneai
 license: MIT
 allowed-tools: Read, Grep, Glob
@@ -194,6 +194,25 @@ Rules with zero hit counts over an extended period (30+ days) indicate stale pol
 
 ---
 
+#### 2.4A Rule Lifecycle and Drift Evidence
+
+Before accepting a broad rule, removing a zero-hit rule, or closing a temporary-rule finding, require rule lifecycle evidence. A packet-match review is not enough to prove that a rule is authorized, time-bound, reversible, and still tied to a valid business need.
+
+| Gate | Evidence Required | Fail / Not Evaluable When |
+|------|-------------------|---------------------------|
+| `FW-LIFECYCLE-EVID-01` Owner and purpose | Rule owner, business purpose, affected application, source/destination asset owner, and implementation date | Rule has only a vague description such as "temporary", "project", "migration", or "emergency" |
+| `FW-LIFECYCLE-EVID-02` Change approval | Ticket, approver, emergency/change type, approval date, and post-implementation reviewer | Emergency or console-created rules bypass change control without later review |
+| `FW-LIFECYCLE-EVID-03` Expiry / review | Expiry date for temporary access or next-review date for accepted risk | Temporary or accepted-risk rules have no expiry, stale review date, or permanent exception |
+| `FW-LIFECYCLE-EVID-04` Risk acceptance | Risk owner, affected assets, compensating control, approved duration, and residual risk | Broad or any/any rules are accepted without accountable risk ownership |
+| `FW-LIFECYCLE-EVID-05` Dependency validation | Hit-counter baseline timestamp, flow-log window, asset-owner confirmation, and dependency inventory | Zero-hit cleanup relies only on a current counter after recent reset/failover/rebuild |
+| `FW-LIFECYCLE-EVID-06` Rollback and validation | Rollback owner, rollback steps, staged disable, test window, and post-change validation | Removal has no rollback plan or production validation evidence |
+| `FW-LIFECYCLE-EVID-07` Logging validation | Evidence that permit/deny logging reaches the expected SIEM after deployment | Logging is configured in policy but no recent log sample proves ingestion |
+| `FW-LIFECYCLE-EVID-08` IaC / deployed drift | Source-of-truth rule ID, deployed rule ID, last drift comparison, and console/manual overrides | Cloud security group, NACL, or firewall policy differs from Terraform/CloudFormation without exception |
+
+Classify lifecycle decisions as **Approved**, **Expired**, **Unsafe to remove**, **Drifted**, or **Not Evaluable**. Do not recommend removal or acceptance when required lifecycle evidence is missing.
+
+---
+
 #### 2.5 Rule Ordering Review (NIST SP 800-41, Section 4.3)
 
 Firewall rules are evaluated top-to-bottom (first match wins in most platforms). Incorrect ordering can lead to security bypasses.
@@ -269,6 +288,12 @@ Produce the final report using the following structure.
 | **Medium** | Shadowed permit rules; missing egress DNS restriction; unused rules (active resources); missing logging on sensitive permits; missing stealth rules. |
 | **Low** | Rule documentation gaps; suboptimal rule ordering with no current security impact; cosmetic rule base issues. |
 
+**Lifecycle-specific classification:**
+
+- **High:** Expired emergency/break-glass rule remains active, console drift exposes production, or zero-hit removal lacks dependency validation for critical services.
+- **Medium:** Rule has owner and purpose but lacks expiry, risk review, logging validation, or IaC drift evidence.
+- **Low:** Lifecycle evidence is complete but review cadence, naming, or ticket linkage needs cleanup.
+
 ---
 
 ## Output Format
@@ -317,6 +342,11 @@ Produce the final report using the following structure.
 | SMTP (25)     | Yes/No    | <mail server IPs>      |
 | HTTPS (443)   | Yes/No    | <proxy or direct>      |
 
+### Rule Lifecycle Evidence
+| Rule ID | Lifecycle Decision | Owner / Ticket | Expiry / Review | Hit Baseline / Flow Logs | Rollback Owner | Logging Validated | Drift Status |
+|---------|--------------------|----------------|-----------------|--------------------------|----------------|-------------------|--------------|
+| <rule-id> | Approved / Expired / Unsafe to remove / Drifted / Not Evaluable | <owner, ticket> | <date> | <baseline + flow window> | <team> | Yes/No | In sync / Drifted |
+
 ### Prioritized Remediation Plan
 1. **[Critical]** <action item with control reference>
 2. **[High]** <action item with control reference>
@@ -361,6 +391,10 @@ Produce the final report using the following structure.
 
 5. **Conflating network ACLs with security groups in cloud environments.** In AWS, NACLs are stateless and operate at the subnet level; security groups are stateful and operate at the instance level. Both must be audited. A permissive NACL can undermine restrictive security group rules for responses.
 
+6. **Accepting broad temporary access without lifecycle evidence.** Temporary incident, migration, and emergency rules must have owner, ticket, approval, expiry, rollback, and monitoring evidence. Otherwise they become permanent exposure.
+
+7. **Trusting IaC while deployed policy drifted.** A clean Terraform security group does not prove the deployed cloud rule base is clean. Compare source-of-truth policy to deployed state and flag console-originated overrides.
+
 ---
 
 ## Prompt Injection Safety Notice
@@ -386,4 +420,5 @@ This skill processes firewall configurations that may contain user-supplied comm
 
 ## Changelog
 
+- **1.0.1** -- Added rule lifecycle and drift evidence gates, lifecycle decision output, zero-hit dependency validation, rollback evidence, and logging validation requirements.
 - **1.0.0** -- Initial release. Full coverage of CIS Controls v8 (4.4, 4.5) and NIST SP 800-41 Rev 1 firewall audit methodology.
